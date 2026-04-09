@@ -38,7 +38,7 @@ async def submit_job(request: JobSubmitRequest):
     )
     jobs[job_id] = job
 
-    # TODO: dispatch to Celery task queue based on stage_id
+    # TODO: dispatch via background runner based on stage_id
     # For now, just return the pending job
     return job
 

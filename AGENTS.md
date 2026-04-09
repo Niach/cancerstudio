@@ -22,7 +22,6 @@ Build a web studio for designing personalized mRNA cancer vaccines. Users provid
 ### Backend (installed)
 
 - FastAPI, Pydantic v2, SQLAlchemy 2.0
-- Celery + Redis (task queue)
 - boto3 (S3/MinIO storage), Biopython
 - PostgreSQL (Docker) or SQLite (local dev fallback)
 - samtools (in Docker image, for BAM/CRAM → FASTQ conversion)
@@ -52,13 +51,11 @@ backend/app/models/records.py             — ORM: WorkspaceRecord, IngestionBat
 backend/app/models/schemas.py             — Pydantic request/response schemas
 backend/app/services/workspace_store.py   — workspace + ingestion business logic
 backend/app/services/s3_storage.py        — S3/MinIO storage abstraction
-backend/app/tasks/celery_app.py           — Celery configuration
-backend/app/tasks/ingestion_tasks.py      — batch normalization task (live)
-backend/app/tasks/pipeline_tasks.py       — pipeline stage tasks (all TODO placeholders)
+backend/app/services/background.py        — ThreadPoolExecutor for async tasks
 backend/tests/test_workspace_api.py       — ingestion test suite with FakeStorage
 
-docker-compose.yml                        — 7 services: frontend, backend, celery-worker,
-                                            redis, postgres, minio, bucket-init
+docker-compose.yml                        — 5 services: frontend, backend,
+                                            postgres, minio, bucket-init
 Dockerfile.frontend                       — Node 20 Alpine
 backend/Dockerfile                        — Python 3.12 + samtools
 ```
@@ -81,7 +78,7 @@ backend/Dockerfile                        — Python 3.12 + samtools
 | GET | `/api/workspaces/{id}` | Get workspace with files and ingestion summary |
 | POST | `/api/workspaces/{id}/files` | Upload FASTQ/BAM/CRAM files |
 | PATCH | `/api/workspaces/{id}/active-stage` | Update active stage |
-| POST | `/api/pipeline/submit` | Submit pipeline job (mock — no Celery dispatch) |
+| POST | `/api/pipeline/submit` | Submit pipeline job (mock — no background dispatch yet) |
 | GET | `/api/pipeline/jobs` | List jobs (in-memory) |
 | GET | `/api/pipeline/jobs/{id}` | Get job |
 | GET | `/api/pipeline/stages` | List all pipeline stages |
@@ -111,9 +108,9 @@ Frontend uses camelCase, backend uses snake_case. `src/lib/api.ts` handles the m
 
 **Live:** Workspace CRUD, file upload, batch normalization (compressed FASTQ copies through, uncompressed gets gzipped, BAM/CRAM converts to paired FASTQ via samtools)
 
-**Mock:** Pipeline job submission — returns a pending job object but does not dispatch Celery tasks
+**Mock:** Pipeline job submission — returns a pending job object but does not dispatch background tasks
 
-**Planned:** Alignment through AI review — all tasks in `pipeline_tasks.py` are TODO placeholders
+**Planned:** Alignment through AI review — pipeline stage runners not yet implemented
 
 ## Known Edge Cases
 
@@ -128,9 +125,6 @@ npm run dev
 
 # Backend API
 cd backend && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-
-# Celery worker
-cd backend && celery -A app.tasks.celery_app worker --loglevel=info
 
 # Full stack (Docker)
 docker compose up --build

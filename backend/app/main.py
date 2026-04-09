@@ -6,12 +6,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import pipeline, workspaces
 from app.db import init_db
+from app.services import background
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     init_db()
     yield
+    background.shutdown()
 
 
 app = FastAPI(

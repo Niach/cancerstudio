@@ -367,10 +367,10 @@ def source_requires_async_processing(source_file: WorkspaceFileRecord) -> bool:
 
 
 def enqueue_batch_normalization(batch_id: str) -> None:
-    from app.tasks.ingestion_tasks import normalize_ingestion_batch
+    from app.services import background
 
     try:
-        normalize_ingestion_batch.delay(batch_id)
+        background.submit(run_batch_normalization, batch_id)
     except Exception as error:
         mark_batch_failed(batch_id, f"Unable to queue normalization: {error}")
 

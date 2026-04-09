@@ -3,7 +3,14 @@
     <module name="cancerstudio" />
     <option name="INTERPRETER_OPTIONS" value="" />
     <option name="PARENT_ENVS" value="true" />
-    <envs />
+    <envs>
+      <env name="S3_BUCKET" value="workspace-data" />
+      <env name="S3_ENDPOINT_URL" value="http://localhost:9000" />
+      <env name="AWS_ACCESS_KEY_ID" value="minioadmin" />
+      <env name="AWS_SECRET_ACCESS_KEY" value="minioadmin" />
+      <env name="AWS_REGION" value="us-east-1" />
+      <env name="S3_FORCE_PATH_STYLE" value="true" />
+    </envs>
     <option name="SDK_HOME" value="$PROJECT_DIR$/backend/venv/bin/python" />
     <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/backend" />
     <option name="IS_MODULE_SDK" value="false" />

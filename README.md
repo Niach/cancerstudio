@@ -17,7 +17,7 @@ The canine case was the starting point, but cancerstudio supports human, dog, an
 - Create workspaces and switch between them
 - Upload FASTQ, BAM, or CRAM files with drag-and-drop
 - Batch normalization: compressed FASTQ copies through, uncompressed gets gzipped, BAM/CRAM converts to paired FASTQ via samtools
-- Full Docker Compose stack (frontend, backend, worker, Redis, Postgres, MinIO)
+- Full Docker Compose stack (frontend, backend, Postgres, MinIO)
 - Backend test suite covering the ingestion flow
 
 Alignment is next. Everything downstream (variant calling through construct output) is planned but not yet wired up.
@@ -37,9 +37,9 @@ Upload FASTQ, BAM, or CRAM files, track normalization, and see when canonical pa
 ## Stack
 
 - **Frontend:** Next.js 15.5, React 19, TypeScript, Tailwind CSS
-- **Backend:** FastAPI, Celery + Redis, SQLAlchemy
+- **Backend:** FastAPI, SQLAlchemy
 - **Storage:** PostgreSQL (Docker) or SQLite (local dev), MinIO for files
-- **Infra:** Docker Compose with 7 services
+- **Infra:** Docker Compose with 5 services
 
 ## Local development
 
@@ -58,14 +58,6 @@ python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-### Celery worker
-
-```bash
-cd backend
-source venv/bin/activate
-celery -A app.tasks.celery_app worker --loglevel=info
 ```
 
 ### Docker (full stack)
