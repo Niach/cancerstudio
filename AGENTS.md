@@ -8,7 +8,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## Mission
 
-Build a web studio for designing personalized mRNA cancer vaccines. Users provide tumor + normal sequencing data, and the pipeline processes it through to an mRNA vaccine construct. See `CLAUDE.md` for the full scientific context.
+Build a desktop-first studio for designing personalized mRNA cancer vaccines. Users provide tumor + normal sequencing data from local disk, and the pipeline processes it through to an mRNA vaccine construct. See `CLAUDE.md` for the full scientific context.
 
 ## Stack
 
@@ -19,12 +19,16 @@ Build a web studio for designing personalized mRNA cancer vaccines. Users provid
 - `lucide-react` for icons
 - `class-variance-authority`, `clsx`, `tailwind-merge`, `tw-animate-css`
 
+### Desktop shell (installed)
+
+- Electron 37
+
 ### Backend (installed)
 
-- FastAPI, Pydantic v2, SQLAlchemy 2.0
-- boto3 (S3/MinIO storage), Biopython
-- PostgreSQL (Docker) or SQLite (local dev fallback)
-- samtools (in Docker image, for BAM/CRAM → FASTQ conversion)
+- FastAPI, Pydantic v2, SQLAlchemy 2.0, Biopython
+- Local filesystem + SQLite via `backend/app/runtime.py`
+- `samtools` for BAM/CRAM -> FASTQ normalization
+- `bwa-mem2` + `samtools` for alignment
 
 ## Repo Map
 
@@ -34,30 +38,34 @@ src/app/workspaces/[workspaceId]/page.tsx — redirect to active stage
 src/app/workspaces/[workspaceId]/[stage]/page.tsx — stage view
 src/app/layout.tsx                        — root layout
 
-src/components/workspaces/                — IngestionStagePanel, FutureStagePanel,
-                                            WorkspaceStageShell, WorkspaceCreateCard
+src/components/workspaces/                — IngestionStagePanel, AlignmentStagePanel,
+                                            FutureStagePanel, WorkspaceStageShell,
+                                            WorkspaceCreateCard
 src/components/ui/                        — button, badge, card, progress, tabs, separator
 
 src/lib/api.ts                            — API client (snake_case → camelCase mapping)
+src/lib/desktop.ts                        — Electron bridge typing/helpers
 src/lib/types.ts                          — all domain types + PIPELINE_STAGES constant
 src/lib/workspace-utils.ts                — workspace helper functions
 
-backend/app/main.py                       — FastAPI app, CORS, WebSocket
-backend/app/db.py                         — SQLAlchemy engine, session, init_db
-backend/app/api/workspaces.py             — workspace CRUD + file upload endpoints
-backend/app/api/pipeline.py               — pipeline job endpoints (in-memory store)
-backend/app/models/records.py             — ORM: WorkspaceRecord, IngestionBatchRecord,
-                                            WorkspaceFileRecord
-backend/app/models/schemas.py             — Pydantic request/response schemas
-backend/app/services/workspace_store.py   — workspace + ingestion business logic
-backend/app/services/s3_storage.py        — S3/MinIO storage abstraction
-backend/app/services/background.py        — ThreadPoolExecutor for async tasks
-backend/tests/test_workspace_api.py       — ingestion test suite with FakeStorage
+electron/main.cjs                         — Electron BrowserWindow shell + IPC
+electron/preload.cjs                      — safe renderer bridge
 
-docker-compose.yml                        — 5 services: frontend, backend,
-                                            postgres, minio, bucket-init
-Dockerfile.frontend                       — Node 20 Alpine
-backend/Dockerfile                        — Python 3.12 + samtools
+backend/app/main.py                       — FastAPI app, CORS, router wiring
+backend/app/runtime.py                    — app-data and workspace path helpers
+backend/app/db.py                         — SQLAlchemy engine, session, init_db
+backend/app/api/workspaces.py             — workspace CRUD, local-file ingestion,
+                                            alignment endpoints
+backend/app/models/records.py             — ORM: WorkspaceRecord, IngestionBatchRecord,
+                                            WorkspaceFileRecord, PipelineRunRecord,
+                                            PipelineArtifactRecord
+backend/app/models/schemas.py             — Pydantic request/response schemas
+backend/app/services/workspace_store.py   — workspace, ingestion, normalization logic
+backend/app/services/alignment.py         — local alignment runner + artifacts
+backend/app/services/background.py        — ThreadPoolExecutor for async tasks
+backend/tests/test_workspace_api.py       — workspace and ingestion API coverage
+backend/tests/test_real_data_ingestion.py — real-data smoke coverage
+.run/Cancerstudio Electron App.run.xml    — shared JetBrains run config
 ```
 
 ## Routes
@@ -66,7 +74,7 @@ backend/Dockerfile                        — Python 3.12 + samtools
 |------|-------------|
 | `/` | Lists workspaces or shows create card |
 | `/workspaces/[workspaceId]` | Redirects to the workspace's active stage |
-| `/workspaces/[workspaceId]/[stage]` | Stage panel — ingestion is live, others show FutureStagePanel |
+| `/workspaces/[workspaceId]/[stage]` | Stage panel — ingestion and alignment are live, later stages stay clearly marked as future work |
 
 ## API Endpoints
 
@@ -76,25 +84,29 @@ backend/Dockerfile                        — Python 3.12 + samtools
 | GET | `/api/workspaces` | List all workspaces |
 | POST | `/api/workspaces` | Create workspace |
 | GET | `/api/workspaces/{id}` | Get workspace with files and ingestion summary |
-| POST | `/api/workspaces/{id}/files` | Upload FASTQ/BAM/CRAM files |
+| PATCH | `/api/workspaces/{id}/analysis-profile` | Set assay/reference choices |
 | PATCH | `/api/workspaces/{id}/active-stage` | Update active stage |
-| POST | `/api/pipeline/submit` | Submit pipeline job (mock — no background dispatch yet) |
-| GET | `/api/pipeline/jobs` | List jobs (in-memory) |
-| GET | `/api/pipeline/jobs/{id}` | Get job |
-| GET | `/api/pipeline/stages` | List all pipeline stages |
-| GET | `/api/pipeline/results/{stage_id}/{workspace_id}` | Not implemented |
-| WS | `/ws/jobs` | WebSocket for job updates (skeleton) |
+| POST | `/api/workspaces/{id}/ingestion/local-files` | Register local FASTQ/BAM/CRAM files |
+| GET | `/api/workspaces/{id}/ingestion/preview/{sample_lane}` | Preview canonical reads |
+| DELETE | `/api/workspaces/{id}/ingestion` | Reset ingestion state |
+| GET | `/api/workspaces/{id}/alignment` | Load alignment summary |
+| POST | `/api/workspaces/{id}/alignment/run` | Start alignment |
+| POST | `/api/workspaces/{id}/alignment/rerun` | Re-run alignment |
+| GET | `/api/workspaces/{id}/alignment/artifacts/{artifact_id}/download` | Download BAM/QC artifacts |
 
 ## Data Model
 
 ```
 Workspace
   ├── id, displayName, species (human | dog | cat), activeStage, createdAt, updatedAt
+  ├── analysisProfile: assayType + referencePreset/referenceOverride
   ├── ingestion: IngestionSummary (status, readyForAlignment, sourceFileCount, ...)
   └── files: WorkspaceFile[]
         ├── id, batchId, filename, format (fastq | bam | cram)
         ├── fileRole (source | canonical), status (uploaded | normalizing | ready | failed)
-        ├── readPair (R1 | R2 | unknown), sizeBytes, storageKey
+        ├── readPair (R1 | R2 | unknown), sizeBytes
+        ├── sourcePath? (original local file)
+        ├── managedPath? (app-managed canonical/alignment output)
         └── error?
 
 Pipeline stages: ingestion → alignment → variant-calling → annotation →
@@ -106,35 +118,43 @@ Frontend uses camelCase, backend uses snake_case. `src/lib/api.ts` handles the m
 
 ## Implementation Status
 
-**Live:** Workspace CRUD, file upload, batch normalization (compressed FASTQ copies through, uncompressed gets gzipped, BAM/CRAM converts to paired FASTQ via samtools)
+**Live:**
 
-**Mock:** Pipeline job submission — returns a pending job object but does not dispatch background tasks
+- Workspace CRUD with species-aware reference preset defaults (GRCh38 / CanFam4 / felCat9)
+- Paired tumor + normal lane model with local-file registration (FASTQ / BAM / CRAM)
+- Canonical FASTQ normalization via `samtools` (BAM/CRAM → paired gzipped FASTQ)
+- Lane-level canonical read preview (sampled FASTQ + GC / length stats)
+- Alignment stage: BWA-MEM2 + samtools, per-lane flagstat / idxstats / stats, QC verdict
+- First-run reference bootstrap under the app-data directory; custom `REFERENCE_*_FASTA` overrides
+- Alignment artifact download (BAM / BAI / flagstat / idxstats / stats)
+- Desktop intake via Electron IPC bridge (`src/lib/desktop.ts` ↔ `electron/preload.cjs`)
+- Real-data smoke harness: `test_real_data_ingestion.py` + `tests/e2e/ingestion-real-data.spec.ts`
 
-**Planned:** Alignment through AI review — pipeline stage runners not yet implemented
+**Planned:** Variant calling through AI review — these stages render `FutureStagePanel.tsx` placeholders and have no backend runner.
 
 ## Known Edge Cases
 
 1. **Unpaired readiness bug:** `batch_status_from_files()` checks for *any* ready R1 and *any* ready R2 in the batch without verifying they belong to the same sample pair. See `workspace_store.py` around `summarize_batch`.
-2. **Empty workspace names:** The API accepts whitespace-only names, which trim to empty strings. See `workspace_store.py` around `create_workspace`.
 
 ## Development Commands
 
 ```bash
-# Frontend
-npm run dev
+# Desktop app
+npm run desktop:dev
 
-# Backend API
-cd backend && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-
-# Full stack (Docker)
-docker compose up --build
+# Split-process desktop dev
+npm run desktop:frontend
+npm run desktop:backend
+npm run desktop:electron
 
 # Lint
 npm run lint
 
 # Backend tests
-./backend/venv/bin/pytest backend/tests
+./.venv/bin/pytest backend/tests
 ```
+
+`npm run sample-data:alignment` expects a local `samtools` binary.
 
 ## Agent Rules
 

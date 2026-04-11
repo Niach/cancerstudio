@@ -10,8 +10,9 @@ export type PipelineStageId =
   | "construct-output"
   | "ai-review";
 
-export type JobStatus = "pending" | "running" | "completed" | "failed";
 export type WorkspaceSpecies = "human" | "dog" | "cat";
+export type AssayType = "wgs" | "wes";
+export type ReferencePreset = "grch38" | "canfam4" | "felcat9";
 export type SampleLane = "tumor" | "normal";
 export type WorkspaceFileFormat = "fastq" | "bam" | "cram";
 export type WorkspaceFileRole = "source" | "canonical";
@@ -27,19 +28,28 @@ export type IngestionStatus =
   | "normalizing"
   | "ready"
   | "failed";
-export type UploadSessionStatus =
-  | "uploading"
-  | "uploaded"
-  | "failed"
-  | "committed";
-export type UploadSessionFileStatus =
-  | "pending"
-  | "uploading"
-  | "uploaded"
-  | "failed";
 export type ReadPair = "R1" | "R2" | "SE" | "unknown";
 export type ReadLayout = "paired" | "single";
 export type StageImplementationState = "live" | "mock" | "planned";
+export type PipelineStageGroup = "primary" | "later";
+export type AlignmentStageStatus =
+  | "blocked"
+  | "ready"
+  | "running"
+  | "completed"
+  | "failed";
+export type AlignmentRunStatus = "pending" | "running" | "completed" | "failed";
+export type AlignmentRuntimePhase =
+  | "preparing_reference"
+  | "aligning"
+  | "finalizing";
+export type QcVerdict = "pass" | "warn" | "fail";
+export type AlignmentArtifactKind =
+  | "bam"
+  | "bai"
+  | "flagstat"
+  | "idxstats"
+  | "stats";
 
 export interface PipelineStage {
   id: PipelineStageId;
@@ -48,18 +58,7 @@ export interface PipelineStage {
   icon: string;
   tools: string[];
   implementationState: StageImplementationState;
-}
-
-export interface Job {
-  id: string;
-  workspaceId: string | null;
-  stageId: PipelineStageId;
-  status: JobStatus;
-  progress: number;
-  createdAt: string;
-  updatedAt: string;
-  error?: string;
-  result?: Record<string, unknown> | null;
+  group: PipelineStageGroup;
 }
 
 export interface WorkspaceFile {
@@ -74,7 +73,8 @@ export interface WorkspaceFile {
   sizeBytes: number;
   uploadedAt: string;
   readPair: ReadPair;
-  storageKey: string;
+  sourcePath?: string | null;
+  managedPath?: string | null;
   error?: string | null;
 }
 
@@ -97,61 +97,27 @@ export interface IngestionSummary {
   lanes: Record<SampleLane, IngestionLaneSummary>;
 }
 
-export interface UploadSessionFile {
-  id: string;
-  sampleLane: SampleLane;
-  filename: string;
-  format: WorkspaceFileFormat;
-  readPair: ReadPair;
-  sizeBytes: number;
-  uploadedBytes: number;
-  totalParts: number;
-  lastModifiedMs: number;
-  fingerprint: string;
-  contentType?: string | null;
-  status: UploadSessionFileStatus;
-  error?: string | null;
-  completedPartNumbers: number[];
-}
-
-export interface UploadSession {
-  id: string;
-  sampleLane: SampleLane;
-  status: UploadSessionStatus;
-  chunkSizeBytes: number;
-  error?: string | null;
-  files: UploadSessionFile[];
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface CreateWorkspaceInput {
   displayName: string;
   species: WorkspaceSpecies;
 }
 
-export interface UploadSessionCreateFileInput {
-  filename: string;
-  sizeBytes: number;
-  lastModifiedMs: number;
-  contentType?: string;
+export interface AnalysisProfile {
+  assayType?: AssayType | null;
+  referencePreset?: ReferencePreset | null;
+  referenceOverride?: string | null;
 }
 
-export interface UploadSessionCreateInput {
+export interface LocalFileRegistrationInput {
   sampleLane: SampleLane;
-  files: UploadSessionCreateFileInput[];
-}
-
-export interface UploadPartResult {
-  uploadedBytes: number;
-  totalParts: number;
-  completedPartNumbers: number[];
+  paths: string[];
 }
 
 export interface Workspace {
   id: string;
   displayName: string;
   species: WorkspaceSpecies;
+  analysisProfile: AnalysisProfile;
   activeStage: PipelineStageId;
   ingestion: IngestionSummary;
   files: WorkspaceFile[];
@@ -182,6 +148,59 @@ export interface IngestionLanePreview {
   readLayout: ReadLayout;
   reads: Partial<Record<Extract<ReadPair, "R1" | "R2" | "SE">, FastqReadPreview[]>>;
   stats: SampledReadStats;
+}
+
+export interface AlignmentLaneMetrics {
+  sampleLane: SampleLane;
+  totalReads: number;
+  mappedReads: number;
+  mappedPercent: number;
+  properlyPairedPercent?: number | null;
+  duplicatePercent?: number | null;
+  meanInsertSize?: number | null;
+}
+
+export interface AlignmentArtifact {
+  id: string;
+  artifactKind: AlignmentArtifactKind;
+  sampleLane?: SampleLane | null;
+  filename: string;
+  sizeBytes: number;
+  downloadPath: string;
+  localPath?: string | null;
+}
+
+export interface AlignmentRun {
+  id: string;
+  status: AlignmentRunStatus;
+  progress: number;
+  assayType?: AssayType | null;
+  referencePreset?: ReferencePreset | null;
+  referenceOverride?: string | null;
+  referenceLabel?: string | null;
+  runtimePhase?: AlignmentRuntimePhase | null;
+  qcVerdict?: QcVerdict | null;
+  createdAt: string;
+  updatedAt: string;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  blockingReason?: string | null;
+  error?: string | null;
+  commandLog: string[];
+  laneMetrics: Partial<Record<SampleLane, AlignmentLaneMetrics>>;
+  artifacts: AlignmentArtifact[];
+}
+
+export interface AlignmentStageSummary {
+  workspaceId: string;
+  status: AlignmentStageStatus;
+  blockingReason?: string | null;
+  analysisProfile: AnalysisProfile;
+  qcVerdict?: QcVerdict | null;
+  readyForVariantCalling: boolean;
+  latestRun?: AlignmentRun | null;
+  laneMetrics: Record<SampleLane, AlignmentLaneMetrics | null>;
+  artifacts: AlignmentArtifact[];
 }
 
 export interface DLAAllele {
@@ -222,42 +241,47 @@ export const PIPELINE_STAGES: PipelineStage[] = [
     id: "ingestion",
     name: "Ingestion",
     description:
-      "Upload tumor and normal sequencing files, then normalize them into canonical paired FASTQ",
+      "Choose local tumor and normal sequencing files, then normalize them into canonical paired FASTQ",
     icon: "Upload",
     tools: ["samtools", "fastp"],
     implementationState: "live",
+    group: "primary",
   },
   {
     id: "alignment",
     name: "Alignment",
-    description: "Consume canonical paired FASTQ reads for reference alignment",
+    description: "Align canonical tumor and normal FASTQ reads, then score BAM quality",
     icon: "GitBranch",
-    tools: ["BWA-MEM2", "pysam"],
-    implementationState: "mock",
+    tools: ["BWA-MEM2", "samtools"],
+    implementationState: "live",
+    group: "primary",
   },
   {
     id: "variant-calling",
     name: "Variant Calling",
-    description: "Identify somatic mutations with ensemble callers",
+    description: "Call somatic variants from the aligned tumor and normal BAMs",
     icon: "Search",
-    tools: ["GATK Mutect2", "Strelka2", "DeepSomatic"],
+    tools: ["GATK Mutect2"],
     implementationState: "planned",
+    group: "primary",
   },
   {
     id: "annotation",
     name: "Annotation",
     description: "Annotate variants with functional consequences",
     icon: "Tag",
-    tools: ["Ensembl VEP", "SnpEff"],
+    tools: ["Ensembl VEP"],
     implementationState: "planned",
+    group: "primary",
   },
   {
     id: "neoantigen-prediction",
     name: "Neoantigen Prediction",
     description: "Predict MHC binding for mutant peptides against DLA alleles",
     icon: "Target",
-    tools: ["pVACseq", "NetMHCpan-4.1", "MHCflurry"],
+    tools: ["pVACseq", "NetMHCpan-4.1"],
     implementationState: "planned",
+    group: "primary",
   },
   {
     id: "epitope-selection",
@@ -266,6 +290,7 @@ export const PIPELINE_STAGES: PipelineStage[] = [
     icon: "ListChecks",
     tools: ["pVACview", "custom scoring"],
     implementationState: "planned",
+    group: "primary",
   },
   {
     id: "construct-design",
@@ -274,6 +299,7 @@ export const PIPELINE_STAGES: PipelineStage[] = [
     icon: "Dna",
     tools: ["LinearDesign", "DNAchisel", "ViennaRNA"],
     implementationState: "planned",
+    group: "primary",
   },
   {
     id: "structure-prediction",
@@ -282,6 +308,7 @@ export const PIPELINE_STAGES: PipelineStage[] = [
     icon: "Box",
     tools: ["Boltz-2", "ESMFold", "Mol*"],
     implementationState: "planned",
+    group: "later",
   },
   {
     id: "construct-output",
@@ -290,6 +317,7 @@ export const PIPELINE_STAGES: PipelineStage[] = [
     icon: "FileOutput",
     tools: ["pVACvector", "Biopython"],
     implementationState: "planned",
+    group: "primary",
   },
   {
     id: "ai-review",
@@ -298,8 +326,17 @@ export const PIPELINE_STAGES: PipelineStage[] = [
     icon: "Brain",
     tools: ["Claude API", "ESM-C"],
     implementationState: "planned",
+    group: "later",
   },
 ];
+
+export const PRIMARY_PIPELINE_STAGES = PIPELINE_STAGES.filter(
+  (stage) => stage.group === "primary"
+);
+
+export const LATER_RESEARCH_STAGES = PIPELINE_STAGES.filter(
+  (stage) => stage.group === "later"
+);
 
 export function isPipelineStageId(value: string): value is PipelineStageId {
   return PIPELINE_STAGES.some((stage) => stage.id === value);

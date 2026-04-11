@@ -1,20 +1,24 @@
 import type {
+  AlignmentArtifact,
+  AlignmentLaneMetrics,
+  AlignmentRuntimePhase,
+  AlignmentStageSummary,
+  AlignmentRun,
+  AnalysisProfile,
+  AssayType,
   CreateWorkspaceInput,
   FastqReadPreview,
   IngestionLaneSummary,
   IngestionLanePreview,
   IngestionSummary,
-  Job,
+  LocalFileRegistrationInput,
   PipelineStageId,
   ReadPair,
   SampledReadStats,
-  SampleLane,
-  UploadPartResult,
-  UploadSession,
-  UploadSessionCreateInput,
-  UploadSessionFile,
   Workspace,
   WorkspaceFile,
+  ReferencePreset,
+  SampleLane,
   WorkspaceSpecies,
 } from "@/lib/types";
 
@@ -37,7 +41,8 @@ type WorkspaceFileDto = {
   size_bytes: number;
   uploaded_at: string;
   read_pair: WorkspaceFile["readPair"];
-  storage_key: string;
+  source_path?: string | null;
+  managed_path?: string | null;
   error?: string | null;
 };
 
@@ -60,47 +65,20 @@ type IngestionSummaryDto = {
   lanes: Record<SampleLane, IngestionLaneSummaryDto>;
 };
 
+type AnalysisProfileDto = {
+  assay_type?: AssayType | null;
+  reference_preset?: ReferencePreset | null;
+  reference_override?: string | null;
+};
+
 type WorkspaceDto = {
   id: string;
   display_name: string;
   species: WorkspaceSpecies;
+  analysis_profile: AnalysisProfileDto;
   active_stage: PipelineStageId;
   ingestion: IngestionSummaryDto;
   files: WorkspaceFileDto[];
-  created_at: string;
-  updated_at: string;
-};
-
-type UploadSessionPartDto = {
-  uploaded_bytes: number;
-  total_parts: number;
-  completed_part_numbers: number[];
-};
-
-type UploadSessionFileDto = {
-  id: string;
-  sample_lane: SampleLane;
-  filename: string;
-  format: UploadSessionFile["format"];
-  read_pair: UploadSessionFile["readPair"];
-  size_bytes: number;
-  uploaded_bytes: number;
-  total_parts: number;
-  last_modified_ms: number;
-  fingerprint: string;
-  content_type?: string | null;
-  status: UploadSessionFile["status"];
-  error?: string | null;
-  completed_part_numbers: number[];
-};
-
-type UploadSessionDto = {
-  id: string;
-  sample_lane: SampleLane;
-  status: UploadSession["status"];
-  chunk_size_bytes: number;
-  error?: string | null;
-  files: UploadSessionFileDto[];
   created_at: string;
   updated_at: string;
 };
@@ -132,16 +110,57 @@ type IngestionLanePreviewDto = {
   stats: SampledReadStatsDto;
 };
 
-type JobDto = {
+type AlignmentLaneMetricsDto = {
+  sample_lane: SampleLane;
+  total_reads: number;
+  mapped_reads: number;
+  mapped_percent: number;
+  properly_paired_percent?: number | null;
+  duplicate_percent?: number | null;
+  mean_insert_size?: number | null;
+};
+
+type AlignmentArtifactDto = {
   id: string;
-  workspace_id: string | null;
-  stage_id: PipelineStageId;
-  status: Job["status"];
+  artifact_kind: AlignmentArtifact["artifactKind"];
+  sample_lane?: SampleLane | null;
+  filename: string;
+  size_bytes: number;
+  download_path: string;
+  local_path?: string | null;
+};
+
+type AlignmentRunDto = {
+  id: string;
+  status: AlignmentRun["status"];
   progress: number;
+  assay_type?: AssayType | null;
+  reference_preset?: ReferencePreset | null;
+  reference_override?: string | null;
+  reference_label?: string | null;
+  runtime_phase?: AlignmentRuntimePhase | null;
+  qc_verdict?: AlignmentStageSummary["qcVerdict"];
   created_at: string;
   updated_at: string;
-  error?: string;
-  result?: Record<string, unknown> | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+  blocking_reason?: string | null;
+  error?: string | null;
+  command_log: string[];
+  lane_metrics: Partial<Record<SampleLane, AlignmentLaneMetricsDto>>;
+  artifacts: AlignmentArtifactDto[];
+};
+
+type AlignmentStageSummaryDto = {
+  workspace_id: string;
+  status: AlignmentStageSummary["status"];
+  blocking_reason?: string | null;
+  analysis_profile: AnalysisProfileDto;
+  qc_verdict?: AlignmentStageSummary["qcVerdict"];
+  ready_for_variant_calling: boolean;
+  latest_run?: AlignmentRunDto | null;
+  lane_metrics: Record<SampleLane, AlignmentLaneMetricsDto | null>;
+  artifacts: AlignmentArtifactDto[];
 };
 
 function mapWorkspaceFile(dto: WorkspaceFileDto): WorkspaceFile {
@@ -157,7 +176,8 @@ function mapWorkspaceFile(dto: WorkspaceFileDto): WorkspaceFile {
     sizeBytes: dto.size_bytes,
     uploadedAt: dto.uploaded_at,
     readPair: dto.read_pair,
-    storageKey: dto.storage_key,
+    sourcePath: dto.source_path,
+    managedPath: dto.managed_path,
     error: dto.error,
   };
 }
@@ -188,54 +208,23 @@ function mapIngestionSummary(dto: IngestionSummaryDto): IngestionSummary {
   };
 }
 
+function mapAnalysisProfile(dto: AnalysisProfileDto): AnalysisProfile {
+  return {
+    assayType: dto.assay_type ?? null,
+    referencePreset: dto.reference_preset ?? null,
+    referenceOverride: dto.reference_override ?? null,
+  };
+}
+
 function mapWorkspace(dto: WorkspaceDto): Workspace {
   return {
     id: dto.id,
     displayName: dto.display_name,
     species: dto.species,
+    analysisProfile: mapAnalysisProfile(dto.analysis_profile),
     activeStage: dto.active_stage,
     ingestion: mapIngestionSummary(dto.ingestion),
     files: dto.files.map(mapWorkspaceFile),
-    createdAt: dto.created_at,
-    updatedAt: dto.updated_at,
-  };
-}
-
-function mapUploadPartResult(dto: UploadSessionPartDto): UploadPartResult {
-  return {
-    uploadedBytes: dto.uploaded_bytes,
-    totalParts: dto.total_parts,
-    completedPartNumbers: dto.completed_part_numbers,
-  };
-}
-
-function mapUploadSessionFile(dto: UploadSessionFileDto): UploadSessionFile {
-  return {
-    id: dto.id,
-    sampleLane: dto.sample_lane,
-    filename: dto.filename,
-    format: dto.format,
-    readPair: dto.read_pair,
-    sizeBytes: dto.size_bytes,
-    uploadedBytes: dto.uploaded_bytes,
-    totalParts: dto.total_parts,
-    lastModifiedMs: dto.last_modified_ms,
-    fingerprint: dto.fingerprint,
-    contentType: dto.content_type,
-    status: dto.status,
-    error: dto.error,
-    completedPartNumbers: dto.completed_part_numbers,
-  };
-}
-
-function mapUploadSession(dto: UploadSessionDto): UploadSession {
-  return {
-    id: dto.id,
-    sampleLane: dto.sample_lane,
-    status: dto.status,
-    chunkSizeBytes: dto.chunk_size_bytes,
-    error: dto.error,
-    files: dto.files.map(mapUploadSessionFile),
     createdAt: dto.created_at,
     updatedAt: dto.updated_at,
   };
@@ -284,17 +273,82 @@ function mapIngestionLanePreview(
   };
 }
 
-function mapJob(dto: JobDto): Job {
+function mapAlignmentLaneMetrics(
+  dto: AlignmentLaneMetricsDto
+): AlignmentLaneMetrics {
+  return {
+    sampleLane: dto.sample_lane,
+    totalReads: dto.total_reads,
+    mappedReads: dto.mapped_reads,
+    mappedPercent: dto.mapped_percent,
+    properlyPairedPercent: dto.properly_paired_percent ?? null,
+    duplicatePercent: dto.duplicate_percent ?? null,
+    meanInsertSize: dto.mean_insert_size ?? null,
+  };
+}
+
+function mapAlignmentArtifact(dto: AlignmentArtifactDto): AlignmentArtifact {
   return {
     id: dto.id,
-    workspaceId: dto.workspace_id,
-    stageId: dto.stage_id,
+    artifactKind: dto.artifact_kind,
+    sampleLane: dto.sample_lane ?? null,
+    filename: dto.filename,
+    sizeBytes: dto.size_bytes,
+    downloadPath: dto.download_path,
+    localPath: dto.local_path ?? null,
+  };
+}
+
+function mapAlignmentRun(dto: AlignmentRunDto): AlignmentRun {
+  const laneMetrics: AlignmentRun["laneMetrics"] = {};
+  if (dto.lane_metrics.tumor) {
+    laneMetrics.tumor = mapAlignmentLaneMetrics(dto.lane_metrics.tumor);
+  }
+  if (dto.lane_metrics.normal) {
+    laneMetrics.normal = mapAlignmentLaneMetrics(dto.lane_metrics.normal);
+  }
+  return {
+    id: dto.id,
     status: dto.status,
     progress: dto.progress,
+    assayType: dto.assay_type ?? null,
+    referencePreset: dto.reference_preset ?? null,
+    referenceOverride: dto.reference_override ?? null,
+    referenceLabel: dto.reference_label ?? null,
+    runtimePhase: dto.runtime_phase ?? null,
+    qcVerdict: dto.qc_verdict ?? null,
     createdAt: dto.created_at,
     updatedAt: dto.updated_at,
-    error: dto.error,
-    result: dto.result ?? null,
+    startedAt: dto.started_at ?? null,
+    completedAt: dto.completed_at ?? null,
+    blockingReason: dto.blocking_reason ?? null,
+    error: dto.error ?? null,
+    commandLog: dto.command_log,
+    laneMetrics,
+    artifacts: dto.artifacts.map(mapAlignmentArtifact),
+  };
+}
+
+function mapAlignmentStageSummary(
+  dto: AlignmentStageSummaryDto
+): AlignmentStageSummary {
+  return {
+    workspaceId: dto.workspace_id,
+    status: dto.status,
+    blockingReason: dto.blocking_reason ?? null,
+    analysisProfile: mapAnalysisProfile(dto.analysis_profile),
+    qcVerdict: dto.qc_verdict ?? null,
+    readyForVariantCalling: dto.ready_for_variant_calling,
+    latestRun: dto.latest_run ? mapAlignmentRun(dto.latest_run) : null,
+    laneMetrics: {
+      tumor: dto.lane_metrics.tumor
+        ? mapAlignmentLaneMetrics(dto.lane_metrics.tumor)
+        : null,
+      normal: dto.lane_metrics.normal
+        ? mapAlignmentLaneMetrics(dto.lane_metrics.normal)
+        : null,
+    },
+    artifacts: dto.artifacts.map(mapAlignmentArtifact),
   };
 }
 
@@ -330,84 +384,6 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
-function uploadBinaryWithProgress(
-  path: string,
-  body: Blob,
-  {
-    onProgress,
-    signal,
-  }: {
-    onProgress?: (loaded: number, total: number) => void;
-    signal?: AbortSignal;
-  } = {}
-): Promise<UploadPartResult> {
-  if (typeof XMLHttpRequest === "undefined") {
-    throw new Error("Chunk uploads are only supported in the browser");
-  }
-
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-
-    const cleanup = () => {
-      if (signal) {
-        signal.removeEventListener("abort", handleAbort);
-      }
-    };
-
-    const handleAbort = () => {
-      xhr.abort();
-      cleanup();
-      reject(new DOMException("Upload aborted", "AbortError"));
-    };
-
-    xhr.open("PUT", `${API_BASE}${path}`);
-    xhr.responseType = "json";
-    xhr.setRequestHeader("Content-Type", "application/octet-stream");
-
-    xhr.upload.onprogress = (event) => {
-      if (!event.lengthComputable) {
-        onProgress?.(event.loaded, body.size);
-        return;
-      }
-      onProgress?.(event.loaded, event.total);
-    };
-
-    xhr.onerror = () => {
-      cleanup();
-      reject(new Error("Chunk upload failed"));
-    };
-
-    xhr.onabort = () => {
-      cleanup();
-      reject(new DOMException("Upload aborted", "AbortError"));
-    };
-
-    xhr.onload = () => {
-      cleanup();
-      if (xhr.status < 200 || xhr.status >= 300) {
-        const detail =
-          typeof xhr.response === "object" && xhr.response?.detail
-            ? String(xhr.response.detail)
-            : xhr.responseText || `API error: ${xhr.status}`;
-        reject(new Error(detail));
-        return;
-      }
-
-      resolve(mapUploadPartResult(xhr.response as UploadSessionPartDto));
-    };
-
-    if (signal) {
-      if (signal.aborted) {
-        handleAbort();
-        return;
-      }
-      signal.addEventListener("abort", handleAbort, { once: true });
-    }
-
-    xhr.send(body);
-  });
-}
-
 export const api = {
   health: () => request<{ status: string }>("/health"),
 
@@ -434,72 +410,20 @@ export const api = {
         }),
       })
     ),
-  listUploadSessions: async (workspaceId: string) =>
-    (
-      await request<UploadSessionDto[]>(
-        `/api/workspaces/${workspaceId}/ingestion/sessions`
-      )
-    ).map(mapUploadSession),
-  createUploadSession: async (
+  registerLocalLaneFiles: async (
     workspaceId: string,
-    input: UploadSessionCreateInput
+    input: LocalFileRegistrationInput
   ) =>
-    mapUploadSession(
-      await request<UploadSessionDto>(
-        `/api/workspaces/${workspaceId}/ingestion/sessions`,
+    mapWorkspace(
+      await request<WorkspaceDto>(
+        `/api/workspaces/${workspaceId}/ingestion/local-files`,
         {
           method: "POST",
           body: JSON.stringify({
             sample_lane: input.sampleLane,
-            files: input.files.map((file) => ({
-              filename: file.filename,
-              size_bytes: file.sizeBytes,
-              last_modified_ms: file.lastModifiedMs,
-              content_type: file.contentType,
-            })),
+            paths: input.paths,
           }),
         }
-      )
-    ),
-  uploadUploadSessionPart: (
-    workspaceId: string,
-    sessionId: string,
-    fileId: string,
-    partNumber: number,
-    body: Blob,
-    options?: {
-      onProgress?: (loaded: number, total: number) => void;
-      signal?: AbortSignal;
-    }
-  ) =>
-    uploadBinaryWithProgress(
-      `/api/workspaces/${workspaceId}/ingestion/sessions/${sessionId}/files/${fileId}/parts/${partNumber}`,
-      body,
-      options
-    ),
-  completeUploadSessionFile: async (
-    workspaceId: string,
-    sessionId: string,
-    fileId: string
-  ) =>
-    mapUploadSessionFile(
-      await request<UploadSessionFileDto>(
-        `/api/workspaces/${workspaceId}/ingestion/sessions/${sessionId}/files/${fileId}/complete`,
-        { method: "POST" }
-      )
-    ),
-  commitUploadSession: async (workspaceId: string, sessionId: string) =>
-    mapWorkspace(
-      await request<WorkspaceDto>(
-        `/api/workspaces/${workspaceId}/ingestion/sessions/${sessionId}/commit`,
-        { method: "POST" }
-      )
-    ),
-  deleteUploadSession: async (workspaceId: string, sessionId: string) =>
-    mapWorkspace(
-      await request<WorkspaceDto>(
-        `/api/workspaces/${workspaceId}/ingestion/sessions/${sessionId}`,
-        { method: "DELETE" }
       )
     ),
   resetWorkspaceIngestion: async (workspaceId: string) =>
@@ -521,24 +445,42 @@ export const api = {
         }
       )
     ),
-
-  submitJob: async (
-    stageId: PipelineStageId,
-    workspaceId: string | null,
-    params: Record<string, unknown>
+  updateWorkspaceAnalysisProfile: async (
+    workspaceId: string,
+    profile: AnalysisProfile
   ) =>
-    mapJob(
-      await request<JobDto>("/api/pipeline/submit", {
-        method: "POST",
-        body: JSON.stringify({
-          stage_id: stageId,
-          workspace_id: workspaceId,
-          params,
-        }),
-      })
+    mapWorkspace(
+      await request<WorkspaceDto>(
+        `/api/workspaces/${workspaceId}/analysis-profile`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            assay_type: profile.assayType,
+            reference_preset: profile.referencePreset,
+            reference_override: profile.referenceOverride,
+          }),
+        }
+      )
     ),
-  getJobStatus: async (jobId: string) =>
-    mapJob(await request<JobDto>(`/api/pipeline/jobs/${jobId}`)),
-  getStageResults: (stageId: string, workspaceId: string) =>
-    request(`/api/pipeline/results/${stageId}/${workspaceId}`),
+  getAlignmentStageSummary: async (workspaceId: string) =>
+    mapAlignmentStageSummary(
+      await request<AlignmentStageSummaryDto>(
+        `/api/workspaces/${workspaceId}/alignment`
+      )
+    ),
+  runAlignment: async (workspaceId: string) =>
+    mapAlignmentStageSummary(
+      await request<AlignmentStageSummaryDto>(
+        `/api/workspaces/${workspaceId}/alignment/run`,
+        { method: "POST" }
+      )
+    ),
+  rerunAlignment: async (workspaceId: string) =>
+    mapAlignmentStageSummary(
+      await request<AlignmentStageSummaryDto>(
+        `/api/workspaces/${workspaceId}/alignment/rerun`,
+        { method: "POST" }
+      )
+    ),
+  resolveDownloadUrl: (downloadPath: string) => `${PUBLIC_API_BASE}${downloadPath}`,
 };

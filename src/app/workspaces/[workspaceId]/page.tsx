@@ -13,7 +13,21 @@ export default async function WorkspaceIndexPage({
 
   try {
     const workspace = await api.getWorkspace(workspaceId);
-    redirect(`/workspaces/${workspace.id}/${workspace.activeStage}`);
+    const alignmentSummary = await api.getAlignmentStageSummary(workspaceId);
+
+    let nextStage = workspace.activeStage;
+    if (nextStage === "alignment" && !workspace.ingestion.readyForAlignment) {
+      nextStage = "ingestion";
+    }
+    if (
+      nextStage !== "ingestion" &&
+      nextStage !== "alignment" &&
+      !alignmentSummary.readyForVariantCalling
+    ) {
+      nextStage = workspace.ingestion.readyForAlignment ? "alignment" : "ingestion";
+    }
+
+    redirect(`/workspaces/${workspace.id}/${nextStage}`);
   } catch (error) {
     if (error instanceof Error && error.message.toLowerCase().includes("not found")) {
       notFound();

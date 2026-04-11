@@ -17,17 +17,21 @@ class PipelineStageId(str, Enum):
     AI_REVIEW = "ai-review"
 
 
-class JobStatus(str, Enum):
-    PENDING = "pending"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
-
-
 class WorkspaceSpecies(str, Enum):
     HUMAN = "human"
     DOG = "dog"
     CAT = "cat"
+
+
+class AnalysisAssayType(str, Enum):
+    WGS = "wgs"
+    WES = "wes"
+
+
+class ReferencePreset(str, Enum):
+    GRCH38 = "grch38"
+    CANFAM4 = "canfam4"
+    FELCAT9 = "felcat9"
 
 
 class SampleLane(str, Enum):
@@ -62,20 +66,6 @@ class IngestionStatus(str, Enum):
     FAILED = "failed"
 
 
-class UploadSessionStatus(str, Enum):
-    UPLOADING = "uploading"
-    UPLOADED = "uploaded"
-    FAILED = "failed"
-    COMMITTED = "committed"
-
-
-class UploadSessionFileStatus(str, Enum):
-    PENDING = "pending"
-    UPLOADING = "uploading"
-    UPLOADED = "uploaded"
-    FAILED = "failed"
-
-
 class ReadPair(str, Enum):
     R1 = "R1"
     R2 = "R2"
@@ -86,6 +76,47 @@ class ReadPair(str, Enum):
 class ReadLayout(str, Enum):
     PAIRED = "paired"
     SINGLE = "single"
+
+
+class AlignmentStageStatus(str, Enum):
+    BLOCKED = "blocked"
+    READY = "ready"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class AlignmentRunStatus(str, Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class AlignmentRuntimePhase(str, Enum):
+    PREPARING_REFERENCE = "preparing_reference"
+    ALIGNING = "aligning"
+    FINALIZING = "finalizing"
+
+
+class QcVerdict(str, Enum):
+    PASS = "pass"
+    WARN = "warn"
+    FAIL = "fail"
+
+
+class AlignmentArtifactKind(str, Enum):
+    BAM = "bam"
+    BAI = "bai"
+    FLAGSTAT = "flagstat"
+    IDXSTATS = "idxstats"
+    STATS = "stats"
+
+
+class WorkspaceAnalysisProfileResponse(BaseModel):
+    assay_type: Optional[AnalysisAssayType] = None
+    reference_preset: Optional[ReferencePreset] = None
+    reference_override: Optional[str] = None
 
 
 class WorkspaceFileResponse(BaseModel):
@@ -100,7 +131,8 @@ class WorkspaceFileResponse(BaseModel):
     size_bytes: int
     uploaded_at: str
     read_pair: ReadPair
-    storage_key: str
+    source_path: Optional[str] = None
+    managed_path: Optional[str] = None
     error: Optional[str] = None
 
 
@@ -132,6 +164,9 @@ class WorkspaceResponse(BaseModel):
     id: str
     display_name: str
     species: WorkspaceSpecies
+    analysis_profile: WorkspaceAnalysisProfileResponse = Field(
+        default_factory=WorkspaceAnalysisProfileResponse
+    )
     active_stage: PipelineStageId = PipelineStageId.INGESTION
     created_at: str
     updated_at: str
@@ -143,50 +178,15 @@ class ActiveStageUpdateRequest(BaseModel):
     active_stage: PipelineStageId
 
 
-class UploadSessionFileCreateRequest(BaseModel):
-    filename: str
-    size_bytes: int
-    last_modified_ms: int
-    content_type: Optional[str] = None
+class WorkspaceAnalysisProfileUpdateRequest(BaseModel):
+    assay_type: AnalysisAssayType
+    reference_preset: Optional[ReferencePreset] = None
+    reference_override: Optional[str] = None
 
 
-class UploadSessionCreateRequest(BaseModel):
+class LocalFileRegistrationRequest(BaseModel):
     sample_lane: SampleLane
-    files: List[UploadSessionFileCreateRequest] = Field(default_factory=list)
-
-
-class UploadSessionPartResponse(BaseModel):
-    uploaded_bytes: int
-    total_parts: int
-    completed_part_numbers: List[int] = Field(default_factory=list)
-
-
-class UploadSessionFileResponse(BaseModel):
-    id: str
-    sample_lane: SampleLane
-    filename: str
-    format: WorkspaceFileFormat
-    read_pair: ReadPair
-    size_bytes: int
-    uploaded_bytes: int
-    total_parts: int
-    last_modified_ms: int
-    fingerprint: str
-    content_type: Optional[str] = None
-    status: UploadSessionFileStatus
-    error: Optional[str] = None
-    completed_part_numbers: List[int] = Field(default_factory=list)
-
-
-class UploadSessionResponse(BaseModel):
-    id: str
-    sample_lane: SampleLane
-    status: UploadSessionStatus
-    chunk_size_bytes: int
-    error: Optional[str] = None
-    files: List[UploadSessionFileResponse] = Field(default_factory=list)
-    created_at: str
-    updated_at: str
+    paths: List[str] = Field(default_factory=list)
 
 
 class FastqReadPreview(BaseModel):
@@ -214,22 +214,63 @@ class IngestionLanePreviewResponse(BaseModel):
     stats: SampledReadStats
 
 
-class JobSubmitRequest(BaseModel):
-    stage_id: PipelineStageId
-    workspace_id: Optional[str] = None
-    params: Dict = Field(default_factory=dict)
+class AlignmentLaneMetricsResponse(BaseModel):
+    sample_lane: SampleLane
+    total_reads: int = 0
+    mapped_reads: int = 0
+    mapped_percent: float = 0.0
+    properly_paired_percent: Optional[float] = None
+    duplicate_percent: Optional[float] = None
+    mean_insert_size: Optional[float] = None
 
 
-class JobResponse(BaseModel):
+class AlignmentArtifactResponse(BaseModel):
     id: str
-    workspace_id: Optional[str] = None
-    stage_id: PipelineStageId
-    status: JobStatus
+    artifact_kind: AlignmentArtifactKind
+    sample_lane: Optional[SampleLane] = None
+    filename: str
+    size_bytes: int
+    download_path: str
+    local_path: Optional[str] = None
+
+
+class AlignmentRunResponse(BaseModel):
+    id: str
+    status: AlignmentRunStatus
     progress: float = 0.0
+    assay_type: Optional[AnalysisAssayType] = None
+    reference_preset: Optional[ReferencePreset] = None
+    reference_override: Optional[str] = None
+    reference_label: Optional[str] = None
+    runtime_phase: Optional[AlignmentRuntimePhase] = None
+    qc_verdict: Optional[QcVerdict] = None
     created_at: str
     updated_at: str
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    blocking_reason: Optional[str] = None
     error: Optional[str] = None
-    result: Optional[Dict] = None
+    command_log: List[str] = Field(default_factory=list)
+    lane_metrics: Dict[SampleLane, AlignmentLaneMetricsResponse] = Field(
+        default_factory=dict
+    )
+    artifacts: List[AlignmentArtifactResponse] = Field(default_factory=list)
+
+
+class AlignmentStageSummaryResponse(BaseModel):
+    workspace_id: str
+    status: AlignmentStageStatus
+    blocking_reason: Optional[str] = None
+    analysis_profile: WorkspaceAnalysisProfileResponse = Field(
+        default_factory=WorkspaceAnalysisProfileResponse
+    )
+    qc_verdict: Optional[QcVerdict] = None
+    ready_for_variant_calling: bool = False
+    latest_run: Optional[AlignmentRunResponse] = None
+    lane_metrics: Dict[SampleLane, Optional[AlignmentLaneMetricsResponse]] = Field(
+        default_factory=dict
+    )
+    artifacts: List[AlignmentArtifactResponse] = Field(default_factory=list)
 
 
 class DLAAllele(BaseModel):

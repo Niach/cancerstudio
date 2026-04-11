@@ -19,11 +19,13 @@ export default async function WorkspaceStagePage({
 
   let workspaces;
   let workspace;
+  let alignmentSummary;
 
   try {
-    [workspaces, workspace] = await Promise.all([
+    [workspaces, workspace, alignmentSummary] = await Promise.all([
       api.listWorkspaces(),
       api.getWorkspace(workspaceId),
+      api.getAlignmentStageSummary(workspaceId),
     ]);
   } catch (error) {
     if (error instanceof Error && error.message.toLowerCase().includes("not found")) {
@@ -39,6 +41,7 @@ export default async function WorkspaceStagePage({
       workspace={workspace}
       workspaces={workspaces}
       currentStageId={stage}
+      initialAlignmentSummary={alignmentSummary}
     />
   );
 }

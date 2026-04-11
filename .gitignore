@@ -77,10 +77,6 @@ venv/
 *.pdb
 data/
 
-# Docker
-docker-compose.override.yml
-minio-data/
-
 # IDE
 .idea/
 .vscode/

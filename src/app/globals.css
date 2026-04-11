@@ -186,3 +186,25 @@
 .specimen-breath {
   animation: specimen-breath 2.4s ease-in-out infinite;
 }
+
+/* Intake slot fill — the left-to-right progress fill behind SpecimenSlot
+   content during upload / reattach states. Driven by the --slot-progress
+   CSS var set inline on the slot element (0..100%). Deliberately low-contrast
+   so it reads as "progress wash" not "alert". */
+.intake-slot-fill {
+  background-image: linear-gradient(
+    to right,
+    color-mix(in oklch, var(--lane-accent) 16%, transparent) 0%,
+    color-mix(in oklch, var(--lane-accent) 16%, transparent) var(--slot-progress, 0%),
+    transparent var(--slot-progress, 0%),
+    transparent 100%
+  );
+  transition: background-image 420ms ease-out;
+}
+
+/* Empty-slot breath — slightly more visible than specimen-breath so an empty
+   SpecimenSlot reads as "tap me" without needing an explicit text hint. */
+@keyframes specimen-invite {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--lane-accent) 0%, transparent); }
+  50%      { box-shadow: 0 0 0 4px color-mix(in oklch, var(--lane-accent) 10%, transparent); }
+}

@@ -6,12 +6,14 @@ interface FutureStagePanelProps {
   stageId: PipelineStageId;
   workspace: Workspace;
   lockedReason?: string;
+  isLocked?: boolean;
 }
 
 export default function FutureStagePanel({
   stageId,
   workspace,
   lockedReason,
+  isLocked = false,
 }: FutureStagePanelProps) {
   const stage = PIPELINE_STAGES.find((s) => s.id === stageId)!;
 
@@ -23,7 +25,9 @@ export default function FutureStagePanel({
       </p>
       <p className="mt-4 text-sm text-muted-foreground">
         {lockedReason ??
-          "This step is still placeholder-backed while we finish the ingestion and storage foundation."}
+          (isLocked
+            ? "This step is still waiting on the previous live stage."
+            : "This step is still placeholder-backed while we finish the Paul-core pipeline." )}
       </p>
       <Link
         href={`/workspaces/${workspace.id}/ingestion`}

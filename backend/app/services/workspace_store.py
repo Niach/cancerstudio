@@ -1,6 +1,4 @@
 import gzip
-import io
-import math
 import os
 import re
 import shutil
@@ -12,21 +10,20 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Optional
 
-from fastapi import UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.db import session_scope
 from app.models.records import (
     IngestionBatchRecord,
-    UploadSessionFileRecord,
-    UploadSessionPartRecord,
-    UploadSessionRecord,
+    PipelineArtifactRecord,
+    PipelineRunRecord,
     WorkspaceFileRecord,
     WorkspaceRecord,
 )
 from app.models.schemas import (
     ActiveStageUpdateRequest,
+    AnalysisAssayType,
     FastqReadPreview,
     IngestionLaneSummaryResponse,
     IngestionLanePreviewResponse,
@@ -35,22 +32,20 @@ from app.models.schemas import (
     PipelineStageId,
     ReadLayout,
     ReadPair,
+    ReferencePreset,
     SampledReadStats,
     SampleLane,
-    UploadSessionCreateRequest,
-    UploadSessionFileResponse,
-    UploadSessionFileStatus,
-    UploadSessionPartResponse,
-    UploadSessionResponse,
-    UploadSessionStatus,
+    LocalFileRegistrationRequest,
     WorkspaceCreateRequest,
     WorkspaceFileFormat,
     WorkspaceFileResponse,
     WorkspaceFileRole,
     WorkspaceFileStatus,
+    WorkspaceAnalysisProfileResponse,
+    WorkspaceAnalysisProfileUpdateRequest,
     WorkspaceResponse,
 )
-from app.services.s3_storage import get_storage
+from app.runtime import get_alignment_run_root, get_batch_canonical_root, is_path_within_app_data
 
 READ_PAIR_PATTERN = re.compile(
     r"(?:^|[_\-.])(R[12])(?:[_\-.]|$)"
@@ -64,7 +59,6 @@ COMPRESSED_FASTQ_SUFFIXES = (".fastq.gz", ".fq.gz")
 FASTQ_SUFFIXES = COMPRESSED_FASTQ_SUFFIXES + (".fastq", ".fq")
 BAM_SUFFIXES = (".bam",)
 CRAM_SUFFIXES = (".cram",)
-CHUNK_SIZE_BYTES = 16 * 1024 * 1024
 PREVIEW_READ_LIMIT = 8
 LANES = (SampleLane.TUMOR, SampleLane.NORMAL)
 
@@ -98,6 +92,77 @@ def isoformat(value: datetime) -> str:
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc).isoformat()
+
+
+def default_reference_preset_for_species(species: str) -> ReferencePreset:
+    normalized = species.lower()
+    if normalized == "dog":
+        return ReferencePreset.CANFAM4
+    if normalized == "cat":
+        return ReferencePreset.FELCAT9
+    return ReferencePreset.GRCH38
+
+
+def serialize_analysis_profile(workspace: WorkspaceRecord) -> WorkspaceAnalysisProfileResponse:
+    assay_type = (
+        AnalysisAssayType(workspace.assay_type)
+        if workspace.assay_type
+        else None
+    )
+    reference_preset_value = (
+        workspace.reference_preset or default_reference_preset_for_species(workspace.species).value
+    )
+    reference_preset = ReferencePreset(reference_preset_value)
+    return WorkspaceAnalysisProfileResponse(
+        assay_type=assay_type,
+        reference_preset=reference_preset,
+        reference_override=workspace.reference_override,
+    )
+
+
+def record_source_path(record: WorkspaceFileRecord) -> Optional[Path]:
+    if record.source_path:
+        return Path(record.source_path)
+    if record.file_role == WorkspaceFileRole.SOURCE.value and record.storage_key:
+        return Path(record.storage_key)
+    return None
+
+
+def record_managed_path(record: WorkspaceFileRecord) -> Optional[Path]:
+    if record.local_path:
+        return Path(record.local_path)
+    if record.file_role == WorkspaceFileRole.CANONICAL.value and record.storage_key:
+        return Path(record.storage_key)
+    return None
+
+
+def workspace_file_access_path(record: WorkspaceFileRecord) -> Path:
+    source = record_source_path(record)
+    if source is not None:
+        return source
+    managed = record_managed_path(record)
+    if managed is not None:
+        return managed
+    raise FileNotFoundError(f"No usable path is available for {record.filename}")
+
+
+def canonical_destination_path(
+    workspace_id: str,
+    batch_id: str,
+    filename: str,
+) -> Path:
+    return get_batch_canonical_root(workspace_id, batch_id) / sanitize_filename(filename)
+
+
+def managed_alignment_artifact_path(
+    workspace_id: str,
+    run_id: str,
+    sample_lane: SampleLane,
+    filename: str,
+) -> Path:
+    root = get_alignment_run_root(workspace_id, run_id) / sample_lane.value
+    root.mkdir(parents=True, exist_ok=True)
+    return root / sanitize_filename(filename)
 
 
 def sanitize_filename(filename: str) -> str:
@@ -151,35 +216,6 @@ def normalize_fastq_sample_stem(filename: str) -> str:
     return "_".join(filtered_tokens).lower()
 
 
-def make_file_fingerprint(filename: str, size_bytes: int, last_modified_ms: int) -> str:
-    return f"{sanitize_filename(filename)}:{size_bytes}:{last_modified_ms}"
-
-
-def expected_total_parts(size_bytes: int) -> int:
-    return max(1, math.ceil(size_bytes / CHUNK_SIZE_BYTES))
-
-
-def expected_part_size(size_bytes: int, part_number: int) -> int:
-    total_parts = expected_total_parts(size_bytes)
-    if part_number < 1 or part_number > total_parts:
-        raise ValueError("Invalid part number")
-    if part_number < total_parts:
-        return CHUNK_SIZE_BYTES
-    remainder = size_bytes % CHUNK_SIZE_BYTES
-    return remainder or CHUNK_SIZE_BYTES
-
-
-def source_object_key(workspace_id: str, session_id: str, file_id: str, filename: str) -> str:
-    return (
-        f"workspaces/{workspace_id}/sessions/{session_id}/source/"
-        f"{file_id}-{sanitize_filename(filename)}"
-    )
-
-
-def canonical_object_key(workspace_id: str, batch_id: str, filename: str) -> str:
-    return f"workspaces/{workspace_id}/batches/{batch_id}/canonical/{sanitize_filename(filename)}"
-
-
 def build_canonical_filename(sample_lane: SampleLane, read_pair: ReadPair) -> str:
     return f"{sample_lane.value}_{read_pair.value}.normalized.fastq.gz"
 
@@ -188,9 +224,6 @@ def get_workspace_query():
     return select(WorkspaceRecord).options(
         selectinload(WorkspaceRecord.files),
         selectinload(WorkspaceRecord.batches).selectinload(IngestionBatchRecord.files),
-        selectinload(WorkspaceRecord.upload_sessions)
-        .selectinload(UploadSessionRecord.files)
-        .selectinload(UploadSessionFileRecord.parts),
     )
 
 
@@ -201,23 +234,6 @@ def get_workspace_record(session, workspace_id: str) -> WorkspaceRecord:
     if workspace is None:
         raise FileNotFoundError(f"Workspace {workspace_id} not found")
     return workspace
-
-
-def get_upload_session_record(session, workspace_id: str, session_id: str) -> UploadSessionRecord:
-    record = session.scalar(
-        select(UploadSessionRecord)
-        .options(
-            selectinload(UploadSessionRecord.workspace),
-            selectinload(UploadSessionRecord.files).selectinload(UploadSessionFileRecord.parts),
-        )
-        .where(
-            UploadSessionRecord.id == session_id,
-            UploadSessionRecord.workspace_id == workspace_id,
-        )
-    )
-    if record is None:
-        raise FileNotFoundError(f"Upload session {session_id} not found")
-    return record
 
 
 def get_batch_record(session, workspace_id: str, batch_id: str) -> IngestionBatchRecord:
@@ -250,44 +266,9 @@ def serialize_file(record: WorkspaceFileRecord) -> WorkspaceFileResponse:
         size_bytes=record.size_bytes,
         uploaded_at=isoformat(record.uploaded_at),
         read_pair=ReadPair(record.read_pair),
-        storage_key=record.storage_key,
+        source_path=str(record_source_path(record)) if record_source_path(record) else None,
+        managed_path=str(record_managed_path(record)) if record_managed_path(record) else None,
         error=record.error,
-    )
-
-
-def serialize_upload_session_file(record: UploadSessionFileRecord) -> UploadSessionFileResponse:
-    return UploadSessionFileResponse(
-        id=record.id,
-        sample_lane=SampleLane(record.sample_lane),
-        filename=record.filename,
-        format=WorkspaceFileFormat(record.format),
-        read_pair=ReadPair(record.read_pair),
-        size_bytes=record.size_bytes,
-        uploaded_bytes=record.uploaded_bytes,
-        total_parts=record.total_parts,
-        last_modified_ms=record.last_modified_ms,
-        fingerprint=record.fingerprint,
-        content_type=record.content_type,
-        status=UploadSessionFileStatus(record.status),
-        error=record.error,
-        completed_part_numbers=[part.part_number for part in record.parts],
-    )
-
-
-def serialize_upload_session(record: UploadSessionRecord) -> UploadSessionResponse:
-    ordered_files = sorted(
-        record.files,
-        key=lambda item: (isoformat(item.created_at), item.filename),
-    )
-    return UploadSessionResponse(
-        id=record.id,
-        sample_lane=SampleLane(record.sample_lane),
-        status=UploadSessionStatus(record.status),
-        chunk_size_bytes=CHUNK_SIZE_BYTES,
-        error=record.error,
-        files=[serialize_upload_session_file(item) for item in ordered_files],
-        created_at=isoformat(record.created_at),
-        updated_at=isoformat(record.updated_at),
     )
 
 
@@ -306,31 +287,13 @@ def latest_batch_for_lane(workspace: WorkspaceRecord, sample_lane: SampleLane) -
     )[0]
 
 
-def latest_open_session_for_lane(
-    workspace: WorkspaceRecord, sample_lane: SampleLane
-) -> Optional[UploadSessionRecord]:
-    candidates = [
-        upload_session
-        for upload_session in workspace.upload_sessions
-        if upload_session.sample_lane == sample_lane.value
-        and upload_session.status != UploadSessionStatus.COMMITTED.value
-    ]
-    if not candidates:
-        return None
-    return sorted(
-        candidates,
-        key=lambda item: isoformat(item.updated_at),
-        reverse=True,
-    )[0]
-
-
 def issues_from_error_text(error_text: Optional[str]) -> list[str]:
     if not error_text:
         return []
     return [item.strip() for item in error_text.split(" | ") if item.strip()]
 
 
-def validate_lane_files(files: Iterable[UploadSessionFileRecord | WorkspaceFileRecord]) -> LaneValidationResult:
+def validate_lane_files(files: Iterable[WorkspaceFileRecord]) -> LaneValidationResult:
     file_list = list(files)
     if not file_list:
         return LaneValidationResult(
@@ -425,36 +388,6 @@ def validate_lane_files(files: Iterable[UploadSessionFileRecord | WorkspaceFileR
     )
 
 
-def summarize_session_lane(
-    sample_lane: SampleLane,
-    upload_session: UploadSessionRecord,
-    batch: Optional[IngestionBatchRecord],
-) -> IngestionLaneSummaryResponse:
-    validation = validate_lane_files(upload_session.files)
-    issues = issues_from_error_text(upload_session.error)
-    blocking_issues = issues or validation.blocking_issues
-
-    if upload_session.status == UploadSessionStatus.FAILED.value:
-        status = IngestionStatus.FAILED
-    elif all(file.status == UploadSessionFileStatus.UPLOADED.value for file in upload_session.files):
-        status = IngestionStatus.UPLOADED
-    else:
-        status = IngestionStatus.UPLOADING
-
-    return IngestionLaneSummaryResponse(
-        active_batch_id=batch.id if batch else None,
-        sample_lane=sample_lane,
-        status=status,
-        ready_for_alignment=False,
-        source_file_count=len(upload_session.files),
-        canonical_file_count=0,
-        missing_pairs=validation.missing_pairs,
-        blocking_issues=blocking_issues,
-        read_layout=validation.read_layout,
-        updated_at=isoformat(upload_session.updated_at),
-    )
-
-
 def summarize_batch(batch: Optional[IngestionBatchRecord], sample_lane: SampleLane) -> IngestionLaneSummaryResponse:
     if batch is None:
         return IngestionLaneSummaryResponse(sample_lane=sample_lane)
@@ -537,14 +470,7 @@ def summarize_workspace_ingestion(workspace: WorkspaceRecord) -> IngestionSummar
 
     for sample_lane in LANES:
         batch = latest_batch_for_lane(workspace, sample_lane)
-        upload_session = latest_open_session_for_lane(workspace, sample_lane)
-        if (
-            upload_session is not None
-            and (batch is None or upload_session.updated_at >= batch.updated_at)
-        ):
-            lane_summaries[sample_lane] = summarize_session_lane(sample_lane, upload_session, batch)
-        else:
-            lane_summaries[sample_lane] = summarize_batch(batch, sample_lane)
+        lane_summaries[sample_lane] = summarize_batch(batch, sample_lane)
 
     ready_for_alignment = all(
         lane_summaries[sample_lane].ready_for_alignment for sample_lane in LANES
@@ -557,8 +483,6 @@ def summarize_workspace_ingestion(workspace: WorkspaceRecord) -> IngestionSummar
         overall_status = IngestionStatus.FAILED
     elif IngestionStatus.NORMALIZING in statuses:
         overall_status = IngestionStatus.NORMALIZING
-    elif IngestionStatus.UPLOADING in statuses:
-        overall_status = IngestionStatus.UPLOADING
     elif IngestionStatus.UPLOADED in statuses:
         overall_status = IngestionStatus.UPLOADED
     elif all(status == IngestionStatus.EMPTY for status in statuses):
@@ -607,44 +531,43 @@ def build_fastq_read_preview(header: str, sequence: str, quality: str) -> FastqR
 
 def sample_canonical_fastq_reads(source_file: WorkspaceFileRecord) -> list[FastqReadPreview]:
     try:
-        with get_storage().open_read_stream(source_file.storage_key) as stream:
-            with gzip.GzipFile(fileobj=stream, mode="rb") as gzip_stream:
-                with io.TextIOWrapper(gzip_stream, encoding="utf-8") as text_stream:
-                    reads: list[FastqReadPreview] = []
-                    for _ in range(PREVIEW_READ_LIMIT):
-                        header = text_stream.readline()
-                        if not header:
-                            break
+        managed_path = workspace_file_access_path(source_file)
+        with gzip.open(managed_path, "rt", encoding="utf-8") as text_stream:
+            reads: list[FastqReadPreview] = []
+            for _ in range(PREVIEW_READ_LIMIT):
+                header = text_stream.readline()
+                if not header:
+                    break
 
-                        sequence = text_stream.readline()
-                        separator = text_stream.readline()
-                        quality = text_stream.readline()
-                        if not sequence or not separator or not quality:
-                            raise ValueError(
-                                f"Malformed canonical FASTQ preview for {source_file.filename}: incomplete record."
-                            )
+                sequence = text_stream.readline()
+                separator = text_stream.readline()
+                quality = text_stream.readline()
+                if not sequence or not separator or not quality:
+                    raise ValueError(
+                        f"Malformed canonical FASTQ preview for {source_file.filename}: incomplete record."
+                    )
 
-                        header = header.rstrip("\r\n")
-                        sequence = sequence.rstrip("\r\n")
-                        separator = separator.rstrip("\r\n")
-                        quality = quality.rstrip("\r\n")
+                header = header.rstrip("\r\n")
+                sequence = sequence.rstrip("\r\n")
+                separator = separator.rstrip("\r\n")
+                quality = quality.rstrip("\r\n")
 
-                        if not header.startswith("@"):
-                            raise ValueError(
-                                f"Malformed canonical FASTQ preview for {source_file.filename}: invalid header."
-                            )
-                        if not separator.startswith("+"):
-                            raise ValueError(
-                                f"Malformed canonical FASTQ preview for {source_file.filename}: missing separator."
-                            )
-                        if len(sequence) != len(quality):
-                            raise ValueError(
-                                f"Malformed canonical FASTQ preview for {source_file.filename}: sequence and quality lengths differ."
-                            )
+                if not header.startswith("@"):
+                    raise ValueError(
+                        f"Malformed canonical FASTQ preview for {source_file.filename}: invalid header."
+                    )
+                if not separator.startswith("+"):
+                    raise ValueError(
+                        f"Malformed canonical FASTQ preview for {source_file.filename}: missing separator."
+                    )
+                if len(sequence) != len(quality):
+                    raise ValueError(
+                        f"Malformed canonical FASTQ preview for {source_file.filename}: sequence and quality lengths differ."
+                    )
 
-                        reads.append(build_fastq_read_preview(header, sequence, quality))
+                reads.append(build_fastq_read_preview(header, sequence, quality))
 
-                    return reads
+            return reads
     except FileNotFoundError:
         raise
     except UnicodeDecodeError as error:
@@ -737,6 +660,7 @@ def serialize_workspace(workspace: WorkspaceRecord) -> WorkspaceResponse:
         id=workspace.id,
         display_name=workspace.display_name,
         species=workspace.species,
+        analysis_profile=serialize_analysis_profile(workspace),
         active_stage=workspace.active_stage,
         created_at=isoformat(workspace.created_at),
         updated_at=isoformat(workspace.updated_at),
@@ -772,6 +696,9 @@ def create_workspace(request: WorkspaceCreateRequest) -> WorkspaceResponse:
             id=str(uuid.uuid4()),
             display_name=display_name,
             species=request.species.value,
+            assay_type=None,
+            reference_preset=default_reference_preset_for_species(request.species.value).value,
+            reference_override=None,
             active_stage=PipelineStageId.INGESTION.value,
             created_at=timestamp,
             updated_at=timestamp,
@@ -794,205 +721,106 @@ def update_workspace_active_stage(
         return serialize_workspace(workspace)
 
 
-def create_upload_session(
-    workspace_id: str, request: UploadSessionCreateRequest
-) -> UploadSessionResponse:
-    if not request.files:
-        raise ValueError("At least one file is required")
-
-    timestamp = utc_now()
-    storage = get_storage()
-
+def update_workspace_analysis_profile(
+    workspace_id: str, request: WorkspaceAnalysisProfileUpdateRequest
+) -> WorkspaceResponse:
     with session_scope() as session:
         workspace = get_workspace_record(session, workspace_id)
-        upload_session = UploadSessionRecord(
+        workspace.assay_type = request.assay_type.value
+        workspace.reference_preset = (
+            request.reference_preset.value
+            if request.reference_preset is not None
+            else default_reference_preset_for_species(workspace.species).value
+        )
+        workspace.reference_override = request.reference_override or None
+        workspace.updated_at = utc_now()
+        session.add(workspace)
+        session.flush()
+        return serialize_workspace(workspace)
+
+
+def register_local_lane_files(
+    workspace_id: str,
+    request: LocalFileRegistrationRequest,
+) -> WorkspaceResponse:
+    if not request.paths:
+        raise ValueError("Pick at least one local sequencing file.")
+
+    timestamp = utc_now()
+    normalized_paths: list[Path] = []
+    for raw_path in request.paths:
+        candidate = Path(raw_path).expanduser()
+        if not candidate.exists():
+            raise ValueError(f"Local file does not exist: {candidate}")
+        if not candidate.is_file():
+            raise ValueError(f"Expected a file path, but got: {candidate}")
+        normalized_paths.append(candidate.resolve())
+
+    created_batch_id: Optional[str] = None
+    with session_scope() as session:
+        workspace = get_workspace_record(session, workspace_id)
+        batch = IngestionBatchRecord(
             id=str(uuid.uuid4()),
             workspace_id=workspace.id,
             sample_lane=request.sample_lane.value,
-            status=UploadSessionStatus.UPLOADING.value,
+            sample_stem=None,
+            status=IngestionStatus.NORMALIZING.value,
             error=None,
             created_at=timestamp,
             updated_at=timestamp,
         )
-        session.add(upload_session)
-        workspace.upload_sessions.append(upload_session)
-        workspace.updated_at = timestamp
+        session.add(batch)
+        workspace.batches.append(batch)
 
-        for file_request in request.files:
-            filename = sanitize_filename(file_request.filename)
+        for file_path in normalized_paths:
+            filename = sanitize_filename(file_path.name)
             file_format = detect_format(filename)
             if file_format is None:
                 raise ValueError(
                     f"Unsupported file type for {filename}. Accepted inputs are FASTQ, BAM, and CRAM."
                 )
-            if file_request.size_bytes <= 0:
+            size_bytes = file_path.stat().st_size
+            if size_bytes <= 0:
                 raise ValueError(f"{filename} is empty")
 
-            file_id = str(uuid.uuid4())
-            storage_key = source_object_key(workspace.id, upload_session.id, file_id, filename)
-            upload_id = storage.create_multipart_upload(storage_key, file_request.content_type)
-            session_file = UploadSessionFileRecord(
-                id=file_id,
-                session_id=upload_session.id,
+            source_record = WorkspaceFileRecord(
+                id=str(uuid.uuid4()),
                 workspace_id=workspace.id,
+                batch_id=batch.id,
+                source_file_id=None,
                 sample_lane=request.sample_lane.value,
                 filename=filename,
                 format=file_format.value,
+                file_role=WorkspaceFileRole.SOURCE.value,
+                status=WorkspaceFileStatus.NORMALIZING.value,
                 read_pair=infer_read_pair(filename).value,
-                size_bytes=file_request.size_bytes,
-                uploaded_bytes=0,
-                total_parts=expected_total_parts(file_request.size_bytes),
-                last_modified_ms=file_request.last_modified_ms,
-                fingerprint=make_file_fingerprint(
-                    filename,
-                    file_request.size_bytes,
-                    file_request.last_modified_ms,
-                ),
-                content_type=file_request.content_type,
-                storage_key=storage_key,
-                multipart_upload_id=upload_id,
-                status=UploadSessionFileStatus.PENDING.value,
+                storage_key=str(file_path),
+                source_path=str(file_path),
+                local_path=None,
+                size_bytes=size_bytes,
+                uploaded_at=timestamp,
                 error=None,
-                created_at=timestamp,
-                updated_at=timestamp,
-                completed_at=None,
             )
-            upload_session.files.append(session_file)
-            session.add(session_file)
+            session.add(source_record)
+            workspace.files.append(source_record)
+            batch.files.append(source_record)
 
+        validation = validate_lane_files(batch.files)
+        if validation.blocking_issues:
+            raise ValueError(" | ".join(validation.blocking_issues))
+
+        batch.sample_stem = validation.sample_stem
+        created_batch_id = batch.id
+        workspace.updated_at = timestamp
+        session.add(batch)
+        session.add(workspace)
         session.flush()
-        session.refresh(upload_session)
-        return serialize_upload_session(upload_session)
+        response = serialize_workspace(workspace)
 
-
-def list_upload_sessions(workspace_id: str) -> list[UploadSessionResponse]:
-    with session_scope() as session:
-        get_workspace_record(session, workspace_id)
-        upload_sessions = session.scalars(
-            select(UploadSessionRecord)
-            .options(
-                selectinload(UploadSessionRecord.files).selectinload(UploadSessionFileRecord.parts),
-            )
-            .where(
-                UploadSessionRecord.workspace_id == workspace_id,
-                UploadSessionRecord.status != UploadSessionStatus.COMMITTED.value,
-            )
-        ).all()
-        ordered = sorted(
-            upload_sessions,
-            key=lambda item: isoformat(item.updated_at),
-            reverse=True,
-        )
-        return [serialize_upload_session(item) for item in ordered]
-
-
-def upload_session_part(
-    workspace_id: str,
-    session_id: str,
-    file_id: str,
-    part_number: int,
-    payload: bytes,
-) -> UploadSessionPartResponse:
-    if not payload:
-        raise ValueError("Upload parts cannot be empty")
-
-    with session_scope() as session:
-        upload_session = get_upload_session_record(session, workspace_id, session_id)
-        session_file = next((item for item in upload_session.files if item.id == file_id), None)
-        if session_file is None:
-            raise FileNotFoundError(f"Upload session file {file_id} not found")
-        if session_file.status == UploadSessionFileStatus.UPLOADED.value:
-            return UploadSessionPartResponse(
-                uploaded_bytes=session_file.uploaded_bytes,
-                total_parts=session_file.total_parts,
-                completed_part_numbers=[part.part_number for part in session_file.parts],
-            )
-
-        expected_size = expected_part_size(session_file.size_bytes, part_number)
-        if len(payload) != expected_size:
-            raise ValueError(
-                f"Part {part_number} must be {expected_size} bytes for {session_file.filename}."
-            )
-        if any(part.part_number == part_number for part in session_file.parts):
-            raise ValueError(f"Part {part_number} for {session_file.filename} was already uploaded.")
-
-        etag = get_storage().upload_part(
-            session_file.storage_key,
-            session_file.multipart_upload_id,
-            part_number,
-            payload,
-        )
-        part = UploadSessionPartRecord(
-            session_file_id=session_file.id,
-            part_number=part_number,
-            etag=etag,
-            size_bytes=len(payload),
-            created_at=utc_now(),
-        )
-        session.add(part)
-        session_file.parts.append(part)
-        session_file.uploaded_bytes += len(payload)
-        session_file.status = UploadSessionFileStatus.UPLOADING.value
-        session_file.updated_at = utc_now()
-        upload_session.updated_at = session_file.updated_at
-        upload_session.workspace.updated_at = session_file.updated_at
-        session.add(session_file)
-        session.add(upload_session)
-        session.flush()
-
-        return UploadSessionPartResponse(
-            uploaded_bytes=session_file.uploaded_bytes,
-            total_parts=session_file.total_parts,
-            completed_part_numbers=[item.part_number for item in session_file.parts],
-        )
-
-
-def complete_upload_session_file(
-    workspace_id: str,
-    session_id: str,
-    file_id: str,
-) -> UploadSessionFileResponse:
-    with session_scope() as session:
-        upload_session = get_upload_session_record(session, workspace_id, session_id)
-        session_file = next((item for item in upload_session.files if item.id == file_id), None)
-        if session_file is None:
-            raise FileNotFoundError(f"Upload session file {file_id} not found")
-        if session_file.status == UploadSessionFileStatus.UPLOADED.value:
-            return serialize_upload_session_file(session_file)
-
-        expected_parts = list(range(1, session_file.total_parts + 1))
-        completed_parts = sorted(part.part_number for part in session_file.parts)
-        if completed_parts != expected_parts:
-            raise ValueError(f"{session_file.filename} is still missing upload parts.")
-        if session_file.uploaded_bytes != session_file.size_bytes:
-            raise ValueError(f"{session_file.filename} upload is incomplete.")
-
-        ordered_parts = sorted(session_file.parts, key=lambda item: item.part_number)
-        get_storage().complete_multipart_upload(
-            session_file.storage_key,
-            session_file.multipart_upload_id,
-            [
-                {"PartNumber": part.part_number, "ETag": part.etag}
-                for part in ordered_parts
-            ],
-        )
-        timestamp = utc_now()
-        session_file.status = UploadSessionFileStatus.UPLOADED.value
-        session_file.error = None
-        session_file.completed_at = timestamp
-        session_file.updated_at = timestamp
-        upload_session.error = None
-        upload_session.status = (
-            UploadSessionStatus.UPLOADED.value
-            if all(item.status == UploadSessionFileStatus.UPLOADED.value for item in upload_session.files)
-            else UploadSessionStatus.UPLOADING.value
-        )
-        upload_session.updated_at = timestamp
-        upload_session.workspace.updated_at = timestamp
-        session.add(session_file)
-        session.add(upload_session)
-        session.flush()
-        return serialize_upload_session_file(session_file)
+    if created_batch_id is None:
+        raise RuntimeError("Local file registration did not create a batch")
+    enqueue_batch_normalization(workspace_id, created_batch_id)
+    return response
 
 
 def create_canonical_record(
@@ -1004,7 +832,7 @@ def create_canonical_record(
     filename: str,
     read_pair: ReadPair,
     size_bytes: int,
-    storage_key: str,
+    local_path: str,
 ) -> WorkspaceFileRecord:
     existing = session.scalar(
         select(WorkspaceFileRecord).where(
@@ -1017,7 +845,9 @@ def create_canonical_record(
     if existing is not None:
         existing.filename = filename
         existing.size_bytes = size_bytes
-        existing.storage_key = storage_key
+        existing.storage_key = local_path
+        existing.local_path = local_path
+        existing.source_path = None
         existing.status = WorkspaceFileStatus.READY.value
         existing.error = None
         existing.uploaded_at = utc_now()
@@ -1035,7 +865,9 @@ def create_canonical_record(
         file_role=WorkspaceFileRole.CANONICAL.value,
         status=WorkspaceFileStatus.READY.value,
         read_pair=read_pair.value,
-        storage_key=storage_key,
+        storage_key=local_path,
+        source_path=None,
+        local_path=local_path,
         size_bytes=size_bytes,
         uploaded_at=utc_now(),
         error=None,
@@ -1105,158 +937,43 @@ def enqueue_batch_normalization(workspace_id: str, batch_id: str) -> None:
         mark_batch_failed(workspace_id, batch_id, f"Unable to queue normalization: {error}")
 
 
-def commit_upload_session(workspace_id: str, session_id: str) -> WorkspaceResponse:
-    error_message: Optional[str] = None
-    response: Optional[WorkspaceResponse] = None
-    should_enqueue = False
-    committed_batch_id: Optional[str] = None
-
-    with session_scope() as session:
-        upload_session = get_upload_session_record(session, workspace_id, session_id)
-        if upload_session.status == UploadSessionStatus.COMMITTED.value:
-            return serialize_workspace(upload_session.workspace)
-
-        if not all(file.status == UploadSessionFileStatus.UPLOADED.value for file in upload_session.files):
-            raise ValueError("Finish uploading every file before committing the lane.")
-
-        validation = validate_lane_files(upload_session.files)
-        if validation.blocking_issues:
-            upload_session.status = UploadSessionStatus.FAILED.value
-            upload_session.error = " | ".join(validation.blocking_issues)
-            upload_session.updated_at = utc_now()
-            upload_session.workspace.updated_at = upload_session.updated_at
-            session.add(upload_session)
-            error_message = upload_session.error
-        else:
-            timestamp = utc_now()
-            batch = IngestionBatchRecord(
-                id=str(uuid.uuid4()),
-                workspace_id=upload_session.workspace_id,
-                sample_lane=upload_session.sample_lane,
-                sample_stem=validation.sample_stem,
-                status=IngestionStatus.NORMALIZING.value,
-                error=None,
-                created_at=timestamp,
-                updated_at=timestamp,
-            )
-            session.add(batch)
-            upload_session.workspace.batches.append(batch)
-            committed_batch_id = batch.id
-
-            for upload_file in upload_session.files:
-                source_record = WorkspaceFileRecord(
-                    id=str(uuid.uuid4()),
-                    workspace_id=upload_session.workspace_id,
-                    batch_id=batch.id,
-                    source_file_id=None,
-                    sample_lane=upload_session.sample_lane,
-                    filename=upload_file.filename,
-                    format=upload_file.format,
-                    file_role=WorkspaceFileRole.SOURCE.value,
-                    status=WorkspaceFileStatus.NORMALIZING.value,
-                    read_pair=upload_file.read_pair,
-                    storage_key=upload_file.storage_key,
-                    size_bytes=upload_file.size_bytes,
-                    uploaded_at=timestamp,
-                    error=None,
-                )
-                session.add(source_record)
-                upload_session.workspace.files.append(source_record)
-                batch.files.append(source_record)
-
-            upload_session.status = UploadSessionStatus.COMMITTED.value
-            upload_session.error = None
-            upload_session.committed_at = timestamp
-            upload_session.updated_at = timestamp
-            upload_session.workspace.updated_at = timestamp
-            session.add(upload_session)
-            session.flush()
-            response = serialize_workspace(upload_session.workspace)
-            should_enqueue = True
-
-    if error_message:
-        raise ValueError(error_message)
-    if should_enqueue and committed_batch_id is not None:
-        enqueue_batch_normalization(workspace_id, committed_batch_id)
-    if response is None:
-        raise RuntimeError("Upload session commit did not produce a workspace response")
-    return response
-
-
-def delete_upload_session(workspace_id: str, session_id: str) -> WorkspaceResponse:
-    storage = get_storage()
-    aborts: list[tuple[str, str]] = []
-
-    with session_scope() as session:
-        upload_session = get_upload_session_record(session, workspace_id, session_id)
-        if upload_session.status != UploadSessionStatus.COMMITTED.value:
-            for upload_file in upload_session.files:
-                if upload_file.multipart_upload_id and upload_file.storage_key:
-                    aborts.append(
-                        (upload_file.storage_key, upload_file.multipart_upload_id)
-                    )
-
-        workspace = upload_session.workspace
-        session.delete(upload_session)
-        workspace.updated_at = utc_now()
-        session.add(workspace)
-        session.flush()
-        response = serialize_workspace(workspace)
-
-    for storage_key, upload_id in aborts:
-        try:
-            storage.abort_multipart_upload(storage_key, upload_id)
-        except Exception:
-            # Best-effort cleanup — the session record is already gone, so a
-            # leftover MinIO multipart will be reaped by lifecycle policy.
-            pass
-
-    return response
-
-
 def reset_workspace_ingestion(workspace_id: str) -> WorkspaceResponse:
-    storage = get_storage()
-    aborts: list[tuple[str, str]] = []
-    deletions: set[str] = set()
+    managed_deletions: set[Path] = set()
 
     with session_scope() as session:
         workspace = get_workspace_record(session, workspace_id)
 
         for workspace_file in workspace.files:
-            if workspace_file.storage_key:
-                deletions.add(workspace_file.storage_key)
+            managed_path = record_managed_path(workspace_file)
+            if managed_path is not None and is_path_within_app_data(managed_path):
+                managed_deletions.add(managed_path)
 
-        for upload_session in list(workspace.upload_sessions):
-            for upload_file in upload_session.files:
-                if upload_file.storage_key:
-                    deletions.add(upload_file.storage_key)
-                if (
-                    upload_session.status != UploadSessionStatus.COMMITTED.value
-                    and upload_file.multipart_upload_id
-                    and upload_file.storage_key
-                ):
-                    aborts.append((upload_file.storage_key, upload_file.multipart_upload_id))
-            session.delete(upload_session)
+        for pipeline_run in list(workspace.pipeline_runs):
+            for artifact in pipeline_run.artifacts:
+                artifact_path = Path(artifact.local_path or artifact.storage_key)
+                if artifact_path.exists() and is_path_within_app_data(artifact_path):
+                    managed_deletions.add(artifact_path)
+            session.delete(pipeline_run)
 
         for batch in list(workspace.batches):
             session.delete(batch)
 
         workspace.active_stage = PipelineStageId.INGESTION.value
+        workspace.assay_type = None
+        workspace.reference_preset = default_reference_preset_for_species(workspace.species).value
+        workspace.reference_override = None
         workspace.updated_at = utc_now()
         session.add(workspace)
         session.flush()
-        session.expire(workspace, ["batches", "files", "upload_sessions"])
+        session.expire(workspace, ["batches", "files"])
         response = serialize_workspace(get_workspace_record(session, workspace_id))
 
-    for storage_key, upload_id in aborts:
+    for path in sorted(managed_deletions, reverse=True):
         try:
-            storage.abort_multipart_upload(storage_key, upload_id)
-        except Exception:
-            pass
-
-    for storage_key in deletions:
-        try:
-            storage.delete_object(storage_key)
+            if path.is_file():
+                path.unlink(missing_ok=True)
+            elif path.is_dir():
+                shutil.rmtree(path, ignore_errors=True)
         except Exception:
             pass
 
@@ -1312,7 +1029,6 @@ def merge_fastq_lane(
     temp_dir: Path,
     read_layout: ReadLayout,
 ) -> None:
-    storage = get_storage()
     if read_layout == ReadLayout.SINGLE:
         grouped_files: dict[ReadPair, list[WorkspaceFileRecord]] = {
             ReadPair.SE: sorted(source_files, key=lambda item: item.filename.lower()),
@@ -1336,14 +1052,14 @@ def merge_fastq_lane(
         canonical_path = temp_dir / canonical_filename
         with gzip.open(canonical_path, "wb") as destination_handle:
             for source_file in read_pair_files:
-                source_path = temp_dir / f"{source_file.id}-{sanitize_filename(source_file.filename)}"
-                storage.download_path(source_file.storage_key, source_path)
+                source_path = workspace_file_access_path(source_file)
                 open_source = gzip.open if is_compressed_fastq(source_file.filename) else open
                 with open_source(source_path, "rb") as source_handle:
                     shutil.copyfileobj(source_handle, destination_handle)
 
-        storage_key = canonical_object_key(workspace.id, batch.id, canonical_filename)
-        storage.upload_path(canonical_path, storage_key, content_type="application/gzip")
+        final_path = canonical_destination_path(workspace.id, batch.id, canonical_filename)
+        final_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(canonical_path, final_path)
         create_canonical_record(
             session,
             workspace=workspace,
@@ -1351,8 +1067,8 @@ def merge_fastq_lane(
             source_file_id=read_pair_files[0].id,
             filename=canonical_filename,
             read_pair=read_pair,
-            size_bytes=canonical_path.stat().st_size,
-            storage_key=storage_key,
+            size_bytes=final_path.stat().st_size,
+            local_path=str(final_path),
         )
 
     for source_file in source_files:
@@ -1369,9 +1085,7 @@ def normalize_alignment_container(
     source_file: WorkspaceFileRecord,
     temp_dir: Path,
 ) -> None:
-    storage = get_storage()
-    source_path = temp_dir / f"{source_file.id}-{sanitize_filename(source_file.filename)}"
-    storage.download_path(source_file.storage_key, source_path)
+    source_path = workspace_file_access_path(source_file)
 
     r1_fastq_path = temp_dir / f"{source_file.id}-R1.fastq"
     r2_fastq_path = temp_dir / f"{source_file.id}-R2.fastq"
@@ -1404,8 +1118,9 @@ def normalize_alignment_container(
         canonical_path = temp_dir / canonical_filename
         with plain_path.open("rb") as source_handle, gzip.open(canonical_path, "wb") as destination_handle:
             shutil.copyfileobj(source_handle, destination_handle)
-        storage_key = canonical_object_key(workspace.id, batch.id, canonical_filename)
-        storage.upload_path(canonical_path, storage_key, content_type="application/gzip")
+        final_path = canonical_destination_path(workspace.id, batch.id, canonical_filename)
+        final_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(canonical_path, final_path)
         create_canonical_record(
             session,
             workspace=workspace,
@@ -1413,8 +1128,8 @@ def normalize_alignment_container(
             source_file_id=source_file.id,
             filename=canonical_filename,
             read_pair=read_pair,
-            size_bytes=canonical_path.stat().st_size,
-            storage_key=storage_key,
+            size_bytes=final_path.stat().st_size,
+            local_path=str(final_path),
         )
 
     source_file.status = WorkspaceFileStatus.READY.value
@@ -1472,7 +1187,3 @@ def run_batch_normalization(workspace_id: str, batch_id: str) -> WorkspaceRespon
         raise
 
 
-def upload_workspace_files(workspace_id: str, uploads: list[UploadFile]) -> WorkspaceResponse:
-    raise ValueError(
-        "Direct file uploads were replaced by resumable ingestion sessions. Use the ingestion session API."
-    )

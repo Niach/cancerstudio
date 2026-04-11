@@ -85,21 +85,6 @@ def wait_for_health(client: httpx.Client, timeout_seconds: int = 30) -> None:
     )
 
 
-def file_payload(path: Path) -> dict[str, object]:
-    stat = path.stat()
-    content_type = (
-        "application/gzip"
-        if path.name.endswith((".fastq.gz", ".fq.gz"))
-        else "application/octet-stream"
-    )
-    return {
-        "filename": path.name,
-        "size_bytes": stat.st_size,
-        "last_modified_ms": int(stat.st_mtime * 1000),
-        "content_type": content_type,
-    }
-
-
 def create_workspace(client: httpx.Client) -> dict:
     response = client.post(
         "/api/workspaces",
@@ -112,54 +97,18 @@ def create_workspace(client: httpx.Client) -> dict:
     return response.json()
 
 
-def create_upload_session(
+def register_local_files(
     client: httpx.Client,
     workspace_id: str,
     sample_lane: str,
     files: list[Path],
 ) -> dict:
     response = client.post(
-        f"/api/workspaces/{workspace_id}/ingestion/sessions",
+        f"/api/workspaces/{workspace_id}/ingestion/local-files",
         json={
             "sample_lane": sample_lane,
-            "files": [file_payload(path) for path in files],
+            "paths": [str(path) for path in files],
         },
-    )
-    assert response.status_code == 201, response.text
-    return response.json()
-
-
-def upload_session_file(
-    client: httpx.Client,
-    workspace_id: str,
-    session: dict,
-    path: Path,
-) -> None:
-    session_file = next(
-        file for file in session["files"] if file["filename"] == path.name
-    )
-    payload = path.read_bytes()
-    chunk_size = session["chunk_size_bytes"]
-
-    for part_number in range(1, session_file["total_parts"] + 1):
-        start = (part_number - 1) * chunk_size
-        end = min(len(payload), start + chunk_size)
-        response = client.put(
-            f"/api/workspaces/{workspace_id}/ingestion/sessions/{session['id']}/files/{session_file['id']}/parts/{part_number}",
-            content=payload[start:end],
-            headers={"content-type": "application/octet-stream"},
-        )
-        assert response.status_code == 200, response.text
-
-    response = client.post(
-        f"/api/workspaces/{workspace_id}/ingestion/sessions/{session['id']}/files/{session_file['id']}/complete"
-    )
-    assert response.status_code == 200, response.text
-
-
-def commit_upload_session(client: httpx.Client, workspace_id: str, session_id: str) -> dict:
-    response = client.post(
-        f"/api/workspaces/{workspace_id}/ingestion/sessions/{session_id}/commit"
     )
     assert response.status_code == 200, response.text
     return response.json()
@@ -209,16 +158,13 @@ def test_real_data_ingestion_end_to_end() -> None:
         wait_for_health(client)
         workspace = create_workspace(client)
 
-        tumor_session = create_upload_session(
+        tumor_registration = register_local_files(
             client,
             workspace["id"],
             "tumor",
             tumor_files,
         )
-        for path in tumor_files:
-            upload_session_file(client, workspace["id"], tumor_session, path)
-        tumor_commit = commit_upload_session(client, workspace["id"], tumor_session["id"])
-        assert tumor_commit["ingestion"]["ready_for_alignment"] is False
+        assert tumor_registration["ingestion"]["ready_for_alignment"] is False
 
         tumor_ready = wait_for_workspace(
             client,
@@ -229,16 +175,13 @@ def test_real_data_ingestion_end_to_end() -> None:
         )
         assert tumor_ready["ingestion"]["lanes"]["normal"]["status"] == "empty"
 
-        normal_session = create_upload_session(
+        normal_registration = register_local_files(
             client,
             workspace["id"],
             "normal",
             normal_files,
         )
-        for path in normal_files:
-            upload_session_file(client, workspace["id"], normal_session, path)
-        normal_commit = commit_upload_session(client, workspace["id"], normal_session["id"])
-        assert normal_commit["ingestion"]["ready_for_alignment"] is False
+        assert normal_registration["ingestion"]["ready_for_alignment"] is False
 
         fully_ready = wait_for_workspace(
             client,
@@ -270,37 +213,16 @@ def test_real_data_alignment_container_ingestion_end_to_end() -> None:
         wait_for_health(client)
         workspace = create_workspace(client)
 
-        tumor_session = create_upload_session(
-            client,
-            workspace["id"],
-            "tumor",
-            tumor_files,
-        )
-        for path in tumor_files:
-            upload_session_file(client, workspace["id"], tumor_session, path)
-        tumor_commit = commit_upload_session(client, workspace["id"], tumor_session["id"])
-        assert tumor_commit["ingestion"]["ready_for_alignment"] is False
-
-        tumor_ready = wait_for_workspace(
+        register_local_files(client, workspace["id"], "tumor", tumor_files)
+        wait_for_workspace(
             client,
             workspace["id"],
             sample_lane="tumor",
             status="ready",
             ready_for_alignment=False,
         )
-        assert tumor_ready["ingestion"]["lanes"]["tumor"]["ready_for_alignment"] is True
 
-        normal_session = create_upload_session(
-            client,
-            workspace["id"],
-            "normal",
-            normal_files,
-        )
-        for path in normal_files:
-            upload_session_file(client, workspace["id"], normal_session, path)
-        normal_commit = commit_upload_session(client, workspace["id"], normal_session["id"])
-        assert normal_commit["ingestion"]["ready_for_alignment"] is False
-
+        register_local_files(client, workspace["id"], "normal", normal_files)
         fully_ready = wait_for_workspace(
             client,
             workspace["id"],
@@ -308,7 +230,7 @@ def test_real_data_alignment_container_ingestion_end_to_end() -> None:
             status="ready",
             ready_for_alignment=True,
         )
-        assert fully_ready["ingestion"]["lanes"]["normal"]["ready_for_alignment"] is True
+        assert fully_ready["ingestion"]["lanes"]["tumor"]["status"] == "ready"
 
         preview_response = client.get(
             f"/api/workspaces/{workspace['id']}/ingestion/preview/normal"

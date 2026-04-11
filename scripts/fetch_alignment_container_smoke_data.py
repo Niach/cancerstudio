@@ -75,48 +75,15 @@ def download_file(url: str, destination: Path, timeout: int) -> None:
         raise
 
 
-def docker_compose_command() -> list[str] | None:
-    if shutil.which("docker"):
-        return ["docker", "compose"]
-    if shutil.which("docker-compose"):
-        return ["docker-compose"]
-    return None
-
-
-def resolve_samtools_command(repo_root: Path) -> tuple[list[str], bool]:
+def resolve_samtools_command() -> list[str]:
     if shutil.which("samtools"):
-        return ["samtools"], False
+        return ["samtools"]
 
-    compose = docker_compose_command()
-    if compose is None:
-        raise RuntimeError(
-            "samtools was not found locally and docker compose is unavailable."
-        )
-
-    return (
-        [
-            *compose,
-            "run",
-            "--rm",
-            "--no-deps",
-            "-T",
-            "-v",
-            f"{repo_root}:/workspace",
-            "-w",
-            "/workspace",
-            "backend",
-            "samtools",
-        ],
-        True,
-    )
+    raise RuntimeError("samtools was not found locally. Install samtools and rerun the script.")
 
 
 def run_samtools(command: list[str], args: list[str]) -> None:
     subprocess.run([*command, *args], check=True)
-
-
-def containerize_path(path: Path, repo_root: Path) -> str:
-    return str(Path("/workspace") / path.resolve().relative_to(repo_root.resolve()))
 
 
 def metadata_text(output_dir: Path) -> str:
@@ -163,7 +130,7 @@ def main() -> int:
     else:
         print(f"Skipping existing file: {reference_path}")
 
-    samtools_command, uses_container_paths = resolve_samtools_command(repo_root)
+    samtools_command = resolve_samtools_command()
 
     with tempfile.TemporaryDirectory(
         prefix="cancerstudio-alignment-smoke-",
@@ -174,32 +141,11 @@ def main() -> int:
         print("Fetching xx#pair.sam")
         download_file(SAM_URL, sam_path, args.timeout)
 
-        bam_output = (
-            containerize_path(bam_path, repo_root)
-            if uses_container_paths
-            else str(bam_path)
-        )
-        cram_output = (
-            containerize_path(cram_path, repo_root)
-            if uses_container_paths
-            else str(cram_path)
-        )
-        reference_arg = (
-            containerize_path(reference_path, repo_root)
-            if uses_container_paths
-            else str(reference_path)
-        )
-        sam_input = (
-            containerize_path(sam_path, repo_root)
-            if uses_container_paths
-            else str(sam_path)
-        )
-
         if args.force or not bam_path.exists():
             print("Materializing tumor.bam")
             run_samtools(
                 samtools_command,
-                ["view", "-b", "-o", bam_output, sam_input],
+                ["view", "-b", "-o", str(bam_path), str(sam_path)],
             )
         else:
             print(f"Skipping existing file: {bam_path}")
@@ -212,10 +158,10 @@ def main() -> int:
                     "view",
                     "-C",
                     "-T",
-                    reference_arg,
+                    str(reference_path),
                     "-o",
-                    cram_output,
-                    sam_input,
+                    str(cram_path),
+                    str(sam_path),
                 ],
             )
         else:

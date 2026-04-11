@@ -1,8 +1,10 @@
 import type {
+  AlignmentStageSummary,
   IngestionStatus,
   PipelineStage,
   ReadPair,
   ReadLayout,
+  ReferencePreset,
   SampleLane,
   Workspace,
   WorkspaceFile,
@@ -194,7 +196,7 @@ export function getLaneIssueLabel(summary: Workspace["ingestion"]["lanes"]["tumo
     return `Need ${missingPairs.join(" + ")}`;
   }
 
-  return getCompactIssueLabel(summary.blockingIssues[0]) ?? "Upload failed";
+  return getCompactIssueLabel(summary.blockingIssues[0]) ?? "Intake failed";
 }
 
 export function getLaneStatusLabel(summary: Workspace["ingestion"]["lanes"]["tumor"]) {
@@ -205,7 +207,7 @@ export function getLaneStatusLabel(summary: Workspace["ingestion"]["lanes"]["tum
     return "Preparing";
   }
   if (summary.status === "uploading" || summary.status === "uploaded") {
-    return "Uploading";
+    return "Queued";
   }
   if (summary.status === "failed") {
     return getLaneIssueLabel(summary);
@@ -259,6 +261,72 @@ export function formatLaneLabel(sampleLane: SampleLane) {
   return sampleLane === "tumor" ? "Tumor" : "Normal";
 }
 
+export function formatAssayType(assayType?: "wgs" | "wes" | null) {
+  if (assayType === "wes") {
+    return "WES";
+  }
+  if (assayType === "wgs") {
+    return "WGS";
+  }
+  return "Unset";
+}
+
+export function formatReferencePreset(referencePreset?: ReferencePreset | null) {
+  if (referencePreset === "canfam4") {
+    return "CanFam4";
+  }
+  if (referencePreset === "felcat9") {
+    return "felCat9";
+  }
+  if (referencePreset === "grch38") {
+    return "GRCh38";
+  }
+  return "Custom";
+}
+
+export function getQcVerdictLabel(
+  qcVerdict?: AlignmentStageSummary["qcVerdict"] | null
+) {
+  if (qcVerdict === "pass") {
+    return "Pass";
+  }
+  if (qcVerdict === "warn") {
+    return "Warn";
+  }
+  if (qcVerdict === "fail") {
+    return "Fail";
+  }
+  return "Pending";
+}
+
+export function getAlignmentStatusCopy(
+  summary?: AlignmentStageSummary | null
+) {
+  if (!summary) {
+    return { label: "Waiting", tone: "warning" as const };
+  }
+
+  if (summary.status === "blocked") {
+    return { label: "Blocked", tone: "warning" as const };
+  }
+  if (summary.status === "ready") {
+    return { label: "Ready", tone: "success" as const };
+  }
+  if (summary.status === "running") {
+    return { label: "Running", tone: "info" as const };
+  }
+  if (summary.status === "failed") {
+    return { label: "Failed", tone: "warning" as const };
+  }
+  return {
+    label: summary.qcVerdict === "warn" ? "Complete (warn)" : "Complete",
+    tone:
+      summary.qcVerdict === "warn"
+        ? ("warning" as const)
+        : ("success" as const),
+  };
+}
+
 export function getImplementationLabel(stage: PipelineStage) {
   if (stage.implementationState === "live") {
     return "Live";
@@ -269,7 +337,11 @@ export function getImplementationLabel(stage: PipelineStage) {
   return "Planned";
 }
 
-export function getStageStatus(stage: PipelineStage, workspace: Workspace) {
+export function getStageStatus(
+  stage: PipelineStage,
+  workspace: Workspace,
+  alignmentSummary?: AlignmentStageSummary | null
+) {
   const readiness = analyzeWorkspace(workspace);
 
   if (stage.id === "ingestion") {
@@ -289,14 +361,14 @@ export function getStageStatus(stage: PipelineStage, workspace: Workspace) {
   }
 
   if (stage.id === "alignment") {
-    if (!readiness.readyForAlignment) {
-      return { label: "Locked", tone: "warning" as const };
-    }
-    return { label: "Mock", tone: "info" as const };
+    return getAlignmentStatusCopy(alignmentSummary);
   }
 
-  if (stage.implementationState === "mock") {
-    return { label: "Mock", tone: "info" as const };
+  if (stage.id === "variant-calling") {
+    if (!alignmentSummary?.readyForVariantCalling) {
+      return { label: "Locked", tone: "warning" as const };
+    }
+    return { label: "Planned", tone: "neutral" as const };
   }
 
   return { label: "Planned", tone: "neutral" as const };

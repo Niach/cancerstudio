@@ -3,23 +3,30 @@
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Dna, LockKeyhole, Plus, RotateCcw } from "lucide-react";
+import { ChevronDown, Dna, LockKeyhole, Plus } from "lucide-react";
 
+import AlignmentStagePanel from "@/components/workspaces/AlignmentStagePanel";
 import IngestionStagePanel from "@/components/workspaces/IngestionStagePanel";
 import FutureStagePanel from "@/components/workspaces/FutureStagePanel";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 
-import type { PipelineStageId, Workspace } from "@/lib/types";
-import { PIPELINE_STAGES } from "@/lib/types";
+import type {
+  AlignmentStageSummary,
+  PipelineStage,
+  PipelineStageId,
+  Workspace,
+} from "@/lib/types";
+import {
+  LATER_RESEARCH_STAGES,
+  PIPELINE_STAGES,
+  PRIMARY_PIPELINE_STAGES,
+} from "@/lib/types";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {
-  countReadyRequiredOutputs,
-  formatLaneLabel,
+  formatReferencePreset,
   formatSpeciesLabel,
-  getLaneStatusLabel,
-  getWorkspaceRequiredOutputs,
+  getAlignmentStatusCopy,
 } from "@/lib/workspace-utils";
 
 function mergeWorkspaces(workspaces: Workspace[], workspace: Workspace) {
@@ -29,16 +36,121 @@ function mergeWorkspaces(workspaces: Workspace[], workspace: Workspace) {
   );
 }
 
+function isStageLocked(
+  stageId: PipelineStageId,
+  workspace: Workspace,
+  alignmentSummary: AlignmentStageSummary
+) {
+  if (stageId === "ingestion") {
+    return false;
+  }
+  if (stageId === "alignment") {
+    return !workspace.ingestion.readyForAlignment;
+  }
+  return !alignmentSummary.readyForVariantCalling;
+}
+
+function stageLockedReason(
+  stageId: PipelineStageId,
+  workspace: Workspace,
+  alignmentSummary: AlignmentStageSummary
+) {
+  if (stageId === "alignment" && !workspace.ingestion.readyForAlignment) {
+    return "Alignment unlocks once both tumor and normal lanes have canonical paired FASTQ ready.";
+  }
+  if (stageId !== "ingestion" && !alignmentSummary.readyForVariantCalling) {
+    return "Variant calling unlocks after a successful alignment run with BAM, BAI, and passing QC.";
+  }
+  return undefined;
+}
+
+function workspaceSubtitle(
+  workspace: Workspace,
+  alignmentSummary: AlignmentStageSummary
+) {
+  if (alignmentSummary.readyForVariantCalling) {
+    return "Alignment QC complete and variant calling is unlocked";
+  }
+  if (workspace.ingestion.readyForAlignment) {
+    return "Tumor + normal intake ready for alignment";
+  }
+  return "Ingestion is still blocking alignment";
+}
+
+function NavigationStageItem({
+  stage,
+  label,
+  href,
+  isActive,
+  isLocked,
+}: {
+  stage: PipelineStage;
+  label: string;
+  href: string;
+  isActive: boolean;
+  isLocked: boolean;
+}) {
+  const content = (
+    <>
+      <span
+        className={cn(
+          "flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full px-2 text-xs font-semibold",
+          isActive
+            ? "bg-emerald-600 text-white"
+            : isLocked
+              ? "bg-slate-200 text-slate-500"
+              : "bg-muted text-muted-foreground"
+        )}
+      >
+        {isLocked ? <LockKeyhole className="size-3.5" /> : label}
+      </span>
+      <div className="min-w-0">
+        <div>{stage.name}</div>
+        {isLocked ? (
+          <div className="text-xs font-normal text-slate-500">Locked</div>
+        ) : null}
+      </div>
+    </>
+  );
+
+  if (isLocked) {
+    return (
+      <div
+        aria-disabled="true"
+        className="flex cursor-not-allowed items-center gap-3 rounded-2xl px-3 py-2 text-sm text-slate-400"
+      >
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "flex items-center gap-3 rounded-2xl px-3 py-2 text-sm transition",
+        isActive
+          ? "bg-emerald-50 font-medium text-emerald-700"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+      )}
+    >
+      {content}
+    </Link>
+  );
+}
+
 interface WorkspaceStageShellProps {
   workspace: Workspace;
   workspaces: Workspace[];
   currentStageId: PipelineStageId;
+  initialAlignmentSummary: AlignmentStageSummary;
 }
 
 export default function WorkspaceStageShell({
   workspace: initialWorkspace,
   workspaces: initialWorkspaces,
   currentStageId,
+  initialAlignmentSummary,
 }: WorkspaceStageShellProps) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -46,17 +158,15 @@ export default function WorkspaceStageShell({
   const [workspaces, setWorkspaces] = useState(
     mergeWorkspaces(initialWorkspaces, initialWorkspace)
   );
-  const [isResetting, setIsResetting] = useState(false);
-
-  const alignmentLocked = !workspace.ingestion.readyForAlignment;
-  const requiredOutputs = getWorkspaceRequiredOutputs(workspace);
-  const readyOutputCount = countReadyRequiredOutputs(workspace);
+  const [alignmentSummary, setAlignmentSummary] = useState(
+    initialAlignmentSummary
+  );
 
   useEffect(() => {
     if (workspace.activeStage === currentStageId) {
       return;
     }
-    if (currentStageId === "alignment" && alignmentLocked) {
+    if (isStageLocked(currentStageId, workspace, alignmentSummary)) {
       return;
     }
 
@@ -74,43 +184,25 @@ export default function WorkspaceStageShell({
     return () => {
       ignore = true;
     };
-  }, [alignmentLocked, currentStageId, workspace.activeStage, workspace.id]);
+  }, [alignmentSummary, currentStageId, workspace]);
 
   const currentStage = PIPELINE_STAGES.find(
     (stage) => stage.id === currentStageId
   )!;
+  const currentStageLocked = isStageLocked(
+    currentStageId,
+    workspace,
+    alignmentSummary
+  );
+  const alignmentStatusCopy = getAlignmentStatusCopy(alignmentSummary);
 
   function handleWorkspaceChange(updatedWorkspace: Workspace) {
     setWorkspace(updatedWorkspace);
     setWorkspaces((current) => mergeWorkspaces(current, updatedWorkspace));
-  }
-
-  async function handleResetWorkspace() {
-    if (
-      !window.confirm(
-        `Reset all ingestion data in "${workspace.displayName}"?`
-      )
-    ) {
-      return;
-    }
-
-    setIsResetting(true);
-    try {
-      const updatedWorkspace = await api.resetWorkspaceIngestion(workspace.id);
-      handleWorkspaceChange(updatedWorkspace);
-      startTransition(() => {
-        router.push(`/workspaces/${workspace.id}/ingestion`);
-        router.refresh();
-      });
-    } catch (error) {
-      window.alert(
-        error instanceof Error
-          ? error.message
-          : "Unable to reset this workspace"
-      );
-    } finally {
-      setIsResetting(false);
-    }
+    void api
+      .getAlignmentStageSummary(updatedWorkspace.id)
+      .then(setAlignmentSummary)
+      .catch(() => {});
   }
 
   return (
@@ -130,26 +222,20 @@ export default function WorkspaceStageShell({
                 <Badge variant="outline">
                   {formatSpeciesLabel(workspace.species)}
                 </Badge>
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  {readyOutputCount}/4 paired ready
+                <Badge
+                  variant="outline"
+                  className="border-black/10 bg-white/80 font-mono text-[10px] tracking-[0.2em] uppercase text-slate-600"
+                >
+                  {formatReferencePreset(workspace.analysisProfile.referencePreset)}
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  {workspaceSubtitle(workspace, alignmentSummary)}
                 </span>
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => void handleResetWorkspace()}
-              disabled={isResetting}
-              data-testid="workspace-reset-button"
-              className="h-9 rounded-xl px-3 text-slate-500 hover:text-rose-700"
-            >
-              <RotateCcw className="size-3.5" />
-              {isResetting ? "Resetting" : "Reset"}
-            </Button>
             <select
               value={workspace.id}
               onChange={(event) =>
@@ -169,8 +255,8 @@ export default function WorkspaceStageShell({
             </select>
             <Link
               href="/"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-black/10 text-muted-foreground transition hover:bg-muted hover:text-foreground"
               aria-label="New workspace"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-black/10 text-muted-foreground transition hover:bg-muted hover:text-foreground"
             >
               <Plus className="size-4" />
             </Link>
@@ -179,181 +265,53 @@ export default function WorkspaceStageShell({
       </header>
 
       <div className="mx-auto max-w-[1440px] px-4 py-6 lg:px-6">
-        <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
+        <div className="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
           <nav className="rounded-[24px] border border-black/5 bg-white/65 p-3 shadow-sm shadow-black/5 backdrop-blur">
             <div className="mb-3 px-2 font-mono text-[10px] font-medium tracking-[0.28em] text-slate-400 uppercase">
-              Pipeline
+              Primary pipeline
             </div>
             <div className="space-y-1">
-              {PIPELINE_STAGES.map((stage, index) => {
-                const isActive = stage.id === currentStageId;
-                const isAlignmentLocked =
-                  stage.id === "alignment" && alignmentLocked;
-
-                const content = (
-                  <>
-                    <span
-                      className={cn(
-                        "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
-                        isActive
-                          ? "bg-emerald-600 text-white"
-                          : isAlignmentLocked
-                            ? "bg-slate-200 text-slate-500"
-                            : "bg-muted text-muted-foreground"
-                      )}
-                    >
-                      {isAlignmentLocked ? (
-                        <LockKeyhole className="size-3.5" />
-                      ) : (
-                        index + 1
-                      )}
-                    </span>
-                    <div className="min-w-0">
-                      <div>{stage.name}</div>
-                      {isAlignmentLocked && (
-                        <div className="text-xs font-normal text-slate-500">
-                          Wait for 4 outputs
-                        </div>
-                      )}
-                    </div>
-                  </>
-                );
-
-                if (isAlignmentLocked) {
-                  return (
-                    <div
-                      key={stage.id}
-                      aria-disabled="true"
-                      className="flex cursor-not-allowed items-center gap-3 rounded-2xl px-3 py-2 text-sm text-slate-400"
-                    >
-                      {content}
-                    </div>
-                  );
-                }
-
-                return (
-                  <Link
-                    key={stage.id}
-                    href={`/workspaces/${workspace.id}/${stage.id}`}
-                    className={cn(
-                      "flex items-center gap-3 rounded-2xl px-3 py-2 text-sm transition",
-                      isActive
-                        ? "bg-emerald-50 font-medium text-emerald-700"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                    )}
-                  >
-                    {content}
-                  </Link>
-                );
-              })}
+              {PRIMARY_PIPELINE_STAGES.map((stage, index) => (
+                <NavigationStageItem
+                  key={stage.id}
+                  stage={stage}
+                  label={`${index + 1}`}
+                  href={`/workspaces/${workspace.id}/${stage.id}`}
+                  isActive={stage.id === currentStageId}
+                  isLocked={isStageLocked(stage.id, workspace, alignmentSummary)}
+                />
+              ))}
             </div>
+
+            <details className="mt-5 rounded-2xl border border-black/6 bg-white/60">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-slate-700">
+                Later research modules
+                <ChevronDown className="size-4 transition group-open:rotate-180" />
+              </summary>
+              <div className="space-y-1 border-t border-black/6 px-2 py-2">
+                {LATER_RESEARCH_STAGES.map((stage, index) => (
+                  <NavigationStageItem
+                    key={stage.id}
+                    stage={stage}
+                    label={`R${index + 1}`}
+                    href={`/workspaces/${workspace.id}/${stage.id}`}
+                    isActive={stage.id === currentStageId}
+                    isLocked={isStageLocked(stage.id, workspace, alignmentSummary)}
+                  />
+                ))}
+              </div>
+            </details>
           </nav>
 
           <main className="space-y-4">
             {currentStageId === "ingestion" ? (
-              <div className="space-y-4 border-b border-black/8 pb-4">
-                <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                  <div className="space-y-1">
-                    <h2 className="text-3xl font-semibold tracking-tight">
-                      {currentStage.name}
-                    </h2>
-                    <p className="text-sm text-slate-500 tabular-nums">
-                      {readyOutputCount}/4 outputs ready
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span
-                      data-testid="alignment-status-indicator"
-                      data-state={alignmentLocked ? "locked" : "unlocked"}
-                      className={cn(
-                        "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 font-mono text-[10px] tracking-[0.2em] uppercase",
-                        alignmentLocked
-                          ? "border-black/10 bg-white/80 text-slate-500"
-                          : "border-emerald-200 bg-emerald-50 text-emerald-700"
-                      )}
-                    >
-                      <span
-                        aria-hidden
-                        className={cn(
-                          "size-1.5 rounded-full",
-                          alignmentLocked ? "bg-slate-300" : "bg-emerald-500"
-                        )}
-                      />
-                      {alignmentLocked ? "Locked" : "Ready"}
-                    </span>
-
-                    {(["tumor", "normal"] as const).map((lane) => {
-                      const summary = workspace.ingestion.lanes[lane];
-                      const isReady = summary.status === "ready";
-                      const isFailed = summary.status === "failed";
-
-                      return (
-                        <span
-                          key={lane}
-                          className={cn(
-                            "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm",
-                            isReady
-                              ? "border-emerald-200 bg-emerald-50/80 text-emerald-800"
-                              : isFailed
-                                ? "border-rose-200 bg-rose-50 text-rose-700"
-                                : "border-black/10 bg-white/80 text-slate-600"
-                          )}
-                        >
-                          <span
-                            aria-hidden
-                            className={cn(
-                              "size-1.5 rounded-full",
-                              lane === "tumor"
-                                ? "bg-[color:var(--lane-tumor)]"
-                                : "bg-[color:var(--lane-normal)]"
-                            )}
-                          />
-                          <span className="font-medium">
-                            {formatLaneLabel(lane)}
-                          </span>
-                          <span className="text-slate-500">
-                            {getLaneStatusLabel(summary)}
-                          </span>
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="overflow-hidden rounded-[22px] border border-black/6 bg-white/70 shadow-sm shadow-black/5 backdrop-blur">
-                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/6 px-4 py-3 sm:px-5">
-                    <div className="font-mono text-[10px] tracking-[0.24em] text-slate-500 uppercase">
-                      Requirements
-                    </div>
-                    <div className="text-sm font-medium tabular-nums text-slate-700">
-                      {readyOutputCount}/4
-                    </div>
-                  </div>
-                  <div className="grid gap-2 px-4 py-3 sm:grid-cols-2 sm:px-5 lg:grid-cols-4">
-                    {requiredOutputs.map((output) => (
-                      <div
-                        key={output.id}
-                        className={cn(
-                          "flex items-center justify-between rounded-2xl border px-3 py-2 text-sm",
-                          output.ready
-                            ? "border-emerald-200 bg-emerald-50/80 text-emerald-900"
-                            : "border-black/8 bg-white text-slate-600"
-                        )}
-                      >
-                        <span>{output.label}</span>
-                        <span
-                          className={cn(
-                            "font-mono text-[10px] tracking-[0.16em] uppercase",
-                            output.ready ? "text-emerald-700" : "text-slate-400"
-                          )}
-                        >
-                          {output.ready ? "Ready" : "Open"}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+              // Ingestion stage owns its own goal visualisation via IntakeTicker —
+              // the shell only renders the section title here. The
+              // `alignment-status-indicator` test hook lives inside IntakeTicker.
+              <div className="pb-1">
+                <h2 className="font-display text-3xl font-semibold tracking-tight">
+                  {currentStage.name}
+                </h2>
               </div>
             ) : (
               <div className="rounded-[24px] border border-black/5 bg-white/70 px-6 py-5 shadow-sm shadow-black/5 backdrop-blur">
@@ -369,12 +327,31 @@ export default function WorkspaceStageShell({
                       {currentStage.description}
                     </p>
                   </div>
-                  <Badge
-                    variant="outline"
-                    className="border-black/10 bg-slate-50/70 font-mono text-[10px] tracking-[0.18em] text-slate-500 uppercase"
-                  >
-                    {currentStage.implementationState}
-                  </Badge>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {currentStageId === "alignment" ? (
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "border-black/10 bg-slate-50/70 font-mono text-[10px] tracking-[0.18em] uppercase",
+                          alignmentSummary.status === "running"
+                            ? "text-sky-600"
+                            : alignmentSummary.status === "completed"
+                              ? "text-emerald-700"
+                              : alignmentSummary.status === "failed"
+                                ? "text-rose-700"
+                                : "text-slate-500"
+                        )}
+                      >
+                        {alignmentStatusCopy.label}
+                      </Badge>
+                    ) : null}
+                    <Badge
+                      variant="outline"
+                      className="border-black/10 bg-slate-50/70 font-mono text-[10px] tracking-[0.18em] text-slate-500 uppercase"
+                    >
+                      {currentStage.implementationState}
+                    </Badge>
+                  </div>
                 </div>
               </div>
             )}
@@ -384,15 +361,23 @@ export default function WorkspaceStageShell({
                 workspace={workspace}
                 onWorkspaceChange={handleWorkspaceChange}
               />
+            ) : currentStageId === "alignment" ? (
+              <AlignmentStagePanel
+                workspace={workspace}
+                summary={alignmentSummary}
+                onWorkspaceChange={handleWorkspaceChange}
+                onSummaryChange={setAlignmentSummary}
+              />
             ) : (
               <FutureStagePanel
                 stageId={currentStageId}
                 workspace={workspace}
-                lockedReason={
-                  currentStageId === "alignment" && alignmentLocked
-                    ? "Alignment unlocks once both tumor and normal lanes have canonical paired FASTQ ready."
-                    : undefined
-                }
+                lockedReason={stageLockedReason(
+                  currentStageId,
+                  workspace,
+                  alignmentSummary
+                )}
+                isLocked={currentStageLocked}
               />
             )}
           </main>

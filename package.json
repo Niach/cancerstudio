@@ -6,6 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "desktop:frontend": "next dev",
+    "desktop:backend": "cd backend && uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload",
+    "desktop:electron": "wait-on http://127.0.0.1:3000 http://127.0.0.1:8000/health && electron electron/main.cjs",
+    "desktop:dev": "concurrently -k -n frontend,backend,electron \"npm run desktop:frontend\" \"npm run desktop:backend\" \"npm run desktop:electron\"",
     "lint": "eslint",
     "test:backend:fast": "./.venv/bin/pytest backend/tests/test_workspace_api.py",
     "test:backend:real-data": "./.venv/bin/pytest -m \"integration and real_data\" backend/tests/test_real_data_ingestion.py",
@@ -33,9 +37,12 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^9.2.1",
+    "electron": "^37.3.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.2",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wait-on": "^8.0.5"
   }
 }

@@ -2,9 +2,11 @@
 
 ## What This Is
 
-A web-based pipeline for designing personalized mRNA cancer vaccines. You provide two DNA samples (tumor + normal), and the pipeline walks through alignment, variant calling, neoantigen prediction, and mRNA construct design — outputting a vaccine sequence ready for synthesis.
+A desktop-first pipeline for designing personalized mRNA cancer vaccines. You provide two DNA samples (tumor + normal) by pointing the app at local sequencing files, and the pipeline walks through alignment, variant calling, neoantigen prediction, and mRNA construct design — outputting a vaccine sequence ready for synthesis.
 
 Supports multiple species: human, dog, and cat. The canine case came first, but the architecture is species-flexible.
+
+Runtime today: an Electron shell over a local Next.js renderer and a local FastAPI engine, with workspace artifacts and SQLite stored under an app-data directory. No cloud services, no Docker, no object storage — everything stays on disk.
 
 ## Origin
 
@@ -14,16 +16,16 @@ Inspired by Paul Conyngham's work creating a personalized mRNA vaccine for his d
 
 | # | Stage | Status | Tools | Description |
 |---|-------|--------|-------|-------------|
-| 1 | Ingestion | **Live** | samtools, fastp | Upload FASTQ/BAM/CRAM, normalize to canonical paired FASTQ |
-| 2 | Alignment | Mock | BWA-MEM2, pysam | Align reads against reference genome |
-| 3 | Variant Calling | Planned | GATK Mutect2, Strelka2, DeepSomatic | Identify somatic mutations with ensemble callers |
-| 4 | Annotation | Planned | Ensembl VEP, SnpEff | Annotate variants with functional consequences |
-| 5 | Neoantigen Prediction | Planned | pVACseq, NetMHCpan-4.1, MHCflurry | Predict MHC binding for mutant peptides |
+| 1 | Ingestion | **Live** | samtools, fastp | Choose local FASTQ/BAM/CRAM files, normalize to canonical paired FASTQ |
+| 2 | Alignment | **Live** | BWA-MEM2, samtools | Align canonical tumor/normal FASTQ pairs, persist BAMs, and score QC |
+| 3 | Variant Calling | Planned | GATK Mutect2 | Identify somatic mutations from the aligned tumor/normal BAMs |
+| 4 | Annotation | Planned | Ensembl VEP | Annotate variants with functional consequences |
+| 5 | Neoantigen Prediction | Planned | pVACseq, NetMHCpan-4.1 | Predict MHC binding for mutant peptides |
 | 6 | Epitope Selection | Planned | pVACview, custom scoring | Rank and select optimal vaccine targets |
 | 7 | mRNA Construct Design | Planned | LinearDesign, DNAchisel, ViennaRNA | Optimize codons, UTRs, and secondary structure |
-| 8 | Structure Prediction | Planned | Boltz-2, ESMFold, Mol* | Model peptide-MHC complex 3D structures |
-| 9 | Construct Output | Planned | pVACvector, Biopython | Generate final annotated mRNA sequence |
-| 10 | AI Review | Planned | Claude API, ESM-C | AI-guided validation and optimization |
+| 8 | Construct Output | Planned | pVACvector, Biopython | Generate final annotated mRNA sequence |
+| 9 | Structure Prediction | Later | Boltz-2, ESMFold, Mol* | Research-only structural follow-up, outside the Paul-core v1 path |
+| 10 | AI Review | Later | Claude API, ESM-C | Research-only validation and optimization suggestions |
 
 ## Scientific Context
 

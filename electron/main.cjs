@@ -1,0 +1,77 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
+const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
+const { statSync } = require("node:fs");
+const { join } = require("node:path");
+
+const FRONTEND_URL =
+  process.env.CANCERSTUDIO_FRONTEND_URL || "http://127.0.0.1:3000";
+
+function createWindow() {
+  const window = new BrowserWindow({
+    width: 1520,
+    height: 980,
+    minWidth: 1180,
+    minHeight: 760,
+    backgroundColor: "#f3f0e8",
+    titleBarStyle: "hiddenInset",
+    webPreferences: {
+      preload: join(__dirname, "preload.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  window.loadURL(FRONTEND_URL);
+}
+
+app.whenReady().then(() => {
+  ipcMain.handle("desktop:pick-sequencing-files", async () => {
+    const result = await dialog.showOpenDialog({
+      title: "Choose sequencing files",
+      properties: ["openFile", "multiSelections"],
+      filters: [
+        {
+          name: "Sequencing files",
+          extensions: ["fastq", "fq", "gz", "bam", "cram"],
+        },
+      ],
+    });
+
+    if (result.canceled) {
+      return [];
+    }
+
+    return result.filePaths.map((filePath) => {
+      const stats = statSync(filePath);
+      return {
+        path: filePath,
+        name: filePath.split(/[\\/]/).pop() || filePath,
+        sizeBytes: stats.size,
+        modifiedAtMs: Math.round(stats.mtimeMs),
+      };
+    });
+  });
+
+  ipcMain.handle("desktop:open-path", async (_event, targetPath) => {
+    if (!targetPath) {
+      return;
+    }
+    await shell.openPath(targetPath);
+  });
+
+  ipcMain.handle("desktop:get-app-data-path", async () => app.getPath("userData"));
+
+  createWindow();
+
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    }
+  });
+});
+
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") {
+    app.quit();
+  }
+});
