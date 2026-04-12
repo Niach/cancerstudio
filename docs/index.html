@@ -6,463 +6,204 @@
     <title>cancerstudio</title>
     <meta
       name="description"
-      content="Two DNA samples in, mRNA vaccine out. cancerstudio is an open pipeline for designing personalized cancer vaccines."
+      content="Two DNA samples in, one mRNA vaccine out. A desktop studio for designing personalized cancer vaccines for humans, dogs, and cats."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&display=swap"
     />
     <link rel="stylesheet" href="./styles.css" />
-    <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
   </head>
   <body>
     <div class="page-shell">
-      <!-- Hero -->
       <header class="hero">
-        <div class="hero-copy">
-          <p class="eyebrow">cancerstudio</p>
-          <h1>Two DNA samples in. One mRNA vaccine out.</h1>
-          <p class="lede">
-            Give it tumor DNA and normal DNA. The pipeline finds what mutated,
-            predicts what the immune system can target, and designs a
-            personalized mRNA vaccine. For humans, dogs, and cats.
-          </p>
-          <div class="hero-actions">
-            <a href="#how-it-works" class="button button-primary"
-              >See how it works</a
-            >
-            <a
-              href="https://x.com/paul_conyngham/status/2036940410363535823"
-              class="button button-secondary"
-              target="_blank"
-              rel="noreferrer"
-            >
-              The story behind this
-            </a>
-          </div>
-        </div>
-
-        <div class="hero-panel">
-          <div class="metric-card">
-            <span class="metric-label">The idea</span>
-            <strong>Compare. Predict. Design.</strong>
-            <p>
-              Compare tumor vs normal DNA, find somatic mutations, predict which
-              ones the immune system can see, and design an mRNA construct
-              targeting them.
-            </p>
-          </div>
-          <div class="metric-card">
-            <span class="metric-label metric-label-navy">Early stage</span>
-            <strong>Ingestion works. The rest is coming.</strong>
-            <p>
-              Tumor and normal intake are live with resumable chunked upload.
-              Alignment, variant calling, and everything downstream is being
-              built stage by stage.
-            </p>
-          </div>
+        <p class="eyebrow">cancerstudio</p>
+        <h1>Two DNA samples in.<br />One mRNA vaccine out.</h1>
+        <p class="lede">
+          A desktop studio for designing personalized mRNA cancer vaccines.
+          Give it tumor DNA and matched-normal DNA. The pipeline finds what
+          mutated, predicts what the immune system can target, and designs a
+          vaccine construct. For humans, dogs, and cats — all on your local
+          machine.
+        </p>
+        <div class="hero-actions">
+          <a href="#pipeline" class="button button-primary">See the pipeline</a>
+          <a
+            href="https://github.com/niach/cancerstudio"
+            class="button button-secondary"
+            target="_blank"
+            rel="noreferrer"
+            >GitHub</a
+          >
         </div>
       </header>
 
       <main>
-        <!-- App preview: Create workspace -->
-        <section class="section" id="how-it-works">
+        <section class="section">
           <div class="section-heading">
-            <p class="eyebrow">Step one</p>
-            <h2>Start a workspace. Pick a species.</h2>
+            <p class="eyebrow">Start</p>
+            <h2>Pick a species. Name your workspace.</h2>
+            <p class="section-sub">
+              Every case is a workspace. Human, dog, or cat — cancerstudio
+              loads the right reference genome and locks the pipeline to that
+              species for the rest of the run.
+            </p>
           </div>
-
-          <div class="app-frame">
-            <div class="app-chrome">
-              <div class="traffic-lights">
-                <span class="dot dot-red"></span>
-                <span class="dot dot-yellow"></span>
-                <span class="dot dot-green"></span>
-              </div>
-              <div class="url-bar">localhost:3000</div>
-            </div>
-            <div class="app-body app-body-light">
-              <div class="mock-create-card">
-                <h3 class="mock-card-title">New workspace</h3>
-                <div class="species-grid">
-                  <button class="species-btn" type="button">
-                    <svg
-                      class="species-icon"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <circle cx="12" cy="8" r="5" />
-                      <path d="M20 21a8 8 0 1 0-16 0" />
-                    </svg>
-                    <span>Human</span>
-                  </button>
-                  <button class="species-btn species-btn-active" type="button">
-                    <svg
-                      class="species-icon"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <path
-                        d="M10 5.172C10 3.782 8.423 2.679 6.5 3c-2.823.47-4.113 6.006-4 7 .08.703 1.725 1.722 3.656 1 1.261-.472 1.96-1.45 2.344-2.5"
-                      />
-                      <path
-                        d="M14.267 5.172c0-1.39 1.577-2.493 3.5-2.172 2.823.47 4.113 6.006 4 7-.08.703-1.725 1.722-3.656 1-1.261-.472-1.855-1.45-2.239-2.5"
-                      />
-                      <path d="M8 14v.5" />
-                      <path d="M16 14v.5" />
-                      <path d="M11.25 16.25h1.5L12 17l-.75-.75Z" />
-                      <path
-                        d="M4.42 11.247A13.152 13.152 0 0 0 4 14.556C4 18.728 7.582 21 12 21s8-2.272 8-6.444c0-1.061-.162-2.2-.493-3.309m-9.243-6.082A8.801 8.801 0 0 1 12 5c.78 0 1.5.108 2.161.306"
-                      />
-                    </svg>
-                    <span>Dog</span>
-                  </button>
-                  <button class="species-btn" type="button">
-                    <svg
-                      class="species-icon"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <path d="M12 5c.67 0 1.35.09 2 .26 1.78-2 5.03-2.1 6.27-.46.72.97.53 2.56-.12 3.63A9 9 0 0 1 21 14c0 4.97-4.03 6-9 6s-9-1.03-9-6a9 9 0 0 1 .85-5.57c-.65-1.07-.84-2.66-.12-3.63C4.97 3.16 8.22 3.26 10 5.26 10.65 5.09 11.33 5 12 5Z" />
-                      <path d="M8 14v.5" />
-                      <path d="M16 14v.5" />
-                      <path d="M11.25 16.25h1.5L12 17l-.75-.75Z" />
-                    </svg>
-                    <span>Cat</span>
-                  </button>
-                </div>
-                <input
-                  class="mock-input"
-                  type="text"
-                  value="Rosie baseline"
-                  readonly
-                />
-                <button class="mock-create-btn" type="button">
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2.5"
-                    stroke-linecap="round"
-                  >
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
-                  Create
-                </button>
-              </div>
-            </div>
-          </div>
+          <figure class="shot">
+            <img
+              src="./screenshots/landing.png"
+              alt="cancerstudio workspaces screen with a species picker and an open HCC1395 workspace"
+              loading="lazy"
+            />
+          </figure>
         </section>
 
-        <!-- Pipeline stages -->
+        <section class="section">
+          <div class="section-heading">
+            <p class="eyebrow">Ingest</p>
+            <h2>Tumor and matched normal. Paired-end or nothing.</h2>
+            <p class="section-sub">
+              Two lanes: the tumor biopsy and a matched normal reference.
+              cancerstudio reads the files in place, validates that both
+              lanes are paired-end, previews a few reads, and normalizes
+              everything into canonical FASTQ before alignment unlocks.
+            </p>
+          </div>
+          <figure class="shot">
+            <img
+              src="./screenshots/ingestion.png"
+              alt="ingestion view with healthy and tumor lanes, sample preview, and alignment unlocked"
+              loading="lazy"
+            />
+          </figure>
+        </section>
+
+        <section class="section">
+          <div class="section-heading">
+            <p class="eyebrow">Align</p>
+            <h2>BWA-MEM2 against the species reference.</h2>
+            <p class="section-sub">
+              Pick whole-genome or whole-exome and hit start. Reference
+              bundles are fetched and indexed on first run; subsequent runs
+              reuse them. The output is sorted, indexed BAMs with QC metrics
+              ready for variant calling.
+            </p>
+          </div>
+          <figure class="shot">
+            <img
+              src="./screenshots/alignment.png"
+              alt="alignment stage showing WGS and WES options and a start alignment button"
+              loading="lazy"
+            />
+          </figure>
+        </section>
+
         <section class="section" id="pipeline">
           <div class="section-heading">
             <p class="eyebrow">The pipeline</p>
-            <h2>Ten stages from raw reads to vaccine.</h2>
-          </div>
-
-          <div class="pipeline-flow">
-            <div class="pipeline-stage pipeline-live">
-              <span class="pipeline-num">1</span>
-              <div>
-                <strong>Ingestion</strong>
-                <p>Upload FASTQ, BAM, or CRAM</p>
-              </div>
-              <span class="status-chip status-live">Live</span>
-            </div>
-            <div class="pipeline-stage pipeline-mock">
-              <span class="pipeline-num">2</span>
-              <div>
-                <strong>Alignment</strong>
-                <p>BWA-MEM2 against reference genome</p>
-              </div>
-              <span class="status-chip status-mock">Next</span>
-            </div>
-            <div class="pipeline-stage">
-              <span class="pipeline-num">3</span>
-              <div>
-                <strong>Variant Calling</strong>
-                <p>Mutect2 + ensemble callers</p>
-              </div>
-              <span class="status-chip status-planned">Planned</span>
-            </div>
-            <div class="pipeline-stage">
-              <span class="pipeline-num">4</span>
-              <div>
-                <strong>Annotation</strong>
-                <p>Ensembl VEP + SnpEff</p>
-              </div>
-              <span class="status-chip status-planned">Planned</span>
-            </div>
-            <div class="pipeline-stage">
-              <span class="pipeline-num">5</span>
-              <div>
-                <strong>Neoantigen Prediction</strong>
-                <p>pVACseq + NetMHCpan</p>
-              </div>
-              <span class="status-chip status-planned">Planned</span>
-            </div>
-            <div class="pipeline-stage">
-              <span class="pipeline-num">6</span>
-              <div>
-                <strong>Epitope Selection</strong>
-                <p>Rank and pick the best targets</p>
-              </div>
-              <span class="status-chip status-planned">Planned</span>
-            </div>
-            <div class="pipeline-stage">
-              <span class="pipeline-num">7</span>
-              <div>
-                <strong>mRNA Construct Design</strong>
-                <p>LinearDesign + codon optimization</p>
-              </div>
-              <span class="status-chip status-planned">Planned</span>
-            </div>
-            <div class="pipeline-stage">
-              <span class="pipeline-num">8</span>
-              <div>
-                <strong>Structure Prediction</strong>
-                <p>Peptide-MHC 3D modeling</p>
-              </div>
-              <span class="status-chip status-planned">Planned</span>
-            </div>
-            <div class="pipeline-stage">
-              <span class="pipeline-num">9</span>
-              <div>
-                <strong>Construct Output</strong>
-                <p>Final mRNA sequence for synthesis</p>
-              </div>
-              <span class="status-chip status-planned">Planned</span>
-            </div>
-            <div class="pipeline-stage">
-              <span class="pipeline-num">10</span>
-              <div>
-                <strong>AI Review</strong>
-                <p>Validation and optimization</p>
-              </div>
-              <span class="status-chip status-planned">Planned</span>
-            </div>
-          </div>
-        </section>
-
-        <!-- App preview: Workspace view -->
-        <section class="section" id="workspace">
-          <div class="section-heading">
-            <p class="eyebrow">Inside the workspace</p>
-            <h2>Two lanes. Tumor and normal. Paired-end or nothing.</h2>
+            <h2>Eight stages from raw reads to vaccine.</h2>
             <p class="section-sub">
-              Stage R1 and R2 in any order. The pipeline checks the pair
-              before any bytes leave your machine — and resumes from the
-              last good chunk if a transfer drops.
+              Ingestion and alignment are live today. The downstream stages
+              are wired into the UI and will light up as they're built.
             </p>
           </div>
 
-          <div class="app-frame app-frame-wide">
-            <div class="app-chrome">
-              <div class="traffic-lights">
-                <span class="dot dot-red"></span>
-                <span class="dot dot-yellow"></span>
-                <span class="dot dot-green"></span>
+          <ol class="pipeline">
+            <li class="stage stage-live">
+              <span class="stage-num">1</span>
+              <div class="stage-body">
+                <strong>Ingestion</strong>
+                <p>Pick local FASTQ, BAM, or CRAM. Normalize into canonical paired FASTQ.</p>
               </div>
-              <div class="url-bar">
-                localhost:3000/workspaces/abc123/ingestion
+              <span class="chip chip-live">Live</span>
+            </li>
+            <li class="stage stage-live">
+              <span class="stage-num">2</span>
+              <div class="stage-body">
+                <strong>Alignment</strong>
+                <p>BWA-MEM2 against GRCh38, CanFam4, or felCat9.</p>
               </div>
-            </div>
-            <div class="app-body">
-              <!-- App header -->
-              <div class="mock-header">
-                <div class="mock-header-left">
-                  <div class="mock-logo">
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="white"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                    >
-                      <path
-                        d="M2 15c6.667-6 13.333 0 20-6"
-                      />
-                      <path
-                        d="M9 22c1.798-1.998 2.518-3.995 2.807-5.993"
-                      />
-                      <path
-                        d="M15 2c-1.798 1.998-2.518 3.995-2.807 5.993"
-                      />
-                    </svg>
-                  </div>
-                  <div>
-                    <div class="mock-workspace-name">Rosie baseline</div>
-                    <div class="mock-workspace-meta">
-                      <span class="mock-badge-outline">Dog</span>
-                      <span class="mock-meta-text"
-                        >Alignment-ready intake</span
-                      >
-                    </div>
-                  </div>
-                </div>
+              <span class="chip chip-live">Live</span>
+            </li>
+            <li class="stage">
+              <span class="stage-num">3</span>
+              <div class="stage-body">
+                <strong>Variant calling</strong>
+                <p>Somatic mutations from tumor vs normal BAMs with Mutect2.</p>
               </div>
-
-              <!-- App layout -->
-              <div class="mock-layout">
-                <!-- Sidebar -->
-                <nav class="mock-sidebar">
-                  <a class="mock-nav-item mock-nav-active">
-                    <span class="mock-nav-num mock-nav-num-active">1</span>
-                    Ingestion
-                  </a>
-                  <a class="mock-nav-item">
-                    <span class="mock-nav-num">2</span>
-                    Alignment
-                  </a>
-                  <a class="mock-nav-item">
-                    <span class="mock-nav-num">3</span>
-                    Variant Calling
-                  </a>
-                  <a class="mock-nav-item">
-                    <span class="mock-nav-num">4</span>
-                    Annotation
-                  </a>
-                  <a class="mock-nav-item">
-                    <span class="mock-nav-num">5</span>
-                    Neoantigen
-                  </a>
-                  <a class="mock-nav-item">
-                    <span class="mock-nav-num">6</span>
-                    Epitope Selection
-                  </a>
-                  <a class="mock-nav-item">
-                    <span class="mock-nav-num">7</span>
-                    Construct Design
-                  </a>
-                  <a class="mock-nav-item">
-                    <span class="mock-nav-num">8</span>
-                    Structure
-                  </a>
-                  <a class="mock-nav-item">
-                    <span class="mock-nav-num">9</span>
-                    Output
-                  </a>
-                  <a class="mock-nav-item">
-                    <span class="mock-nav-num">10</span>
-                    AI Review
-                  </a>
-                </nav>
-
-                <!-- Main content -->
-                <div class="mock-main">
-                  <div class="mock-stage-header">
-                    <h3>Ingestion</h3>
-                    <p>
-                      Stage tumor and normal FASTQ. Files accumulate across
-                      picks until paired R1 + R2 are present, then a single
-                      Start hands them to the resumable transfer.
-                    </p>
-                  </div>
-
-                  <div class="flex justify-end border-b border-slate-900/6 pb-3 mb-5">
-                    <span class="font-mono text-[11px] tracking-[0.18em] uppercase text-emerald-700">
-                      ● Alignment unlocked
-                    </span>
-                  </div>
-
-                  <div class="flex flex-col gap-6">
-                    <!-- Tumor — ready -->
-                    <section class="flex flex-col gap-2">
-                      <div class="flex items-baseline justify-between gap-4">
-                        <div class="flex items-baseline gap-2.5">
-                          <span class="font-mono text-[11px] tracking-[0.22em] uppercase text-slate-500">Tumor</span>
-                          <span class="text-slate-300">·</span>
-                          <span class="font-['Fraunces'] text-lg italic font-medium leading-none text-emerald-700">ready</span>
-                        </div>
-                        <span class="font-mono text-[11px] tabular-nums text-slate-500">2 files · 2.5 GB</span>
-                      </div>
-                      <div class="flex items-baseline justify-between gap-4 pt-0.5">
-                        <p class="m-0 text-sm text-slate-500">Canonical paired FASTQ ready for alignment</p>
-                        <div class="flex items-center gap-3.5 shrink-0">
-                          <button type="button" class="inline-flex items-center gap-1.5 p-0 border-0 bg-transparent font-mono text-[11px] tracking-[0.14em] uppercase text-slate-600 cursor-default">
-                            Preview
-                            <svg class="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                              <polyline points="6 9 12 15 18 9"></polyline>
-                            </svg>
-                          </button>
-                          <button type="button" class="px-2.5 py-1 border-0 bg-transparent text-[13px] font-medium text-slate-600 cursor-default hover:text-slate-900">Replace</button>
-                        </div>
-                      </div>
-                    </section>
-
-                    <!-- Normal — staging (pre-upload, paired-end gate) -->
-                    <section class="flex flex-col gap-3">
-                      <div class="flex items-baseline justify-between gap-4">
-                        <div class="flex items-baseline gap-2.5">
-                          <span class="font-mono text-[11px] tracking-[0.22em] uppercase text-slate-500">Normal</span>
-                          <span class="text-slate-300">·</span>
-                          <span class="font-['Fraunces'] text-lg italic font-medium leading-none text-slate-600">staging</span>
-                        </div>
-                        <span class="font-mono text-[11px] tabular-nums text-slate-500">rosie_normal · 2 files</span>
-                      </div>
-                      <ul class="list-none p-0 m-0 flex flex-col">
-                        <li class="flex items-baseline justify-between gap-4 py-2 border-b border-slate-900/6">
-                          <span class="text-sm text-slate-900 truncate min-w-0">rosie_normal_R1.fastq.gz</span>
-                          <span class="flex items-baseline gap-3.5 font-mono text-[10px] tabular-nums shrink-0">
-                            <span class="tracking-[0.08em] uppercase text-slate-600">R1</span>
-                            <span class="text-slate-400">1.1 GB</span>
-                            <span class="tracking-[0.18em] uppercase text-slate-400">remove</span>
-                          </span>
-                        </li>
-                        <li class="flex items-baseline justify-between gap-4 py-2">
-                          <span class="text-sm text-slate-900 truncate min-w-0">rosie_normal_R2.fastq.gz</span>
-                          <span class="flex items-baseline gap-3.5 font-mono text-[10px] tabular-nums shrink-0">
-                            <span class="tracking-[0.08em] uppercase text-slate-600">R2</span>
-                            <span class="text-slate-400">1.3 GB</span>
-                            <span class="tracking-[0.18em] uppercase text-slate-400">remove</span>
-                          </span>
-                        </li>
-                      </ul>
-                      <div class="flex items-center justify-between gap-3 rounded-2xl border border-dashed border-slate-900/12 px-3 py-2.5">
-                        <div class="flex items-center gap-2.5 text-sm text-slate-500">
-                          <svg class="w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                            <polyline points="17 8 12 3 7 8"/>
-                            <line x1="12" y1="3" x2="12" y2="15"/>
-                          </svg>
-                          <span>Add more files</span>
-                        </div>
-                        <span class="font-mono text-[10px] tracking-[0.18em] uppercase text-slate-400">Drop or browse</span>
-                      </div>
-                      <div class="flex items-center justify-between gap-3 pt-0.5">
-                        <p class="m-0 text-xs leading-5 text-slate-500">2 files ready · paired-end detected</p>
-                        <button type="button" class="inline-flex items-center rounded-md border border-slate-900/15 bg-white px-3 py-1.5 text-[13px] font-medium text-slate-900 cursor-default hover:bg-slate-50">
-                          Start upload
-                        </button>
-                      </div>
-                    </section>
-                  </div>
-                </div>
+              <span class="chip chip-planned">Planned</span>
+            </li>
+            <li class="stage">
+              <span class="stage-num">4</span>
+              <div class="stage-body">
+                <strong>Annotation</strong>
+                <p>Functional consequences via Ensembl VEP.</p>
               </div>
-            </div>
+              <span class="chip chip-planned">Planned</span>
+            </li>
+            <li class="stage">
+              <span class="stage-num">5</span>
+              <div class="stage-body">
+                <strong>Neoantigen prediction</strong>
+                <p>MHC binding for mutant peptides with pVACseq + NetMHCpan.</p>
+              </div>
+              <span class="chip chip-planned">Planned</span>
+            </li>
+            <li class="stage">
+              <span class="stage-num">6</span>
+              <div class="stage-body">
+                <strong>Epitope selection</strong>
+                <p>Rank and pick the best targets.</p>
+              </div>
+              <span class="chip chip-planned">Planned</span>
+            </li>
+            <li class="stage">
+              <span class="stage-num">7</span>
+              <div class="stage-body">
+                <strong>mRNA construct design</strong>
+                <p>Codon optimization, UTRs, and secondary structure.</p>
+              </div>
+              <span class="chip chip-planned">Planned</span>
+            </li>
+            <li class="stage">
+              <span class="stage-num">8</span>
+              <div class="stage-body">
+                <strong>Construct output</strong>
+                <p>Annotated mRNA sequence ready for synthesis.</p>
+              </div>
+              <span class="chip chip-planned">Planned</span>
+            </li>
+          </ol>
+        </section>
+
+        <section class="section">
+          <div class="section-heading">
+            <p class="eyebrow">Stays on your laptop</p>
+            <h2>Desktop-first, by design.</h2>
+            <p class="section-sub">
+              Electron shell, local Next.js renderer, local FastAPI engine,
+              SQLite on disk. No cloud services, no Docker, no object
+              storage. Your sequencing data never leaves the machine.
+            </p>
           </div>
         </section>
 
+        <footer class="footer">
+          <p>
+            Inspired by Paul Conyngham's personalized mRNA vaccine for his
+            dog Rosie.
+          </p>
+          <p>
+            <a
+              href="https://github.com/niach/cancerstudio"
+              target="_blank"
+              rel="noreferrer"
+              >github.com/niach/cancerstudio</a
+            >
+          </p>
+        </footer>
       </main>
     </div>
   </body>

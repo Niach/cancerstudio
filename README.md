@@ -1,27 +1,33 @@
 # cancerstudio
 
-cancerstudio is a desktop-first studio for designing personalized mRNA cancer vaccines. You pick local tumor and matched-normal sequencing files, the app normalizes them into canonical FASTQ, aligns them, and prepares the workflow for somatic variant calling and downstream neoantigen work.
+Two DNA samples in, one mRNA vaccine out. cancerstudio is a desktop-first studio for designing personalized cancer vaccines for humans, dogs, and cats. You point the app at local tumor and matched-normal sequencing files, it prepares alignment-ready inputs on your disk, aligns them against a species reference, and stages the rest of the neoantigen workflow.
 
-The current live slice is:
+Project site: <https://niach.github.io/cancerstudio/>
 
-`Ingestion -> Alignment -> Variant Calling -> Annotation -> Neoantigen Prediction -> Epitope Selection -> Construct Design -> Construct Output`
+## Screenshots
 
-Only ingestion and alignment are live today. The later stages are staged in the UI but not implemented yet.
+| Pick a species | Stage the samples | Run alignment |
+| --- | --- | --- |
+| ![landing](docs/screenshots/landing.png) | ![ingestion](docs/screenshots/ingestion.png) | ![alignment](docs/screenshots/alignment.png) |
 
-## What changed
+## Pipeline
 
-- Desktop-first runtime: Electron shell + local Next.js renderer + local FastAPI pipeline engine
-- Disk-backed workflow: no MinIO, no object-storage uploads, no remote file transfer step
-- Reference-in-place intake: source FASTQ/BAM/CRAM files stay where they already live
-- Managed local outputs: canonical FASTQ, BAM/BAI, QC artifacts, reference bundles, and SQLite live under the app data directory
-- Species presets: human `GRCh38`, dog `CanFam4`, cat `felCat9`
-- First-run reference bootstrap: missing preset references are downloaded and indexed automatically during alignment
+`Ingestion -> Alignment -> Variant Calling -> Annotation -> Neoantigen Prediction -> Epitope Selection -> mRNA Construct Design -> Construct Output`
+
+Ingestion and alignment are live. The downstream stages are wired into the UI but not implemented yet. Structure Prediction and AI Review live in a separate research track.
+
+## How it works
+
+- Desktop-first runtime: Electron shell + local Next.js renderer + local FastAPI pipeline engine. No cloud, no Docker, no object storage.
+- Reference-in-place intake: your source FASTQ/BAM/CRAM files stay where they live. Only derived artifacts (canonical FASTQ, BAM/BAI, QC, reference bundles, SQLite) land in the app-data directory.
+- Species presets: human `GRCh38`, dog `CanFam4`, cat `felCat9`. Missing references are downloaded and indexed on first alignment.
+- Paired-lane model: tumor and normal are separate lanes. Alignment unlocks only when both lanes are paired-end ready.
 
 ## Stack
 
 - Frontend: Next.js 15.5, React 19, TypeScript, Tailwind CSS
 - Desktop shell: Electron
-- Backend: FastAPI, SQLAlchemy, samtools, bwa-mem2
+- Backend: FastAPI, SQLAlchemy, samtools, pigz, bwa-mem2
 - Storage: local filesystem + SQLite
 
 ## Local development
@@ -68,6 +74,74 @@ Copy `.env.example` to `.env` for local overrides. The most important settings a
 
 If you do not set `REFERENCE_*_FASTA`, cancerstudio caches preset references under the app-data directory and prepares them on first alignment.
 
+## System requirements
+
+cancerstudio shells out to three bioinformatics binaries from the FastAPI backend. They must be on `PATH` (or pointed at via the env overrides below) before the live ingestion and alignment stages can run.
+
+| Tool | Purpose | Used by |
+|------|---------|---------|
+| `samtools` ≥ 1.16 | BAM/CRAM normalization, sort, index, flagstat, idxstats, stats, markdup | Ingestion + Alignment |
+| `bwa-mem2` ≥ 2.2 | Reference indexing and paired-end alignment | Alignment |
+| `pigz` ≥ 2.6 | Multithreaded FASTQ compression for managed `.fastq.gz` outputs | Ingestion |
+
+If any of these are missing the backend will reject the relevant API call up-front with a structured `503 missing_tools` response, and the UI surfaces a friendly callout listing what to install — no more raw `[Errno 2]` stack traces.
+
+> **Memory warning for the first alignment run.** `bwa-mem2 index` peaks at roughly **28 GB of RAM** while building `genome.fa.bwt.2bit.64`. The backend refuses to start indexing if `/proc/meminfo` reports less than 30 GB available, so your box won't get pushed into swap. If you're on a modest machine, close your browser, IDE, and dev servers before hitting *Start alignment* the first time — or run `scripts/prepare-reference.sh` from a clean terminal to finish the index in isolation. Once the index is on disk the backend detects it on subsequent runs and skips bootstrapping entirely.
+
+### Install on Ubuntu / Debian / Linux Mint
+
+A helper script handles all three. It pulls `samtools` + `pigz` from apt and downloads the upstream static `bwa-mem2` v2.2.1 build (not in apt) into `/usr/local/bin`:
+
+```bash
+sudo bash scripts/install-bioinformatics-deps.sh
+```
+
+Or do it by hand:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y samtools pigz
+
+curl -fsSL https://github.com/bwa-mem2/bwa-mem2/releases/download/v2.2.1/bwa-mem2-2.2.1_x64-linux.tar.bz2 -o /tmp/bwa-mem2.tar.bz2
+tar -xjf /tmp/bwa-mem2.tar.bz2 -C /tmp
+sudo install -m 0755 /tmp/bwa-mem2-2.2.1_x64-linux/bwa-mem2 /usr/local/bin/bwa-mem2
+sudo cp /tmp/bwa-mem2-2.2.1_x64-linux/bwa-mem2.* /usr/local/bin/
+rm -rf /tmp/bwa-mem2.tar.bz2 /tmp/bwa-mem2-2.2.1_x64-linux
+```
+
+### Install on macOS
+
+```bash
+brew install samtools pigz bwa-mem2
+```
+
+### Verify
+
+```bash
+samtools --version | head -1
+bwa-mem2 version
+pigz --version
+```
+
+### Env overrides
+
+Useful when you have non-standard binary locations or want to point at a specific build:
+
+- `SAMTOOLS_BINARY` — absolute path or alternate command name (default `samtools`)
+- `ALIGNMENT_BWA_BINARY` — absolute path or alternate command name (default `bwa-mem2`)
+- `PIGZ_BINARY` — absolute path or alternate command name (default `pigz`)
+- `PIGZ_THREADS` — worker count for pigz compression
+
+### Standalone reference indexer
+
+If *Start alignment* refuses with an "insufficient memory" callout, or you'd just rather not run the memory-hungry indexing inside the live app:
+
+```bash
+bash scripts/prepare-reference.sh
+```
+
+Defaults to `~/.local/share/cancerstudio/references/grch38/genome.fa`. Pass a different FASTA as the first argument to index something else. The script checks `MemAvailable`, refuses to start if <30 GB is free, and runs `samtools faidx` + `bwa-mem2 index` in a clean process. Once it finishes, restart the backend — the alignment stage will detect the existing index and skip bootstrapping entirely.
+
 ## Tests
 
 ```bash
@@ -81,19 +155,34 @@ Real-data smoke fixtures:
 npm run sample-data:smoke
 ```
 
-Browser smoke:
+Browser ingestion smoke:
 
 ```bash
 npx playwright install chromium
 npm run test:browser:real-data
 ```
 
+Backend real-data smoke:
+
+```bash
+npm run test:backend:real-data
+```
+
+Opt-in live alignment smoke:
+
+- uses the matched SEQC2 tumor/normal FASTQ smoke pair
+- requires local `samtools` and `bwa-mem2`
+- downloads and indexes `GRCh38` on first run unless `REFERENCE_GRCH38_FASTA` is already set
+- runs only when `REAL_DATA_RUN_ALIGNMENT=1`
+
 ## Sample data
 
 The repo includes helpers for public smoke fixtures:
 
-- SEQC2 human tumor/normal FASTQ smoke data for ingestion
-- a small BAM/CRAM smoke dataset for local normalization checks
+- SEQC2 human tumor/normal FASTQ smoke data for ingestion and opt-in live alignment smoke
+- a tiny BAM/CRAM smoke dataset for local normalization checks only
+
+There is no full downstream pipeline fixture yet. Variant calling and later stages remain placeholder-backed.
 
 The BAM/CRAM helper expects a local `samtools` binary.
 
