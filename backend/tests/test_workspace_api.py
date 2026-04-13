@@ -8,6 +8,7 @@ import httpx
 import pytest
 from sqlalchemy import delete
 
+from app.api import workspaces as workspace_routes
 from app.db import init_db, session_scope
 from app.main import app
 from app.models.records import (
@@ -465,6 +466,7 @@ async def test_alignment_run_persists_local_artifacts_and_unlocks_variant_stage(
         "execute_alignment_lane",
         fake_execute_alignment_lane,
     )
+    monkeypatch.setattr(workspace_routes, "verify_tools", lambda _tools: None)
 
     summary_response = await client.post(
         f"/api/workspaces/{workspace['id']}/alignment/run"

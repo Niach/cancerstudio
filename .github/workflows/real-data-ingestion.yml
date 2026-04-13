@@ -12,6 +12,11 @@ jobs:
   real-data:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      CANCERSTUDIO_APP_DATA_DIR: ${{ github.workspace }}/.run/app-data
+      CORS_ALLOW_ORIGINS: http://127.0.0.1:3000,http://localhost:3000
+      PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
+      REAL_DATA_API_BASE: http://127.0.0.1:8000
 
     steps:
       - name: Checkout
@@ -37,22 +42,23 @@ jobs:
       - name: Install backend dependencies
         run: ./.venv/bin/pip install -r backend/requirements.txt
 
+      - name: Install bioinformatics dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y samtools pigz
+
       - name: Fetch smoke sample data
         run: npm run sample-data:smoke
 
-      - name: Start infrastructure services
-        run: docker compose up -d postgres minio bucket-init
+      - name: Fetch alignment-container sample data
+        run: npm run sample-data:alignment
+
+      - name: Reset local app data
+        run: |
+          mkdir -p .run
+          rm -rf .run/app-data
 
       - name: Start backend
-        env:
-          DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/cancerstudio
-          S3_BUCKET: workspace-data
-          S3_ENDPOINT_URL: http://127.0.0.1:9000
-          AWS_ACCESS_KEY_ID: minioadmin
-          AWS_SECRET_ACCESS_KEY: minioadmin
-          AWS_REGION: us-east-1
-          S3_FORCE_PATH_STYLE: "true"
-          CORS_ALLOW_ORIGINS: http://127.0.0.1:3000,http://localhost:3000
         run: |
           mkdir -p .run
           ./.venv/bin/uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000 > .run/backend.log 2>&1 &
@@ -62,8 +68,6 @@ jobs:
         run: python3 scripts/wait_for_http.py http://127.0.0.1:8000/health --timeout 60
 
       - name: Run real-data backend integration
-        env:
-          REAL_DATA_API_BASE: http://127.0.0.1:8000
         run: npm run test:backend:real-data
 
       - name: Stop backend before browser reset
@@ -74,24 +78,13 @@ jobs:
             rm .run/backend.pid
           fi
 
-      - name: Reset infrastructure for browser smoke
+      - name: Reset local app data for browser smoke
         if: always()
-        run: |
-          docker compose down -v || true
-          rm -rf minio-data
-          docker compose up -d postgres minio bucket-init
+        run: rm -rf .run/app-data
 
       - name: Restart backend for browser smoke
-        env:
-          DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/cancerstudio
-          S3_BUCKET: workspace-data
-          S3_ENDPOINT_URL: http://127.0.0.1:9000
-          AWS_ACCESS_KEY_ID: minioadmin
-          AWS_SECRET_ACCESS_KEY: minioadmin
-          AWS_REGION: us-east-1
-          S3_FORCE_PATH_STYLE: "true"
-          CORS_ALLOW_ORIGINS: http://127.0.0.1:3000,http://localhost:3000
         run: |
+          mkdir -p .run
           ./.venv/bin/uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000 > .run/backend-browser.log 2>&1 &
           echo $! > .run/backend-browser.pid
 
@@ -113,8 +106,6 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run browser smoke
-        env:
-          PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
         run: npm run test:browser:real-data
 
       - name: Upload debug artifacts
@@ -139,4 +130,3 @@ jobs:
           if [ -f .run/backend.pid ]; then
             kill "$(cat .run/backend.pid)" || true
           fi
-          docker compose down -v || true
