@@ -56,7 +56,10 @@ app.whenReady().then(() => {
     if (!targetPath) {
       return;
     }
-    await shell.openPath(targetPath);
+    // Fire-and-forget: on some Linux desktop environments shell.openPath()'s
+    // Promise never resolves after the file opens successfully, tripping
+    // Electron's "reply was never sent" IPC watchdog.
+    shell.openPath(targetPath).catch(() => {});
   });
 
   ipcMain.handle("desktop:get-app-data-path", async () => app.getPath("userData"));
