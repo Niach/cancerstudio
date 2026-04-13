@@ -221,6 +221,12 @@ export interface AlignmentStageSummary {
   artifacts: AlignmentArtifact[];
 }
 
+export interface SystemMemoryResponse {
+  availableBytes: number | null;
+  totalBytes: number | null;
+  thresholdBytes: number;
+}
+
 export interface DLAAllele {
   name: string;
   locus: "DLA-88" | "DLA-DRB1" | "DLA-DQA1" | "DLA-DQB1";

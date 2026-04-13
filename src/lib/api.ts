@@ -16,6 +16,7 @@ import type {
   PipelineStageId,
   ReadPair,
   SampledReadStats,
+  SystemMemoryResponse,
   Workspace,
   WorkspaceFile,
   ReferencePreset,
@@ -173,6 +174,12 @@ type AlignmentStageSummaryDto = {
   latest_run?: AlignmentRunDto | null;
   lane_metrics: Record<SampleLane, AlignmentLaneMetricsDto | null>;
   artifacts: AlignmentArtifactDto[];
+};
+
+type SystemMemoryDto = {
+  available_bytes: number | null;
+  total_bytes: number | null;
+  threshold_bytes: number;
 };
 
 function mapWorkspaceFile(dto: WorkspaceFileDto): WorkspaceFile {
@@ -622,5 +629,13 @@ export const api = {
         { method: "POST" }
       )
     ),
+  getSystemMemory: async (): Promise<SystemMemoryResponse> => {
+    const dto = await request<SystemMemoryDto>("/api/system/memory");
+    return {
+      availableBytes: dto.available_bytes,
+      totalBytes: dto.total_bytes,
+      thresholdBytes: dto.threshold_bytes,
+    };
+  },
   resolveDownloadUrl: (downloadPath: string) => `${PUBLIC_API_BASE}${downloadPath}`,
 };

@@ -168,10 +168,23 @@ def read_available_memory_bytes() -> int | None:
     the line is missing — the caller should treat that as "can't check,
     let the operation proceed" rather than blocking.
     """
+    return _read_meminfo_field_bytes("MemAvailable")
+
+
+def read_total_memory_bytes() -> int | None:
+    """Return ``/proc/meminfo``'s ``MemTotal`` in bytes, or ``None``.
+
+    Same semantics as :func:`read_available_memory_bytes` — non-Linux or
+    unreadable ``/proc/meminfo`` returns ``None``.
+    """
+    return _read_meminfo_field_bytes("MemTotal")
+
+
+def _read_meminfo_field_bytes(label: str) -> int | None:
     try:
         with open("/proc/meminfo", "r", encoding="utf-8") as handle:
             for line in handle:
-                if line.startswith("MemAvailable:"):
+                if line.startswith(f"{label}:"):
                     parts = line.split()
                     if len(parts) >= 2:
                         return int(parts[1]) * 1024

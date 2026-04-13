@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import workspaces
+from app.api import system, workspaces
 from app.db import init_db
 from app.services import background
 
@@ -39,6 +39,7 @@ app.add_middleware(
 )
 
 app.include_router(workspaces.router, prefix="/api/workspaces", tags=["workspaces"])
+app.include_router(system.router)
 
 
 @app.get("/health")

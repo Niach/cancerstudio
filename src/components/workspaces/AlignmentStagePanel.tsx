@@ -18,6 +18,7 @@ import type {
   AlignmentLaneMetrics,
   AlignmentStageSummary,
   AssayType,
+  SystemMemoryResponse,
   Workspace,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -341,6 +342,7 @@ export default function AlignmentStagePanel({
                     }}
                   />
                 </div>
+                <MemoryHairline />
               </div>
             ) : (
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -660,6 +662,89 @@ function InsufficientMemoryCallout({
         The download and partial indices are already on disk — only the final
         genome.fa.r150.sti file still needs to be built.
       </p>
+    </div>
+  );
+}
+
+function MemoryHairline() {
+  const [memory, setMemory] = useState<SystemMemoryResponse | null>(null);
+  const [isHovered, setIsHovered] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchMemory = () => {
+      void api
+        .getSystemMemory()
+        .then((response) => {
+          if (!cancelled) setMemory(response);
+        })
+        .catch(() => {});
+    };
+
+    fetchMemory();
+    const timer = window.setInterval(fetchMemory, 2000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  if (!memory || memory.availableBytes == null || memory.totalBytes == null) {
+    return null;
+  }
+
+  const usedBytes = memory.totalBytes - memory.availableBytes;
+  const usedRatio = Math.min(1, Math.max(0, usedBytes / memory.totalBytes));
+  const availabilityRatio = memory.availableBytes / memory.thresholdBytes;
+
+  const tone =
+    availabilityRatio < 1
+      ? "rose"
+      : availabilityRatio < 1.5
+        ? "amber"
+        : "stone";
+
+  const fillClass =
+    tone === "rose"
+      ? "bg-rose-500/80"
+      : tone === "amber"
+        ? "bg-amber-500/80"
+        : "bg-stone-400/60";
+
+  const readoutClass =
+    tone === "rose"
+      ? "text-rose-700"
+      : tone === "amber"
+        ? "text-amber-700"
+        : "text-stone-500";
+
+  return (
+    <div
+      className="mt-1"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <div
+        className={cn(
+          "relative overflow-hidden rounded-full bg-stone-100 transition-all duration-200",
+          isHovered ? "h-[3px]" : "h-px"
+        )}
+      >
+        <div
+          className={cn("h-full transition-all duration-500", fillClass)}
+          style={{ width: `${usedRatio * 100}%` }}
+        />
+      </div>
+      {isHovered ? (
+        <div
+          className={cn(
+            "mt-0.5 text-right font-mono text-[10px] tabular-nums tracking-[0.08em]",
+            readoutClass
+          )}
+        >
+          {(usedBytes / 1024 ** 3).toFixed(1)} / {(memory.totalBytes / 1024 ** 3).toFixed(1)} GiB
+        </div>
+      ) : null}
     </div>
   );
 }
