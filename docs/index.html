@@ -83,18 +83,43 @@
         <section class="section">
           <div class="section-heading">
             <p class="eyebrow">Align</p>
-            <h2>strobealign against the species reference.</h2>
+            <h2>Chunked strobealign that survives 100&times; WGS on 62&nbsp;GB.</h2>
             <p class="section-sub">
-              Pick whole-genome or whole-exome and hit start. Reference
-              bundles are fetched and indexed on first run; subsequent runs
-              reuse them. The output is sorted, indexed BAMs with QC metrics
-              ready for variant calling.
+              Pick whole-genome or whole-exome and hit start. Paired FASTQ is
+              split into ~20M-read chunks and aligned in parallel with fresh
+              strobealign workers, so memory never accumulates across a
+              multi-hour run. A watcher thread enqueues chunks as they land,
+              so aligners start within a minute of split instead of waiting
+              for the full pass. Compute knobs (chunk size, parallelism,
+              aligner threads, sort memory) are exposed inline with a live
+              RAM-footprint estimator.
             </p>
           </div>
           <figure class="shot">
             <img
               src="./screenshots/alignment.png"
-              alt="alignment stage showing WGS and WES options and a start alignment button"
+              alt="alignment stage showing completed COLO829 run with QC metrics and compute settings"
+              loading="lazy"
+            />
+          </figure>
+        </section>
+
+        <section class="section">
+          <div class="section-heading">
+            <p class="eyebrow">Call variants</p>
+            <h2>Mutect2 on the paired BAMs.</h2>
+            <p class="section-sub">
+              Variant calling unlocks as soon as alignment lands a QC-pass
+              verdict. The panel, API routes, and orchestration stub are
+              wired end-to-end today; the Mutect2 scatter/gather body is the
+              next step. Output will be a somatic VCF plus Mutect2 stats,
+              ready for annotation.
+            </p>
+          </div>
+          <figure class="shot">
+            <img
+              src="./screenshots/variant-calling.png"
+              alt="variant calling stage with ready status and a start variant calling button"
               loading="lazy"
             />
           </figure>
@@ -105,8 +130,10 @@
             <p class="eyebrow">The pipeline</p>
             <h2>Eight stages from raw reads to vaccine.</h2>
             <p class="section-sub">
-              Ingestion and alignment are live today. The downstream stages
-              are wired into the UI and will light up as they're built.
+              Ingestion and alignment are live today. Variant calling is
+              scaffolded end-to-end and actively being implemented. The rest
+              of the stages are wired into the UI and will light up as
+              they're built.
             </p>
           </div>
 
@@ -123,17 +150,17 @@
               <span class="stage-num">2</span>
               <div class="stage-body">
                 <strong>Alignment</strong>
-                <p>strobealign against GRCh38, CanFam4, or felCat9.</p>
+                <p>Chunked strobealign against GRCh38, CanFam4, or felCat9. Verified on COLO829 100&times; WGS.</p>
               </div>
               <span class="chip chip-live">Live</span>
             </li>
-            <li class="stage">
+            <li class="stage stage-scaffolded">
               <span class="stage-num">3</span>
               <div class="stage-body">
                 <strong>Variant calling</strong>
-                <p>Somatic mutations from tumor vs normal BAMs with Mutect2.</p>
+                <p>Somatic mutations from tumor vs normal BAMs with GATK Mutect2. Panel + routes scaffolded; orchestration in progress.</p>
               </div>
-              <span class="chip chip-planned">Planned</span>
+              <span class="chip chip-scaffolded">Scaffolded</span>
             </li>
             <li class="stage">
               <span class="stage-num">4</span>
