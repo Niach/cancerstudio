@@ -11,6 +11,50 @@ APP_NAME = "cancerstudio"
 _settings_lock = threading.Lock()
 
 
+def _load_local_env_file() -> None:
+    """Load ``.env`` at the repo root into ``os.environ`` on first import.
+
+    Without this hook the desktop app (``npm run desktop:dev``) launches
+    uvicorn in a fresh subshell that doesn't inherit the user's shell
+    overrides — in particular ``CANCERSTUDIO_APP_DATA_DIR`` — so the UI
+    ends up pointing at the default data root and the user's real
+    workspaces don't show up.
+
+    Skipped when pytest is loaded so tests never pick up a developer's
+    local ``.env`` (which would point at the production data directory
+    and make the DB-cleaning fixtures destructive).
+
+    ``os.environ.setdefault`` semantics: values already set in the
+    environment (by the shell or a wrapper script) always win over
+    ``.env``.
+    """
+    if "pytest" in sys.modules:
+        return
+    env_path = Path(__file__).resolve().parents[2] / ".env"
+    try:
+        lines = env_path.read_text(encoding="utf-8").splitlines()
+    except FileNotFoundError:
+        return
+    except OSError:
+        return
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        if not key:
+            continue
+        value = value.strip()
+        # Strip surrounding quotes if symmetric.
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+            value = value[1:-1]
+        os.environ.setdefault(key, value)
+
+
+_load_local_env_file()
+
+
 def _default_app_data_root() -> Path:
     if sys.platform == "darwin":
         return Path.home() / "Library" / "Application Support" / APP_NAME
