@@ -38,12 +38,12 @@ const LANE_TITLES: Record<SampleLane, string> = {
 };
 
 const LANE_HINTS: Record<SampleLane, string> = {
-  normal: "Reference draw from healthy tissue (e.g. blood).",
-  tumor: "Sequencing reads from the tumor biopsy.",
+  normal: "Healthy reference sample, often blood or unaffected tissue.",
+  tumor: "Tumor biopsy or tumor sequencing sample.",
 };
 
 const FILE_HINT =
-  "Pick the two FASTQ files for this sample — usually named with _R1 and _R2 and ending in .fastq.gz.";
+  "Choose either two FASTQ files for this sample (usually _R1 and _R2) or one BAM/CRAM file.";
 
 export function LaneAccordionSection({
   lane,
@@ -115,7 +115,7 @@ export function LaneAccordionSection({
           ) : (
             <FolderOpen className="mr-1.5 size-3.5" />
           )}
-          {files.length > 0 ? "Replace" : "Choose files"}
+          {files.length > 0 ? "Replace files" : "Choose files"}
         </Button>
       </div>
 

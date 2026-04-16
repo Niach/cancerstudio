@@ -964,7 +964,7 @@ def build_alignment_stage_summary(
 
     required_artifacts_ready = has_required_alignment_artifacts(latest_run)
     ready_for_variant = (
-        latest_run.qc_verdict != QcVerdict.FAIL.value and required_artifacts_ready
+        latest_run.qc_verdict == QcVerdict.PASS.value and required_artifacts_ready
     )
     if latest_run.qc_verdict == QcVerdict.FAIL.value or not required_artifacts_ready:
         return AlignmentStageSummaryResponse(
@@ -979,9 +979,16 @@ def build_alignment_stage_summary(
             artifacts=artifacts,
         )
 
+    completion_reason = None
+    if latest_run.qc_verdict == QcVerdict.WARN.value:
+        completion_reason = (
+            "Alignment finished, but the quality warnings need review before variant calling."
+        )
+
     return AlignmentStageSummaryResponse(
         workspace_id=workspace.id,
         status=AlignmentStageStatus.COMPLETED,
+        blocking_reason=completion_reason,
         analysis_profile=analysis_profile,
         latest_run=latest_run_response,
         qc_verdict=latest_run_response.qc_verdict if latest_run_response else None,

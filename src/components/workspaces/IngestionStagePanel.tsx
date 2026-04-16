@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { api, MissingToolsError } from "@/lib/api";
@@ -192,6 +193,28 @@ export default function IngestionStagePanel({
   return (
     <div className="space-y-3">
       <IngestionHeader alignmentState={alignmentState} />
+
+      <section className="rounded-2xl border border-stone-200 bg-white px-5 py-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-2xl">
+            <h3 className="text-[15px] font-semibold text-stone-900">What you need</h3>
+            <ul className="mt-2 space-y-1 text-[13px] leading-6 text-stone-600">
+              <li>One tumor sample and one healthy sample.</li>
+              <li>For each sample: a paired FASTQ set or a single BAM/CRAM file.</li>
+              <li>Everything stays on your machine while we prepare the reads.</li>
+            </ul>
+          </div>
+          {workspace.ingestion.readyForAlignment ? (
+            <Link
+              href={`/workspaces/${workspace.id}/alignment`}
+              data-testid="ingestion-continue-link"
+              className="inline-flex items-center rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500"
+            >
+              Continue to alignment
+            </Link>
+          ) : null}
+        </div>
+      </section>
 
       {missingTools ? <MissingToolsCallout error={missingTools} /> : null}
 

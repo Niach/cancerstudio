@@ -37,7 +37,7 @@ export type IngestionProgressPhase =
   | "finalizing";
 export type ReadPair = "R1" | "R2" | "SE" | "unknown";
 export type ReadLayout = "paired" | "single";
-export type StageImplementationState = "live" | "mock" | "planned";
+export type StageImplementationState = "live" | "scaffolded" | "planned";
 export type PipelineStageGroup = "primary" | "later";
 export type AlignmentStageStatus =
   | "blocked"
@@ -285,7 +285,7 @@ export type AlignmentSettingsPatch = Partial<AlignmentSettingsDefaults> & {
 export type VariantCallingRunStatus = "pending" | "running" | "completed" | "failed";
 export type VariantCallingStageStatus =
   | "blocked"
-  | "ready"
+  | "scaffolded"
   | "running"
   | "completed"
   | "failed";
@@ -396,7 +396,7 @@ export const PIPELINE_STAGES: PipelineStage[] = [
     description: "Call somatic variants from the aligned tumor and normal BAMs",
     icon: "Search",
     tools: ["GATK Mutect2"],
-    implementationState: "planned",
+    implementationState: "scaffolded",
     group: "primary",
   },
   {

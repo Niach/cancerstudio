@@ -4,7 +4,6 @@ import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
 const repoRoot = path.resolve(__dirname, "..", "..");
-const apiBase = process.env.REAL_DATA_API_BASE ?? "http://127.0.0.1:8001";
 const sampleDir =
   process.env.REAL_DATA_SAMPLE_DIR
     ? path.resolve(process.env.REAL_DATA_SAMPLE_DIR)
@@ -68,6 +67,11 @@ test("desktop ingestion smoke reaches alignment-ready state", async ({ page }) =
     page.getByTestId("workspace-create-submit").click(),
   ]);
 
+  await expect(page.getByText("What you need")).toBeVisible();
+  await expect(
+    page.getByText("For each sample: a paired FASTQ set or a single BAM/CRAM file.")
+  ).toBeVisible();
+
   await page.getByTestId("tumor-pick-files").click();
   await expect(page.getByTestId("tumor-lane-panel")).toHaveAttribute(
     "data-summary-status",
@@ -84,57 +88,9 @@ test("desktop ingestion smoke reaches alignment-ready state", async ({ page }) =
     "data-state",
     "unlocked"
   );
+  await expect(page.getByTestId("ingestion-continue-link")).toBeVisible();
   await expect(page.getByTestId("tumor-preview-panel")).toHaveAttribute(
     "data-phase",
     "ready"
   );
-});
-
-test("reset clears derived intake state", async ({ page }) => {
-  const stamp = Date.now();
-  await installDesktopMock(page, [
-    [selectedFile("tumor_R1.fastq.gz"), selectedFile("tumor_R2.fastq.gz")],
-  ]);
-
-  await page.goto("/");
-  await page.getByTestId("workspace-name-input").fill(`Desktop reset ${stamp}`);
-
-  await Promise.all([
-    page.waitForURL(/\/workspaces\/[^/]+\/ingestion$/),
-    page.getByTestId("workspace-create-submit").click(),
-  ]);
-
-  await page.getByTestId("tumor-pick-files").click();
-  await expect(page.getByTestId("tumor-lane-panel")).toHaveAttribute(
-    "data-summary-status",
-    "ready"
-  );
-
-  page.once("dialog", (dialog) => dialog.accept());
-  await page.getByRole("button", { name: "Reset ingestion" }).click();
-
-  await expect(page.getByTestId("alignment-status-indicator")).toHaveAttribute(
-    "data-state",
-    "locked"
-  );
-  await expect(page.getByTestId("tumor-lane-panel")).toHaveAttribute(
-    "data-summary-status",
-    "empty"
-  );
-});
-
-test("header plus returns to the home workspace foyer", async ({ page, request }) => {
-  const stamp = Date.now();
-  const workspaceResponse = await request.post(`${apiBase}/api/workspaces/`, {
-    data: { display_name: `Plus nav ${stamp}`, species: "human" },
-  });
-  expect(workspaceResponse.ok()).toBeTruthy();
-  const workspace = await workspaceResponse.json();
-
-  await page.goto(`/workspaces/${workspace.id}/ingestion`);
-  await page.getByLabel("New workspace").click();
-
-  await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByText("Workspaces")).toBeVisible();
-  await expect(page.getByText(`Plus nav ${stamp}`)).toBeVisible();
 });

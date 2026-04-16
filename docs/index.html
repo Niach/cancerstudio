@@ -6,7 +6,7 @@
     <title>cancerstudio</title>
     <meta
       name="description"
-      content="Two DNA samples in, one mRNA vaccine out. A desktop studio for designing personalized cancer vaccines for humans, dogs, and cats."
+      content="A desktop studio for the guided first steps of a personalized cancer vaccine workflow: local intake, alignment, and a preview of what comes next."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -20,13 +20,13 @@
     <div class="page-shell">
       <header class="hero">
         <p class="eyebrow">cancerstudio</p>
-        <h1>Two DNA samples in.<br />One mRNA vaccine out.</h1>
+        <h1>Bring in two DNA samples.<br />Work through the core pipeline locally.</h1>
         <p class="lede">
-          A desktop studio for designing personalized mRNA cancer vaccines.
-          Give it tumor DNA and matched-normal DNA. The pipeline finds what
-          mutated, predicts what the immune system can target, and designs a
-          vaccine construct. For humans, dogs, and cats — all on your local
-          machine.
+          A desktop studio for the first guided steps of a personalized mRNA
+          cancer vaccine workflow. Give it tumor DNA and matched-normal DNA.
+          Today it helps you prepare the files, run local alignment, and see
+          the next stage honestly as a preview. For humans, dogs, and cats,
+          all on your local machine.
         </p>
         <div class="hero-actions">
           <a href="#pipeline" class="button button-primary">See the pipeline</a>
@@ -63,11 +63,11 @@
         <section class="section">
           <div class="section-heading">
             <p class="eyebrow">Ingest</p>
-            <h2>Tumor and matched normal. Paired-end or nothing.</h2>
+            <h2>Tumor and healthy reference. Guided from the start.</h2>
             <p class="section-sub">
               Two lanes: the tumor biopsy and a matched normal reference.
-              cancerstudio reads the files in place, validates that both
-              lanes are paired-end, previews a few reads, and normalizes
+              cancerstudio reads the files in place, supports a FASTQ pair or
+              one BAM/CRAM per sample, previews a few reads, and normalizes
               everything into canonical FASTQ before alignment unlocks.
             </p>
           </div>
@@ -83,26 +83,20 @@
         <section class="section">
           <div class="section-heading">
             <p class="eyebrow">Align</p>
-            <h2>Chunked strobealign that survives 100&times; WGS on 62&nbsp;GB.</h2>
+            <h2>Plain-language alignment first. Advanced controls when needed.</h2>
             <p class="section-sub">
-              Pick whole-genome or whole-exome and hit start. Paired FASTQ is
-              split into ~20M-read chunks and aligned in parallel with fresh
-              strobealign workers, so memory never accumulates across a
-              multi-hour run. A watcher thread enqueues chunks as they land,
-              so aligners start within a minute of split instead of waiting
-              for the full pass. Compute knobs (chunk size, parallelism,
-              aligner threads, sort memory) are exposed inline with a live
-              RAM-footprint estimator.
+              Pick whole-genome or whole-exome and hit start. The main card
+              tells you what is happening in plain language, how long it may
+              take, and what the next step depends on. All of the chunk grids,
+              command tails, and compute settings live under one advanced
+              section instead of crowding the default workflow.
             </p>
             <p class="section-sub">
               Multi-hour runs need multi-hour UX: blended progress bar with
-              per-phase sub-bars, rolling ETA, heartbeat and stall detection,
-              and a live tail of the commands actually running. Need your
-              machine back? Hit <strong>Stop &amp; keep progress</strong> and
-              every aligned chunk stays on disk &mdash; <strong>Resume</strong>
-              picks up from the next un-aligned chunk instead of starting
-              over. <strong>Cancel &amp; discard</strong> is there too when
-              you want a clean slate.
+              per-phase sub-bars, rolling ETA, heartbeat and stall detection.
+              Need your machine back? Hit <strong>Pause &amp; keep progress</strong>
+              and resume later, or <strong>Cancel &amp; discard</strong> if you
+              want a clean slate.
             </p>
           </div>
           <figure class="shot">
@@ -117,19 +111,19 @@
         <section class="section">
           <div class="section-heading">
             <p class="eyebrow">Call variants</p>
-            <h2>Mutect2 on the paired BAMs.</h2>
+            <h2>Visible next, but not runnable yet.</h2>
             <p class="section-sub">
-              Variant calling unlocks as soon as alignment lands a QC-pass
-              verdict. The panel, API routes, and orchestration stub are
-              wired end-to-end today; the Mutect2 scatter/gather body is the
-              next step. Output will be a somatic VCF plus Mutect2 stats,
-              ready for annotation.
+              Variant calling appears as a read-only preview after alignment
+              passes QC. If alignment finishes with warnings, the page stays
+              visible but blocked with a plain-language explanation. The UI and
+              API shape are scaffolded now; Mutect2 orchestration is the next
+              implementation step.
             </p>
           </div>
           <figure class="shot">
             <img
               src="./screenshots/variant-calling.png"
-              alt="variant calling stage with ready status and a start variant calling button"
+              alt="variant calling stage shown as the next read-only preview step"
               loading="lazy"
             />
           </figure>
@@ -138,12 +132,11 @@
         <section class="section" id="pipeline">
           <div class="section-heading">
             <p class="eyebrow">The pipeline</p>
-            <h2>Eight stages from raw reads to vaccine.</h2>
+            <h2>Three guided core steps, then the roadmap.</h2>
             <p class="section-sub">
-              Ingestion and alignment are live today. Variant calling is
-              scaffolded end-to-end and actively being implemented. The rest
-              of the stages are wired into the UI and will light up as
-              they're built.
+              Ingestion and alignment are live today. Variant calling is a
+              visible read-only scaffold. The rest of the stages stay visible
+              as disabled roadmap items so the workflow stays honest.
             </p>
           </div>
 
@@ -168,7 +161,7 @@
               <span class="stage-num">3</span>
               <div class="stage-body">
                 <strong>Variant calling</strong>
-                <p>Somatic mutations from tumor vs normal BAMs with GATK Mutect2. Panel + routes scaffolded; orchestration in progress.</p>
+                <p>Somatic mutations from tumor vs normal BAMs with GATK Mutect2. Visible preview only; orchestration is still in progress.</p>
               </div>
               <span class="chip chip-scaffolded">Scaffolded</span>
             </li>
@@ -208,7 +201,7 @@
               <span class="stage-num">8</span>
               <div class="stage-body">
                 <strong>Construct output</strong>
-                <p>Annotated mRNA sequence ready for synthesis.</p>
+                <p>Planned export of the final construct package.</p>
               </div>
               <span class="chip chip-planned">Planned</span>
             </li>

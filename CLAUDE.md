@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A desktop-first pipeline for designing personalized mRNA cancer vaccines. You provide two DNA samples (tumor + normal) by pointing the app at local sequencing files, and the pipeline walks through alignment, variant calling, neoantigen prediction, and mRNA construct design — outputting a vaccine sequence ready for synthesis.
+A desktop-first pipeline for designing personalized mRNA cancer vaccines. You provide two DNA samples (tumor + normal) by pointing the app at local sequencing files, and the product guides you through intake and alignment today, with variant calling visible as the next scaffolded step and the downstream neoantigen and construct work kept as roadmap stages.
 
 Supports multiple species: human, dog, and cat. The canine case came first, but the architecture is species-flexible.
 
@@ -18,7 +18,7 @@ Inspired by Paul Conyngham's work creating a personalized mRNA vaccine for his d
 |---|-------|--------|-------|-------------|
 | 1 | Ingestion | **Live** | samtools, fastp | Choose local FASTQ/BAM/CRAM files, normalize to canonical paired FASTQ |
 | 2 | Alignment | **Live** | strobealign, samtools | Chunked pipeline with stop-and-resume; aligns canonical tumor/normal FASTQ pairs, persists BAMs, and scores QC |
-| 3 | Variant Calling | Scaffolded | GATK Mutect2 | Panel + API wired; Mutect2 orchestration is the next piece |
+| 3 | Variant Calling | Scaffolded | GATK Mutect2 | Visible read-only preview after QC-pass alignment; run/rerun stay blocked until orchestration ships |
 | 4 | Annotation | Planned | Ensembl VEP | Annotate variants with functional consequences |
 | 5 | Neoantigen Prediction | Planned | pVACseq, NetMHCpan-4.1 | Predict MHC binding for mutant peptides |
 | 6 | Epitope Selection | Planned | pVACview, custom scoring | Rank and select optimal vaccine targets |
@@ -79,5 +79,5 @@ These are external databases, not integrations built into the app:
 - The app must be usable by veterinary oncologists without CLI expertise
 - Use TypeScript strict mode throughout frontend
 - All bioinformatics parameters should have sensible defaults with expert-override capability
-- Every pipeline step should be independently runnable and resumable
+- Every live pipeline step should be independently runnable and resumable
 - Supported file formats: FASTQ, BAM, CRAM, VCF, BED, GFF3, FASTA, PDB, GenBank

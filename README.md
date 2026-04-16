@@ -1,6 +1,6 @@
 # cancerstudio
 
-Two DNA samples in, one mRNA vaccine out. cancerstudio is a desktop-first studio for designing personalized cancer vaccines for humans, dogs, and cats. You point the app at local tumor and matched-normal sequencing files, it prepares alignment-ready inputs on your disk, aligns them against a species reference, and stages the rest of the neoantigen workflow.
+cancerstudio is a desktop-first studio for the first guided steps of a personalized cancer vaccine workflow. Today it helps a non-technical operator bring in local tumor and matched-normal sequencing files, prepare alignment-ready inputs on disk, run alignment against a species reference, and review a read-only preview of what comes next. Downstream vaccine-design stages stay visible as roadmap items, not runnable promises.
 
 Project site: <https://niach.github.io/cancerstudio/>
 
@@ -12,24 +12,24 @@ Project site: <https://niach.github.io/cancerstudio/>
 
 ## Pipeline
 
-`Ingestion → Alignment → Variant Calling → Annotation → Neoantigen Prediction → Epitope Selection → mRNA Construct Design → Construct Output`
+`Ingestion → Alignment → Variant Calling preview → Annotation → Neoantigen Prediction → Epitope Selection → mRNA Construct Design → Construct Output`
 
 | # | Stage | State | Tools |
 | --- | --- | --- | --- |
 | 1 | Ingestion | **Live** | samtools, pigz, fastp |
 | 2 | Alignment | **Live** | strobealign, samtools |
-| 3 | Variant Calling | **Scaffolded** — UI + API wired, Mutect2 orchestration in progress | GATK Mutect2 |
+| 3 | Variant Calling | **Scaffolded** — visible read-only preview; run/rerun stay blocked until Mutect2 orchestration exists | GATK Mutect2 |
 | 4 | Annotation | Planned | Ensembl VEP |
 | 5 | Neoantigen Prediction | Planned | pVACseq, NetMHCpan |
 | 6 | Epitope Selection | Planned | pVACview |
 | 7 | mRNA Construct Design | Planned | LinearDesign, DNAchisel |
 | 8 | Construct Output | Planned | pVACvector, Biopython |
 
-Structure Prediction and AI Review live in a separate research track.
+Structure Prediction and AI Review stay in a separate disabled research track.
 
 ### Stage 2: chunked alignment on commodity hardware
 
-The alignment pipeline splits each paired FASTQ into ~20M-read chunks and aligns them in parallel with fresh strobealign workers, then merges the per-chunk coord-sorted BAMs. A watcher thread enqueues chunks as they land on disk, so aligners start within ~60 s of the split beginning instead of waiting for the full split pass. A bounded queue back-pressures the splitter. Compute knobs (chunk size, parallelism, aligner threads, sort memory) are exposed in the UI with a live RAM-footprint estimator.
+The alignment pipeline splits each paired FASTQ into ~20M-read chunks and aligns them in parallel with fresh strobealign workers, then merges the per-chunk coord-sorted BAMs. A watcher thread enqueues chunks as they land on disk, so aligners start within ~60 s of the split beginning instead of waiting for the full split pass. A bounded queue back-pressures the splitter. Compute knobs (chunk size, parallelism, aligner threads, sort memory) live under the UI's `Advanced details` section with a live RAM-footprint estimator.
 
 The panel surfaces honest progress for multi-hour runs: blended progress bar (5 % ref prep + 75 % chunk alignment + 15 % finalize + 5 % stats) + per-phase sub-bars, rolling-window ETA, heartbeat + stall detection, live command tail, and a desktop notification on long-run completion.
 
@@ -42,13 +42,13 @@ Verified end-to-end on COLO829 100× WGS (~2B tumor + 754M normal read pairs) on
 - Desktop-first runtime: Electron shell + local Next.js renderer + local FastAPI pipeline engine. No cloud, no Docker, no object storage.
 - Reference-in-place intake: your source FASTQ/BAM/CRAM files stay where they live. Only derived artifacts (canonical FASTQ, BAM/BAI, QC, reference bundles, SQLite) land in the app-data directory.
 - Species presets: human `GRCh38`, dog `CanFam4`, cat `felCat9`. Missing references are downloaded and indexed on first alignment.
-- Paired-lane model: tumor and normal are separate lanes. Alignment unlocks only when both lanes are paired-end ready; variant calling unlocks only after alignment passes QC.
+- Paired-lane model: tumor and normal are separate lanes. Alignment unlocks only when both lanes are ready; a QC pass reveals the variant-calling preview, while `warn` or `fail` keeps the workflow blocked in plain language.
 
 ## Stack
 
 - Frontend: Next.js 15.5, React 19, TypeScript, Tailwind CSS
 - Desktop shell: Electron
-- Backend: FastAPI, SQLAlchemy, samtools, pigz, strobealign, GATK Mutect2 (scaffolded)
+- Backend: FastAPI, SQLAlchemy, samtools, pigz, strobealign, GATK Mutect2 scaffolding
 - Storage: local filesystem + SQLite
 
 ## Local development
@@ -104,7 +104,7 @@ cancerstudio shells out to bioinformatics binaries from the FastAPI backend. The
 | `samtools` ≥ 1.16 | BAM/CRAM normalization, sort, index, flagstat, idxstats, stats, markdup, merge | Ingestion + Alignment |
 | `strobealign` ≥ 0.17 | Reference indexing and paired-end alignment | Alignment |
 | `pigz` ≥ 2.6 | Multithreaded FASTQ compression, parallel chunk splitting | Ingestion + Alignment |
-| `gatk` ≥ 4.5 (+ JDK 17) | Mutect2 somatic caller, CreateSequenceDictionary | Variant Calling (scaffolded) |
+| `gatk` ≥ 4.5 (+ JDK 17) | Optional future Mutect2 caller, CreateSequenceDictionary | Variant Calling (scaffolded preview) |
 
 If any required tool is missing the backend rejects the relevant API call up-front with a structured `503 missing_tools` response, and the UI surfaces a friendly callout listing what to install — no more raw `[Errno 2]` stack traces.
 
@@ -131,7 +131,7 @@ brew install --cask gatk     # or download from broadinstitute/gatk releases
 samtools --version | head -1
 strobealign --version
 pigz --version
-gatk --version
+gatk --version   # optional today; needed once stage 3 becomes runnable
 ```
 
 ### Env overrides
@@ -162,36 +162,30 @@ Defaults to `~/.local/share/cancerstudio/references/grch38/genome.fa`. Pass a di
 
 ## Tests
 
-```bash
-npm run lint
-npm run test:backend:fast
-```
-
-Real-data smoke fixtures:
+Fast / local:
 
 ```bash
-npm run sample-data:smoke
+npm run test:fast
 ```
 
-Browser ingestion smoke:
+That covers lint, TypeScript, and the backend suite that passes without a live server or real sequencing fixtures.
+
+Browser integration:
 
 ```bash
 npx playwright install chromium
+npm run test:integration
+```
+
+Live real-data:
+
+```bash
+npm run sample-data:smoke
+npm run test:backend:real-data
 npm run test:browser:real-data
 ```
 
-Backend real-data smoke:
-
-```bash
-npm run test:backend:real-data
-```
-
-Opt-in live alignment smoke:
-
-- uses the matched SEQC2 tumor/normal FASTQ smoke pair (or the full COLO829 WGS pair if you point `REAL_DATA_SAMPLE_DIR` at it and set `REAL_DATA_ASSAY_TYPE=wgs`)
-- requires local `samtools`, `strobealign`, `pigz`
-- downloads and indexes `GRCh38` on first run unless `REFERENCE_GRCH38_FASTA` is already set
-- runs only when `REAL_DATA_RUN_ALIGNMENT=1`
+The live real-data path uses the matched SEQC2 tumor/normal FASTQ smoke pair by default. Opt-in live alignment still requires local `samtools`, `strobealign`, and `pigz`, downloads and indexes `GRCh38` on first run unless `REFERENCE_GRCH38_FASTA` is already set, and only runs when `REAL_DATA_RUN_ALIGNMENT=1`.
 
 ## Sample data
 

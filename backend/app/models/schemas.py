@@ -326,7 +326,7 @@ class VariantCallingRunStatus(str, Enum):
 
 class VariantCallingStageStatus(str, Enum):
     BLOCKED = "blocked"
-    READY = "ready"
+    SCAFFOLDED = "scaffolded"
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"

@@ -78,7 +78,7 @@ test("capture alignment stage (completed)", async ({ page }) => {
   });
 });
 
-test("capture variant calling stage (ready)", async ({ page }) => {
+test("capture variant calling stage (preview)", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(
     `http://127.0.0.1:3000/workspaces/${workspaceId}/variant-calling`

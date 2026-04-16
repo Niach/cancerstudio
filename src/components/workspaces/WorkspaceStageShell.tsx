@@ -1,29 +1,29 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, Dna, LockKeyhole, Plus } from "lucide-react";
+import { useEffect, useState, useTransition } from "react";
 
 import AlignmentStagePanel from "@/components/workspaces/AlignmentStagePanel";
 import IngestionStagePanel from "@/components/workspaces/IngestionStagePanel";
-import FutureStagePanel from "@/components/workspaces/FutureStagePanel";
 import VariantCallingStagePanel from "@/components/workspaces/VariantCallingStagePanel";
 import { Badge } from "@/components/ui/badge";
-
+import { api } from "@/lib/api";
+import {
+  describeWorkspaceProgress,
+  getPipelinePolicy,
+  getVisiblePrimaryStages,
+  getVisibleResearchStages,
+  type PipelineStagePolicy,
+} from "@/lib/pipeline-policy";
 import type {
   AlignmentStageSummary,
-  PipelineStage,
   PipelineStageId,
   VariantCallingStageSummary,
   Workspace,
 } from "@/lib/types";
-import {
-  LATER_RESEARCH_STAGES,
-  PIPELINE_STAGES,
-  PRIMARY_PIPELINE_STAGES,
-} from "@/lib/types";
-import { api } from "@/lib/api";
+import { PIPELINE_STAGES } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import {
   formatReferencePreset,
@@ -37,60 +37,21 @@ function mergeWorkspaces(workspaces: Workspace[], workspace: Workspace) {
   );
 }
 
-function isStageLocked(
-  stageId: PipelineStageId,
-  workspace: Workspace,
-  alignmentSummary: AlignmentStageSummary
-) {
-  if (stageId === "ingestion") {
-    return false;
-  }
-  if (stageId === "alignment") {
-    return !workspace.ingestion.readyForAlignment;
-  }
-  return !alignmentSummary.readyForVariantCalling;
-}
-
-function stageLockedReason(
-  stageId: PipelineStageId,
-  workspace: Workspace,
-  alignmentSummary: AlignmentStageSummary
-) {
-  if (stageId === "alignment" && !workspace.ingestion.readyForAlignment) {
-    return "Alignment unlocks once both tumor and normal lanes have canonical paired FASTQ ready.";
-  }
-  if (stageId !== "ingestion" && !alignmentSummary.readyForVariantCalling) {
-    return "Variant calling unlocks after a successful alignment run with BAM, BAI, and passing QC.";
-  }
-  return undefined;
-}
-
-function workspaceSubtitle(
-  workspace: Workspace,
-  alignmentSummary: AlignmentStageSummary
-) {
-  if (alignmentSummary.readyForVariantCalling) {
-    return "Alignment QC complete and variant calling is unlocked";
-  }
-  if (workspace.ingestion.readyForAlignment) {
-    return "Tumor + normal intake ready for alignment";
-  }
-  return "Ingestion is still blocking alignment";
-}
-
 function NavigationStageItem({
-  stage,
+  policy,
   label,
   href,
   isActive,
-  isLocked,
+  disabledLabel,
 }: {
-  stage: PipelineStage;
+  policy: PipelineStagePolicy;
   label: string;
   href: string;
   isActive: boolean;
-  isLocked: boolean;
+  disabledLabel?: string;
 }) {
+  const { stage, enterable, actionable } = policy;
+  const secondaryLabel = disabledLabel ?? (enterable ? "Read only" : "Upcoming");
   const content = (
     <>
       <span
@@ -98,23 +59,23 @@ function NavigationStageItem({
           "flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full px-2 text-xs font-semibold",
           isActive
             ? "bg-emerald-600 text-white"
-            : isLocked
+            : !enterable
               ? "bg-slate-200 text-slate-500"
               : "bg-muted text-muted-foreground"
         )}
       >
-        {isLocked ? <LockKeyhole className="size-3.5" /> : label}
+        {!enterable ? <LockKeyhole className="size-3.5" /> : label}
       </span>
       <div className="min-w-0">
         <div>{stage.name}</div>
-        {isLocked ? (
-          <div className="text-xs font-normal text-slate-500">Locked</div>
+        {!actionable ? (
+          <div className="text-xs font-normal text-slate-500">{secondaryLabel}</div>
         ) : null}
       </div>
     </>
   );
 
-  if (isLocked) {
+  if (!enterable) {
     return (
       <div
         aria-disabled="true"
@@ -146,6 +107,7 @@ interface WorkspaceStageShellProps {
   currentStageId: PipelineStageId;
   initialAlignmentSummary: AlignmentStageSummary;
   initialVariantCallingSummary: VariantCallingStageSummary;
+  redirectedFromStageId: PipelineStageId | null;
 }
 
 export default function WorkspaceStageShell({
@@ -154,6 +116,7 @@ export default function WorkspaceStageShell({
   currentStageId,
   initialAlignmentSummary,
   initialVariantCallingSummary,
+  redirectedFromStageId,
 }: WorkspaceStageShellProps) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -168,11 +131,26 @@ export default function WorkspaceStageShell({
     initialVariantCallingSummary
   );
 
+  const stagePolicy = getPipelinePolicy(
+    workspace,
+    alignmentSummary,
+    variantCallingSummary
+  );
+  const currentStagePolicy = stagePolicy[currentStageId];
+  const primaryStages = getVisiblePrimaryStages(stagePolicy);
+  const coreStages = primaryStages.filter(
+    (stage) => stage.implementationState !== "planned"
+  );
+  const upcomingStages = primaryStages.filter(
+    (stage) => stage.implementationState === "planned"
+  );
+  const researchStages = getVisibleResearchStages(stagePolicy);
+  const redirectNoticeStage = redirectedFromStageId
+    ? PIPELINE_STAGES.find((stage) => stage.id === redirectedFromStageId) ?? null
+    : null;
+
   useEffect(() => {
-    if (workspace.activeStage === currentStageId) {
-      return;
-    }
-    if (isStageLocked(currentStageId, workspace, alignmentSummary)) {
+    if (workspace.activeStage === currentStageId || !currentStagePolicy.enterable) {
       return;
     }
 
@@ -190,16 +168,8 @@ export default function WorkspaceStageShell({
     return () => {
       ignore = true;
     };
-  }, [alignmentSummary, currentStageId, workspace]);
+  }, [currentStageId, currentStagePolicy.enterable, workspace]);
 
-  const currentStage = PIPELINE_STAGES.find(
-    (stage) => stage.id === currentStageId
-  )!;
-  const currentStageLocked = isStageLocked(
-    currentStageId,
-    workspace,
-    alignmentSummary
-  );
   function handleWorkspaceChange(updatedWorkspace: Workspace) {
     setWorkspace(updatedWorkspace);
     setWorkspaces((current) => mergeWorkspaces(current, updatedWorkspace));
@@ -239,7 +209,7 @@ export default function WorkspaceStageShell({
                   {formatReferencePreset(workspace.analysisProfile.referencePreset)}
                 </Badge>
                 <span className="text-xs text-muted-foreground">
-                  {workspaceSubtitle(workspace, alignmentSummary)}
+                  {describeWorkspaceProgress(workspace, alignmentSummary)}
                 </span>
               </div>
             </div>
@@ -250,9 +220,7 @@ export default function WorkspaceStageShell({
               value={workspace.id}
               onChange={(event) =>
                 startTransition(() => {
-                  router.push(
-                    `/workspaces/${event.target.value}/${currentStageId}`
-                  );
+                  router.push(`/workspaces/${event.target.value}`);
                 })
               }
               className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
@@ -278,35 +246,52 @@ export default function WorkspaceStageShell({
         <div className="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
           <nav className="rounded-[24px] border border-black/5 bg-white/65 p-3 shadow-sm shadow-black/5 backdrop-blur">
             <div className="mb-3 px-2 font-mono text-[10px] font-medium tracking-[0.28em] text-slate-400 uppercase">
-              Primary pipeline
+              Core workflow
             </div>
             <div className="space-y-1">
-              {PRIMARY_PIPELINE_STAGES.map((stage, index) => (
+              {coreStages.map((stage, index) => (
                 <NavigationStageItem
                   key={stage.id}
-                  stage={stage}
+                  policy={stagePolicy[stage.id]}
                   label={`${index + 1}`}
                   href={`/workspaces/${workspace.id}/${stage.id}`}
                   isActive={stage.id === currentStageId}
-                  isLocked={isStageLocked(stage.id, workspace, alignmentSummary)}
                 />
               ))}
             </div>
 
-            <details className="mt-5 rounded-2xl border border-black/6 bg-white/60">
+            <div className="mt-5">
+              <div className="mb-3 px-2 font-mono text-[10px] font-medium tracking-[0.28em] text-slate-400 uppercase">
+                Upcoming
+              </div>
+              <div className="space-y-1">
+                {upcomingStages.map((stage, index) => (
+                  <NavigationStageItem
+                    key={stage.id}
+                    policy={stagePolicy[stage.id]}
+                    label={`${coreStages.length + index + 1}`}
+                    href={`/workspaces/${workspace.id}/${stage.id}`}
+                    isActive={false}
+                    disabledLabel="Upcoming"
+                  />
+                ))}
+              </div>
+            </div>
+
+            <details className="group mt-5 rounded-2xl border border-black/6 bg-white/60">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-slate-700">
                 Later research modules
                 <ChevronDown className="size-4 transition group-open:rotate-180" />
               </summary>
               <div className="space-y-1 border-t border-black/6 px-2 py-2">
-                {LATER_RESEARCH_STAGES.map((stage, index) => (
+                {researchStages.map((stage, index) => (
                   <NavigationStageItem
                     key={stage.id}
-                    stage={stage}
+                    policy={stagePolicy[stage.id]}
                     label={`R${index + 1}`}
                     href={`/workspaces/${workspace.id}/${stage.id}`}
-                    isActive={stage.id === currentStageId}
-                    isLocked={isStageLocked(stage.id, workspace, alignmentSummary)}
+                    isActive={false}
+                    disabledLabel="Research"
                   />
                 ))}
               </div>
@@ -314,33 +299,16 @@ export default function WorkspaceStageShell({
           </nav>
 
           <main className="space-y-4">
-            {currentStageId === "ingestion" ||
-            currentStageId === "alignment" ||
-            currentStageId === "variant-calling" ? null : (
-              <div className="rounded-[24px] border border-black/5 bg-white/70 px-6 py-5 shadow-sm shadow-black/5 backdrop-blur">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h2 className="text-2xl font-semibold tracking-tight">
-                      {currentStage.name}
-                    </h2>
-                    <p
-                      className="mt-1 max-w-2xl font-display text-[15px] italic text-muted-foreground"
-                      style={{ fontOpticalSizing: "auto" }}
-                    >
-                      {currentStage.description}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge
-                      variant="outline"
-                      className="border-black/10 bg-slate-50/70 font-mono text-[10px] tracking-[0.18em] text-slate-500 uppercase"
-                    >
-                      {currentStage.implementationState}
-                    </Badge>
-                  </div>
+            {redirectNoticeStage ? (
+              <div className="rounded-[24px] border border-amber-200 bg-amber-50 px-6 py-4 text-sm text-amber-900 shadow-sm shadow-amber-900/5">
+                <div className="font-medium">
+                  {redirectNoticeStage.name} is on the roadmap, but it is not usable yet.
                 </div>
+                <p className="mt-1 text-amber-800">
+                  We brought you back to the current working step so the workflow stays simple.
+                </p>
               </div>
-            )}
+            ) : null}
 
             {currentStageId === "ingestion" ? (
               <IngestionStagePanel
@@ -359,18 +327,7 @@ export default function WorkspaceStageShell({
                 workspace={workspace}
                 initialSummary={variantCallingSummary}
               />
-            ) : (
-              <FutureStagePanel
-                stageId={currentStageId}
-                workspace={workspace}
-                lockedReason={stageLockedReason(
-                  currentStageId,
-                  workspace,
-                  alignmentSummary
-                )}
-                isLocked={currentStageLocked}
-              />
-            )}
+            ) : null}
           </main>
         </div>
       </div>

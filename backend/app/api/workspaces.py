@@ -23,11 +23,10 @@ from app.services.alignment import (
     resume_alignment_run,
 )
 from app.services.variant_calling import (
+    NOT_ACTIONABLE_MESSAGE,
     VariantCallingArtifactNotFoundError,
-    create_variant_calling_run,
     load_variant_calling_artifact_download,
     load_variant_calling_stage_summary,
-    rerun_variant_calling,
 )
 from app.services.tool_preflight import (
     ALIGNMENT_TOOLS,
@@ -241,14 +240,14 @@ async def get_variant_calling_stage_summary(workspace_id: str):
     response_model=VariantCallingStageSummaryResponse,
 )
 async def run_variant_calling_stage(workspace_id: str):
-    try:
-        return create_variant_calling_run(workspace_id)
-    except FileNotFoundError as error:
-        raise HTTPException(status_code=404, detail=str(error)) from error
-    except ValueError as error:
-        raise HTTPException(status_code=400, detail=str(error)) from error
-    except Exception as error:
-        raise unexpected_workspace_error("Variant calling run", error) from error
+    raise HTTPException(
+        status_code=409,
+        detail={
+            "code": "stage_not_actionable",
+            "stage": "variant-calling",
+            "message": NOT_ACTIONABLE_MESSAGE,
+        },
+    )
 
 
 @router.post(
@@ -256,14 +255,14 @@ async def run_variant_calling_stage(workspace_id: str):
     response_model=VariantCallingStageSummaryResponse,
 )
 async def rerun_variant_calling_stage(workspace_id: str):
-    try:
-        return rerun_variant_calling(workspace_id)
-    except FileNotFoundError as error:
-        raise HTTPException(status_code=404, detail=str(error)) from error
-    except ValueError as error:
-        raise HTTPException(status_code=400, detail=str(error)) from error
-    except Exception as error:
-        raise unexpected_workspace_error("Variant calling rerun", error) from error
+    raise HTTPException(
+        status_code=409,
+        detail={
+            "code": "stage_not_actionable",
+            "stage": "variant-calling",
+            "message": NOT_ACTIONABLE_MESSAGE,
+        },
+    )
 
 
 @router.get("/{workspace_id}/variant-calling/artifacts/{artifact_id}/download")

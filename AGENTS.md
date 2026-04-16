@@ -8,7 +8,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## Mission
 
-Build a desktop-first studio for designing personalized mRNA cancer vaccines. Users provide tumor + normal sequencing data from local disk, and the pipeline processes it through to an mRNA vaccine construct. See `CLAUDE.md` for the full scientific context.
+Build a desktop-first studio for designing personalized mRNA cancer vaccines. Today the shipped product focuses on a guided core workflow: local tumor + normal intake, local alignment, and an honest preview of variant calling, with later stages kept visible as roadmap items. See `CLAUDE.md` for the full scientific context.
 
 ## Stack
 
@@ -39,8 +39,8 @@ src/app/workspaces/[workspaceId]/[stage]/page.tsx — stage view
 src/app/layout.tsx                        — root layout
 
 src/components/workspaces/                — IngestionStagePanel, AlignmentStagePanel,
-                                            FutureStagePanel, WorkspaceStageShell,
-                                            WorkspaceCreateCard
+                                            VariantCallingStagePanel,
+                                            WorkspaceStageShell, WorkspaceCreateCard
 src/components/ui/                        — button, badge, card, progress, tabs, separator
 
 src/lib/api.ts                            — API client (snake_case → camelCase mapping)
@@ -73,8 +73,8 @@ backend/tests/test_real_data_ingestion.py — real-data smoke coverage
 | Path | What it does |
 |------|-------------|
 | `/` | Lists workspaces or shows create card |
-| `/workspaces/[workspaceId]` | Redirects to the workspace's active stage |
-| `/workspaces/[workspaceId]/[stage]` | Stage panel — ingestion and alignment are live, later stages stay clearly marked as future work |
+| `/workspaces/[workspaceId]` | Redirects to the latest actionable stage in the guided flow |
+| `/workspaces/[workspaceId]/[stage]` | Stage panel — ingestion and alignment are live, variant calling is read-only, later stages stay disabled roadmap items |
 
 ## API Endpoints
 
@@ -93,6 +93,9 @@ backend/tests/test_real_data_ingestion.py — real-data smoke coverage
 | POST | `/api/workspaces/{id}/alignment/run` | Start alignment |
 | POST | `/api/workspaces/{id}/alignment/rerun` | Re-run alignment |
 | GET | `/api/workspaces/{id}/alignment/artifacts/{artifact_id}/download` | Download BAM/QC artifacts |
+| GET | `/api/workspaces/{id}/variant-calling` | Load the read-only scaffold summary |
+| POST | `/api/workspaces/{id}/variant-calling/run` | Returns `409 stage_not_actionable` until Mutect2 orchestration exists |
+| POST | `/api/workspaces/{id}/variant-calling/rerun` | Returns `409 stage_not_actionable` until Mutect2 orchestration exists |
 
 ## Data Model
 
@@ -129,8 +132,11 @@ Frontend uses camelCase, backend uses snake_case. `src/lib/api.ts` handles the m
 - Alignment artifact download (BAM / BAI / flagstat / idxstats / stats)
 - Desktop intake via Electron IPC bridge (`src/lib/desktop.ts` ↔ `electron/preload.cjs`)
 - Real-data smoke harness: matched SEQC2 FASTQ smoke for ingestion plus opt-in live alignment smoke in `test_real_data_ingestion.py`, and desktop ingestion smoke in `tests/e2e/ingestion-real-data.spec.ts`
+- Shared pipeline policy across route redirects, stage chrome, and stage availability
 
-**Planned:** Variant calling through AI review — these stages render `FutureStagePanel.tsx` placeholders and have no backend runner.
+**Scaffolded:** Variant calling is visible as a read-only stage with a stable `stage_not_actionable` API response until Mutect2 orchestration exists.
+
+**Planned:** Annotation through construct output stay visible as disabled roadmap stages. Structure prediction and AI review remain separate disabled research modules.
 
 ## Known Edge Cases
 
@@ -150,8 +156,15 @@ npm run desktop:electron
 # Lint
 npm run lint
 
-# Backend tests
-./.venv/bin/pytest backend/tests
+# Fast local checks
+npm run test:fast
+
+# Browser integration checks
+npm run test:integration
+
+# Live real-data checks
+npm run test:backend:real-data
+npm run test:browser:real-data
 ```
 
 `npm run sample-data:alignment` materializes a tiny BAM/CRAM normalization-only fixture and expects a local `samtools` binary.

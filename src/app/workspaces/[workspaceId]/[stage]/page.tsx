@@ -1,17 +1,21 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import WorkspaceStageShell from "@/components/workspaces/WorkspaceStageShell";
 import { api } from "@/lib/api";
+import { getLatestActionableStageId, getPipelinePolicy } from "@/lib/pipeline-policy";
 import { isPipelineStageId } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 export default async function WorkspaceStagePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ workspaceId: string; stage: string }>;
+  searchParams: Promise<{ comingSoon?: string }>;
 }) {
   const { workspaceId, stage } = await params;
+  const { comingSoon } = await searchParams;
 
   if (!isPipelineStageId(stage)) {
     notFound();
@@ -37,6 +41,15 @@ export default async function WorkspaceStagePage({
     throw error;
   }
 
+  const policy = getPipelinePolicy(workspace, alignmentSummary, variantCallingSummary);
+  const redirectedFromStageId = comingSoon && isPipelineStageId(comingSoon) ? comingSoon : null;
+  if (!policy[stage].enterable) {
+    const fallbackStage = getLatestActionableStageId(policy);
+    redirect(
+      `/workspaces/${workspace.id}/${fallbackStage}?comingSoon=${encodeURIComponent(stage)}`
+    );
+  }
+
   return (
     <WorkspaceStageShell
       key={`${workspace.id}:${workspace.updatedAt}:${stage}`}
@@ -45,6 +58,7 @@ export default async function WorkspaceStagePage({
       currentStageId={stage}
       initialAlignmentSummary={alignmentSummary}
       initialVariantCallingSummary={variantCallingSummary}
+      redirectedFromStageId={redirectedFromStageId}
     />
   );
 }

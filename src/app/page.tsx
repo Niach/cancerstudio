@@ -3,17 +3,22 @@ import Link from "next/link";
 import WorkspaceCreateCard from "@/components/workspaces/WorkspaceCreateCard";
 import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api";
-import { PIPELINE_STAGES } from "@/lib/types";
-import {
-  countReadyRequiredOutputs,
-  formatDateTime,
-  formatSpeciesLabel,
-} from "@/lib/workspace-utils";
+import { describeWorkspaceProgress } from "@/lib/pipeline-policy";
+import { formatDateTime, formatSpeciesLabel } from "@/lib/workspace-utils";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const workspaces = await api.listWorkspaces().catch(() => []);
+  const alignmentSummaries = await Promise.all(
+    workspaces.map(async (workspace) => ({
+      workspaceId: workspace.id,
+      summary: await api.getAlignmentStageSummary(workspace.id).catch(() => null),
+    }))
+  );
+  const alignmentByWorkspaceId = new Map(
+    alignmentSummaries.map((entry) => [entry.workspaceId, entry.summary])
+  );
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.14),_transparent_28%),linear-gradient(180deg,_#f7faf7_0%,_#eef3ef_48%,_#e9efeb_100%)] px-4 py-10 lg:px-6">
@@ -46,16 +51,15 @@ export default async function Home() {
           ) : (
             <div className="divide-y divide-black/6">
               {workspaces.map((workspace) => {
-                const readyCount = countReadyRequiredOutputs(workspace);
-                const activeStage =
-                  PIPELINE_STAGES.find(
-                    (stage) => stage.id === workspace.activeStage
-                  ) ?? PIPELINE_STAGES[0];
+                const alignmentSummary = alignmentByWorkspaceId.get(workspace.id);
+                const progressLabel = alignmentSummary
+                  ? describeWorkspaceProgress(workspace, alignmentSummary)
+                  : "Open this workspace to continue.";
 
                 return (
                   <Link
                     key={workspace.id}
-                    href={`/workspaces/${workspace.id}/${workspace.activeStage}`}
+                    href={`/workspaces/${workspace.id}`}
                     className="flex flex-col gap-3 px-5 py-4 transition hover:bg-white/70 sm:px-6 lg:flex-row lg:items-center lg:justify-between"
                   >
                     <div className="min-w-0 space-y-2">
@@ -68,8 +72,7 @@ export default async function Home() {
                         </Badge>
                       </div>
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-500">
-                        <span>{readyCount}/4 paired ready</span>
-                        <span>{activeStage.name}</span>
+                        <span>{progressLabel}</span>
                       </div>
                     </div>
 

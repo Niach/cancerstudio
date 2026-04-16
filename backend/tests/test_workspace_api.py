@@ -6,7 +6,7 @@ from pathlib import Path
 
 import httpx
 import pytest
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
 from app.api import workspaces as workspace_routes
 from app.db import init_db, session_scope
@@ -19,7 +19,6 @@ from app.models.records import (
     WorkspaceRecord,
 )
 from app.services import alignment as alignment_service
-from app.services import variant_calling as variant_calling_service
 from app.services import workspace_store
 from app.models.schemas import AlignmentArtifactKind, AlignmentLaneMetricsResponse, SampleLane
 
@@ -81,19 +80,6 @@ def queued_alignment_runs(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, st
 
 
 @pytest.fixture
-def queued_variant_calling_runs(
-    monkeypatch: pytest.MonkeyPatch,
-) -> list[tuple[str, str]]:
-    runs: list[tuple[str, str]] = []
-    monkeypatch.setattr(
-        variant_calling_service,
-        "enqueue_variant_calling_run",
-        lambda workspace_id, run_id: runs.append((workspace_id, run_id)),
-    )
-    return runs
-
-
-@pytest.fixture
 async def client():
     async with app.router.lifespan_context(app):
         transport = httpx.ASGITransport(app=app)
@@ -140,6 +126,114 @@ def run_next_normalization(
     return workspace_store.run_batch_normalization(
         workspace_id, batch_id
     ).model_dump(mode="json")
+
+
+async def prepare_alignment_ready_workspace(
+    client: httpx.AsyncClient,
+    queued_batches: list[tuple[str, str]],
+    tmp_path: Path,
+) -> dict:
+    workspace = await create_workspace(client)
+    for lane in ("tumor", "normal"):
+        await register_lane_paths(
+            client,
+            workspace["id"],
+            lane,
+            [
+                write_gz_fastq(tmp_path / f"{lane}_R1.fastq.gz", f"{lane}-r1", "ACGT"),
+                write_gz_fastq(tmp_path / f"{lane}_R2.fastq.gz", f"{lane}-r2", "TGCA"),
+            ],
+        )
+        run_next_normalization(queued_batches)
+
+    update_profile = await client.patch(
+        f"/api/workspaces/{workspace['id']}/analysis-profile",
+        json={"assay_type": "wgs"},
+    )
+    assert update_profile.status_code == 200, update_profile.text
+    return workspace
+
+
+def install_fake_alignment(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    *,
+    mapped_percent: float = 95.0,
+    properly_paired_percent: float = 88.0,
+    duplicate_percent: float = 20.0,
+    mean_insert_size: float = 320.0,
+) -> None:
+    reference_path = tmp_path / "grch38.fa"
+    reference_path.write_text(">chr1\nACGTACGTACGT\n", encoding="utf-8")
+    monkeypatch.setattr(
+        alignment_service,
+        "ensure_reference_ready",
+        lambda reference: reference_path,
+    )
+
+    total_reads = 100
+    mapped_reads = int(round(total_reads * (mapped_percent / 100)))
+    properly_paired_reads = int(round(total_reads * (properly_paired_percent / 100)))
+
+    def fake_execute_alignment_lane(
+        *,
+        workspace_display_name: str,
+        workspace_id: str,
+        run_id: str,
+        sample_lane: SampleLane,
+        reference_path: Path,
+        r1_path: Path,
+        r2_path: Path,
+        working_dir: Path,
+        run_dir: Path = None,
+    ):
+        bam_path = working_dir / f"{sample_lane.value}.aligned.bam"
+        bai_path = working_dir / f"{sample_lane.value}.aligned.bam.bai"
+        flagstat_path = working_dir / f"{sample_lane.value}.flagstat.txt"
+        idxstats_path = working_dir / f"{sample_lane.value}.idxstats.txt"
+        stats_path = working_dir / f"{sample_lane.value}.stats.txt"
+        bam_path.write_text("bam", encoding="utf-8")
+        bai_path.write_text("bai", encoding="utf-8")
+        flagstat_path.write_text(
+            f"{total_reads} + 0 in total (QC-passed reads + QC-failed reads)\n"
+            f"{mapped_reads} + 0 mapped ({mapped_percent:.2f}% : N/A)\n"
+            f"{properly_paired_reads} + 0 properly paired ({properly_paired_percent:.2f}% : N/A)\n",
+            encoding="utf-8",
+        )
+        idxstats_path.write_text(f"chr1\t12\t{mapped_reads}\t0\n", encoding="utf-8")
+        stats_path.write_text(
+            f"SN\traw total sequences:\t{total_reads}\n"
+            f"SN\treads duplicated:\t{int(round(total_reads * (duplicate_percent / 100)))}\n"
+            f"SN\tinsert size average:\t{mean_insert_size:.0f}\n",
+            encoding="utf-8",
+        )
+        return alignment_service.LaneExecutionOutput(
+            sample_lane=sample_lane,
+            metrics=AlignmentLaneMetricsResponse(
+                sample_lane=sample_lane,
+                total_reads=total_reads,
+                mapped_reads=mapped_reads,
+                mapped_percent=mapped_percent,
+                properly_paired_percent=properly_paired_percent,
+                duplicate_percent=duplicate_percent,
+                mean_insert_size=mean_insert_size,
+            ),
+            artifact_paths={
+                AlignmentArtifactKind.BAM: bam_path,
+                AlignmentArtifactKind.BAI: bai_path,
+                AlignmentArtifactKind.FLAGSTAT: flagstat_path,
+                AlignmentArtifactKind.IDXSTATS: idxstats_path,
+                AlignmentArtifactKind.STATS: stats_path,
+            },
+            command_log=[f"fake align {sample_lane.value}"],
+        )
+
+    monkeypatch.setattr(
+        alignment_service,
+        "execute_alignment_lane",
+        fake_execute_alignment_lane,
+    )
+    monkeypatch.setattr(workspace_routes, "verify_tools", lambda _tools: None)
 
 
 def test_parse_remote_checksum_requires_an_exact_filename_token(
@@ -390,99 +484,15 @@ async def test_same_source_fastqs_can_be_reused_in_multiple_workspaces(
 
 
 @pytest.mark.anyio
-async def test_alignment_run_persists_local_artifacts_and_unlocks_variant_stage(
+async def test_alignment_run_persists_local_artifacts_and_exposes_variant_preview(
     client: httpx.AsyncClient,
     queued_batches: list[tuple[str, str]],
     queued_alignment_runs: list[tuple[str, str]],
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ):
-    workspace = await create_workspace(client)
-    for lane in ("tumor", "normal"):
-        await register_lane_paths(
-            client,
-            workspace["id"],
-            lane,
-            [
-                write_gz_fastq(tmp_path / f"{lane}_R1.fastq.gz", f"{lane}-r1", "ACGT"),
-                write_gz_fastq(tmp_path / f"{lane}_R2.fastq.gz", f"{lane}-r2", "TGCA"),
-            ],
-        )
-        run_next_normalization(queued_batches)
-
-    update_profile = await client.patch(
-        f"/api/workspaces/{workspace['id']}/analysis-profile",
-        json={"assay_type": "wgs"},
-    )
-    assert update_profile.status_code == 200, update_profile.text
-
-    reference_path = tmp_path / "grch38.fa"
-    reference_path.write_text(">chr1\nACGTACGTACGT\n", encoding="utf-8")
-    monkeypatch.setattr(
-        alignment_service,
-        "ensure_reference_ready",
-        lambda reference: reference_path,
-    )
-
-    def fake_execute_alignment_lane(
-        *,
-        workspace_display_name: str,
-        workspace_id: str,
-        run_id: str,
-        sample_lane: SampleLane,
-        reference_path: Path,
-        r1_path: Path,
-        r2_path: Path,
-        working_dir: Path,
-        run_dir: Path = None,
-    ):
-        bam_path = working_dir / f"{sample_lane.value}.aligned.bam"
-        bai_path = working_dir / f"{sample_lane.value}.aligned.bam.bai"
-        flagstat_path = working_dir / f"{sample_lane.value}.flagstat.txt"
-        idxstats_path = working_dir / f"{sample_lane.value}.idxstats.txt"
-        stats_path = working_dir / f"{sample_lane.value}.stats.txt"
-        bam_path.write_text("bam", encoding="utf-8")
-        bai_path.write_text("bai", encoding="utf-8")
-        flagstat_path.write_text(
-            "100 + 0 in total (QC-passed reads + QC-failed reads)\n"
-            "95 + 0 mapped (95.00% : N/A)\n"
-            "88 + 0 properly paired (88.00% : N/A)\n",
-            encoding="utf-8",
-        )
-        idxstats_path.write_text("chr1\t12\t95\t0\n", encoding="utf-8")
-        stats_path.write_text(
-            "SN\traw total sequences:\t100\n"
-            "SN\treads duplicated:\t20\n"
-            "SN\tinsert size average:\t320\n",
-            encoding="utf-8",
-        )
-        return alignment_service.LaneExecutionOutput(
-            sample_lane=sample_lane,
-            metrics=AlignmentLaneMetricsResponse(
-                sample_lane=sample_lane,
-                total_reads=100,
-                mapped_reads=95,
-                mapped_percent=95.0,
-                properly_paired_percent=88.0,
-                duplicate_percent=20.0,
-                mean_insert_size=320.0,
-            ),
-            artifact_paths={
-                AlignmentArtifactKind.BAM: bam_path,
-                AlignmentArtifactKind.BAI: bai_path,
-                AlignmentArtifactKind.FLAGSTAT: flagstat_path,
-                AlignmentArtifactKind.IDXSTATS: idxstats_path,
-                AlignmentArtifactKind.STATS: stats_path,
-            },
-            command_log=[f"fake align {sample_lane.value}"],
-        )
-
-    monkeypatch.setattr(
-        alignment_service,
-        "execute_alignment_lane",
-        fake_execute_alignment_lane,
-    )
-    monkeypatch.setattr(workspace_routes, "verify_tools", lambda _tools: None)
+    workspace = await prepare_alignment_ready_workspace(client, queued_batches, tmp_path)
+    install_fake_alignment(monkeypatch, tmp_path)
 
     summary_response = await client.post(
         f"/api/workspaces/{workspace['id']}/alignment/run"
@@ -501,6 +511,16 @@ async def test_alignment_run_persists_local_artifacts_and_unlocks_variant_stage(
     assert completed["ready_for_variant_calling"] is True
     assert len(completed["artifacts"]) == 10
 
+    variant_summary_response = await client.get(
+        f"/api/workspaces/{workspace['id']}/variant-calling"
+    )
+    assert variant_summary_response.status_code == 200, variant_summary_response.text
+    variant_summary = variant_summary_response.json()
+    assert variant_summary["status"] == "scaffolded"
+    assert variant_summary["blocking_reason"]
+    assert "not available yet" in variant_summary["blocking_reason"]
+    assert variant_summary["latest_run"] is None
+
     bam_artifact = next(
         artifact
         for artifact in completed["artifacts"]
@@ -509,6 +529,41 @@ async def test_alignment_run_persists_local_artifacts_and_unlocks_variant_stage(
     download_response = await client.get(bam_artifact["download_path"])
     assert download_response.status_code == 200
     assert download_response.text == "bam"
+
+
+@pytest.mark.anyio
+async def test_alignment_warn_keeps_variant_preview_blocked(
+    client: httpx.AsyncClient,
+    queued_batches: list[tuple[str, str]],
+    queued_alignment_runs: list[tuple[str, str]],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    workspace = await prepare_alignment_ready_workspace(client, queued_batches, tmp_path)
+    install_fake_alignment(monkeypatch, tmp_path, duplicate_percent=72.0)
+
+    summary_response = await client.post(
+        f"/api/workspaces/{workspace['id']}/alignment/run"
+    )
+    assert summary_response.status_code == 200, summary_response.text
+    queued_workspace_id, run_id = queued_alignment_runs.pop(0)
+    alignment_service.run_alignment(queued_workspace_id, run_id)
+
+    completed_response = await client.get(f"/api/workspaces/{workspace['id']}/alignment")
+    assert completed_response.status_code == 200, completed_response.text
+    completed = completed_response.json()
+    assert completed["status"] == "completed"
+    assert completed["qc_verdict"] == "warn"
+    assert completed["ready_for_variant_calling"] is False
+    assert "quality warnings need review" in (completed["blocking_reason"] or "")
+
+    variant_summary_response = await client.get(
+        f"/api/workspaces/{workspace['id']}/variant-calling"
+    )
+    assert variant_summary_response.status_code == 200, variant_summary_response.text
+    variant_summary = variant_summary_response.json()
+    assert variant_summary["status"] == "blocked"
+    assert "quality warnings need review" in (variant_summary["blocking_reason"] or "")
 
 
 @pytest.mark.anyio
@@ -614,6 +669,7 @@ async def test_variant_calling_summary_is_blocked_before_alignment_completes(
     assert payload["ready_for_annotation"] is False
     assert payload["latest_run"] is None
     assert payload["artifacts"] == []
+    assert payload["blocking_reason"]
 
 
 @pytest.mark.anyio
@@ -621,97 +677,11 @@ async def test_variant_calling_run_surfaces_not_implemented_after_alignment(
     client: httpx.AsyncClient,
     queued_batches: list[tuple[str, str]],
     queued_alignment_runs: list[tuple[str, str]],
-    queued_variant_calling_runs: list[tuple[str, str]],
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ):
-    # Reuse the happy-path alignment scaffolding from the earlier test
-    workspace = await create_workspace(client)
-    for lane in ("tumor", "normal"):
-        await register_lane_paths(
-            client,
-            workspace["id"],
-            lane,
-            [
-                write_gz_fastq(tmp_path / f"{lane}_R1.fastq.gz", f"{lane}-r1", "ACGT"),
-                write_gz_fastq(tmp_path / f"{lane}_R2.fastq.gz", f"{lane}-r2", "TGCA"),
-            ],
-        )
-        run_next_normalization(queued_batches)
-
-    update_profile = await client.patch(
-        f"/api/workspaces/{workspace['id']}/analysis-profile",
-        json={"assay_type": "wgs"},
-    )
-    assert update_profile.status_code == 200, update_profile.text
-
-    reference_path = tmp_path / "grch38.fa"
-    reference_path.write_text(">chr1\nACGTACGTACGT\n", encoding="utf-8")
-    monkeypatch.setattr(
-        alignment_service,
-        "ensure_reference_ready",
-        lambda reference: reference_path,
-    )
-
-    def fake_execute_alignment_lane(
-        *,
-        workspace_display_name: str,
-        workspace_id: str,
-        run_id: str,
-        sample_lane: SampleLane,
-        reference_path: Path,
-        r1_path: Path,
-        r2_path: Path,
-        working_dir: Path,
-        run_dir: Path = None,
-    ):
-        bam_path = working_dir / f"{sample_lane.value}.aligned.bam"
-        bai_path = working_dir / f"{sample_lane.value}.aligned.bam.bai"
-        flagstat_path = working_dir / f"{sample_lane.value}.flagstat.txt"
-        idxstats_path = working_dir / f"{sample_lane.value}.idxstats.txt"
-        stats_path = working_dir / f"{sample_lane.value}.stats.txt"
-        bam_path.write_text("bam", encoding="utf-8")
-        bai_path.write_text("bai", encoding="utf-8")
-        flagstat_path.write_text(
-            "100 + 0 in total (QC-passed reads + QC-failed reads)\n"
-            "95 + 0 mapped (95.00% : N/A)\n"
-            "88 + 0 properly paired (88.00% : N/A)\n",
-            encoding="utf-8",
-        )
-        idxstats_path.write_text("chr1\t12\t95\t0\n", encoding="utf-8")
-        stats_path.write_text(
-            "SN\traw total sequences:\t100\n"
-            "SN\treads duplicated:\t20\n"
-            "SN\tinsert size average:\t320\n",
-            encoding="utf-8",
-        )
-        return alignment_service.LaneExecutionOutput(
-            sample_lane=sample_lane,
-            metrics=AlignmentLaneMetricsResponse(
-                sample_lane=sample_lane,
-                total_reads=100,
-                mapped_reads=95,
-                mapped_percent=95.0,
-                properly_paired_percent=88.0,
-                duplicate_percent=20.0,
-                mean_insert_size=320.0,
-            ),
-            artifact_paths={
-                AlignmentArtifactKind.BAM: bam_path,
-                AlignmentArtifactKind.BAI: bai_path,
-                AlignmentArtifactKind.FLAGSTAT: flagstat_path,
-                AlignmentArtifactKind.IDXSTATS: idxstats_path,
-                AlignmentArtifactKind.STATS: stats_path,
-            },
-            command_log=[f"fake align {sample_lane.value}"],
-        )
-
-    monkeypatch.setattr(
-        alignment_service,
-        "execute_alignment_lane",
-        fake_execute_alignment_lane,
-    )
-    monkeypatch.setattr(workspace_routes, "verify_tools", lambda _tools: None)
+    workspace = await prepare_alignment_ready_workspace(client, queued_batches, tmp_path)
+    install_fake_alignment(monkeypatch, tmp_path)
 
     summary_response = await client.post(
         f"/api/workspaces/{workspace['id']}/alignment/run"
@@ -720,31 +690,36 @@ async def test_variant_calling_run_surfaces_not_implemented_after_alignment(
     queued_workspace_id, alignment_run_id = queued_alignment_runs.pop(0)
     alignment_service.run_alignment(queued_workspace_id, alignment_run_id)
 
-    # Variant calling stage should now be READY
-    ready_response = await client.get(
+    preview_response = await client.get(
         f"/api/workspaces/{workspace['id']}/variant-calling"
     )
-    assert ready_response.status_code == 200, ready_response.text
-    ready_payload = ready_response.json()
-    assert ready_payload["status"] == "ready"
+    assert preview_response.status_code == 200, preview_response.text
+    preview_payload = preview_response.json()
+    assert preview_payload["status"] == "scaffolded"
+    assert preview_payload["latest_run"] is None
 
-    # POST to start variant calling → queues a run, then run the stub explicitly
     run_response = await client.post(
         f"/api/workspaces/{workspace['id']}/variant-calling/run"
     )
-    assert run_response.status_code == 200, run_response.text
-    assert queued_variant_calling_runs
+    assert run_response.status_code == 409, run_response.text
+    run_payload = run_response.json()["detail"]
+    assert run_payload["code"] == "stage_not_actionable"
+    assert run_payload["stage"] == "variant-calling"
+    assert "not available yet" in run_payload["message"]
 
-    variant_workspace_id, variant_run_id = queued_variant_calling_runs.pop(0)
-    variant_calling_service.run_variant_calling(variant_workspace_id, variant_run_id)
-
-    failed_response = await client.get(
-        f"/api/workspaces/{workspace['id']}/variant-calling"
+    rerun_response = await client.post(
+        f"/api/workspaces/{workspace['id']}/variant-calling/rerun"
     )
-    assert failed_response.status_code == 200, failed_response.text
-    failed_payload = failed_response.json()
-    assert failed_payload["status"] == "failed"
-    assert failed_payload["latest_run"] is not None
-    error_message = failed_payload["latest_run"]["error"] or ""
-    assert "Mutect2 orchestration" in error_message
-    assert "not yet implemented" in error_message
+    assert rerun_response.status_code == 409, rerun_response.text
+    rerun_payload = rerun_response.json()["detail"]
+    assert rerun_payload["code"] == "stage_not_actionable"
+
+    with session_scope() as session:
+        variant_runs = session.scalars(
+            select(PipelineRunRecord).where(
+                PipelineRunRecord.workspace_id == workspace["id"],
+                PipelineRunRecord.stage_id == "variant-calling",
+            )
+        ).all()
+
+    assert variant_runs == []

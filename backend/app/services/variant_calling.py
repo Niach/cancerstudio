@@ -1,19 +1,11 @@
 """Variant calling stage service (GATK Mutect2).
 
-Scaffold only — the real Mutect2 orchestration is not yet implemented. Clicking
-"Start variant calling" in the UI routes a run through this module, which
-validates that the alignment outputs are present and then raises
-``NotImplementedError`` so the UI transitions to FAILED with a clear marker.
+The stage is intentionally scaffolded today. The shipped product exposes a
+read-only summary page after alignment passes QC, while the run/rerun API
+returns a stable "stage_not_actionable" payload without creating run records.
 
-Future work:
-- GATK + samtools preflight
-- CreateSequenceDictionary if reference.dict is missing
-- Mutect2 per-chromosome scatter with parallel workers (already have the
-  compute-settings plumbing from alignment)
-- MergeVcfs → FilterMutectCalls → artifact persist
-- Optional: panel-of-normals and gnomAD germline resource
-
-Mirrors the shape of ``alignment.py`` so the control flow is familiar.
+The orchestration helpers below are kept as future scaffolding so the eventual
+Mutect2 implementation can follow the same service shape as ``alignment.py``.
 """
 from __future__ import annotations
 
@@ -44,8 +36,8 @@ from app.models.schemas import (
     VariantCallingStageSummaryResponse,
 )
 from app.services.alignment import (
+    build_alignment_stage_summary,
     get_latest_alignment_run,
-    has_required_alignment_artifacts,
 )
 from app.services.workspace_store import (
     get_workspace_record,
@@ -57,6 +49,9 @@ from app.services.workspace_store import (
 VARIANT_CALLING_STAGE_ID = PipelineStageId.VARIANT_CALLING.value
 NOT_IMPLEMENTED_MESSAGE = (
     "Mutect2 orchestration is scaffolded but not yet implemented."
+)
+NOT_ACTIONABLE_MESSAGE = (
+    "Variant calling is visible here, but not available yet. Alignment is the current working step."
 )
 
 
@@ -183,6 +178,7 @@ def build_variant_calling_stage_summary(
     latest_alignment_run: Optional[PipelineRunRecord],
     latest_variant_calling_run: Optional[PipelineRunRecord],
 ) -> VariantCallingStageSummaryResponse:
+    alignment_summary = build_alignment_stage_summary(workspace, latest_alignment_run)
     latest_response = (
         serialize_variant_calling_run(latest_variant_calling_run)
         if latest_variant_calling_run is not None
@@ -190,23 +186,22 @@ def build_variant_calling_stage_summary(
     )
     artifacts = latest_response.artifacts if latest_response else []
 
-    # Blocked if alignment isn't done yet
-    if latest_alignment_run is None or not has_required_alignment_artifacts(latest_alignment_run):
+    if not alignment_summary.ready_for_variant_calling:
         return VariantCallingStageSummaryResponse(
             workspace_id=workspace.id,
             status=VariantCallingStageStatus.BLOCKED,
-            blocking_reason="Finish alignment before calling variants.",
+            blocking_reason=alignment_summary.blocking_reason
+            or "Finish alignment before calling variants.",
             ready_for_annotation=False,
             latest_run=latest_response,
             artifacts=artifacts,
         )
 
-    # Derive current stage status from latest run (if any)
     if latest_variant_calling_run is None:
         return VariantCallingStageSummaryResponse(
             workspace_id=workspace.id,
-            status=VariantCallingStageStatus.READY,
-            blocking_reason=None,
+            status=VariantCallingStageStatus.SCAFFOLDED,
+            blocking_reason=NOT_ACTIONABLE_MESSAGE,
             ready_for_annotation=False,
             latest_run=None,
             artifacts=[],
@@ -228,20 +223,18 @@ def build_variant_calling_stage_summary(
     if latest_variant_calling_run.status == VariantCallingRunStatus.FAILED.value:
         return VariantCallingStageSummaryResponse(
             workspace_id=workspace.id,
-            status=VariantCallingStageStatus.FAILED,
-            blocking_reason=latest_variant_calling_run.error
-            or latest_variant_calling_run.blocking_reason,
+            status=VariantCallingStageStatus.SCAFFOLDED,
+            blocking_reason=NOT_ACTIONABLE_MESSAGE,
             ready_for_annotation=False,
             latest_run=latest_response,
             artifacts=artifacts,
         )
 
-    # completed
     return VariantCallingStageSummaryResponse(
         workspace_id=workspace.id,
-        status=VariantCallingStageStatus.COMPLETED,
-        blocking_reason=None,
-        ready_for_annotation=True,
+        status=VariantCallingStageStatus.SCAFFOLDED,
+        blocking_reason=NOT_ACTIONABLE_MESSAGE,
+        ready_for_annotation=False,
         latest_run=latest_response,
         artifacts=artifacts,
     )

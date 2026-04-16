@@ -10,7 +10,16 @@ export function IngestionHeader({
   const isUnlocked = alignmentState === "unlocked";
 
   return (
-    <div className="flex flex-wrap items-center justify-end gap-3 px-1 pt-1 pb-3">
+    <div className="flex flex-wrap items-start justify-between gap-4 px-1 pt-1 pb-3">
+      <div className="max-w-2xl">
+        <h2 className="text-[18px] font-semibold text-stone-950">
+          Add the tumor sample and the healthy sample
+        </h2>
+        <p className="mt-1 text-[13px] leading-6 text-stone-600">
+          Choose either a paired FASTQ set or one BAM/CRAM file for each sample.
+          We prepare the files locally so alignment can start cleanly.
+        </p>
+      </div>
       <span
         data-testid="alignment-status-indicator"
         data-state={alignmentState}
@@ -27,7 +36,7 @@ export function IngestionHeader({
             isUnlocked ? "bg-emerald-500" : "bg-stone-400"
           )}
         />
-        {isUnlocked ? "Ready for alignment" : "Waiting for files"}
+        {isUnlocked ? "Ready for alignment" : "Waiting for both samples"}
       </span>
     </div>
   );

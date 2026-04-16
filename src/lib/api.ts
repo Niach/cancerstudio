@@ -613,6 +613,16 @@ export class InsufficientMemoryError extends Error {
   }
 }
 
+export class StageNotActionableError extends Error {
+  readonly stage: PipelineStageId;
+
+  constructor(message: string, stage: PipelineStageId) {
+    super(message);
+    this.name = "StageNotActionableError";
+    this.stage = stage;
+  }
+}
+
 type MissingToolsDetail = {
   code: "missing_tools";
   tools: string[];
@@ -625,6 +635,12 @@ type InsufficientMemoryDetail = {
   required_bytes: number;
   available_bytes: number | null;
   purpose: string;
+  message: string;
+};
+
+type StageNotActionableDetail = {
+  code: "stage_not_actionable";
+  stage: PipelineStageId;
   message: string;
 };
 
@@ -679,6 +695,30 @@ function parseInsufficientMemoryDetail(
   return null;
 }
 
+function parseStageNotActionableDetail(
+  payload: string
+): StageNotActionableDetail | null {
+  try {
+    const parsed = JSON.parse(payload) as { detail?: unknown };
+    const detail = parsed.detail;
+    if (
+      detail &&
+      typeof detail === "object" &&
+      (detail as { code?: unknown }).code === "stage_not_actionable"
+    ) {
+      const typed = detail as Partial<StageNotActionableDetail>;
+      if (typeof typed.stage === "string" && typeof typed.message === "string") {
+        return {
+          code: "stage_not_actionable",
+          stage: typed.stage as PipelineStageId,
+          message: typed.message,
+        };
+      }
+    }
+  } catch {}
+  return null;
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const headers = new Headers(options?.headers);
   const isFormData =
@@ -710,6 +750,14 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
           memory.purpose
         );
       }
+    }
+
+    const notActionable = parseStageNotActionableDetail(payload);
+    if (notActionable) {
+      throw new StageNotActionableError(
+        notActionable.message,
+        notActionable.stage
+      );
     }
 
     let detail: string | undefined;
@@ -854,20 +902,6 @@ export const api = {
     mapVariantCallingStageSummary(
       await request<VariantCallingStageSummaryDto>(
         `/api/workspaces/${workspaceId}/variant-calling`
-      )
-    ),
-  runVariantCalling: async (workspaceId: string) =>
-    mapVariantCallingStageSummary(
-      await request<VariantCallingStageSummaryDto>(
-        `/api/workspaces/${workspaceId}/variant-calling/run`,
-        { method: "POST" }
-      )
-    ),
-  rerunVariantCalling: async (workspaceId: string) =>
-    mapVariantCallingStageSummary(
-      await request<VariantCallingStageSummaryDto>(
-        `/api/workspaces/${workspaceId}/variant-calling/rerun`,
-        { method: "POST" }
       )
     ),
   getSystemMemory: async (): Promise<SystemMemoryResponse> => {

@@ -7,11 +7,8 @@ import {
   FolderOpen,
   LoaderCircle,
   LockKeyhole,
-  Play,
-  RotateCcw,
 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { getDesktopBridge } from "@/lib/desktop";
 import type {
@@ -19,27 +16,31 @@ import type {
   VariantCallingStageSummary,
   Workspace,
 } from "@/lib/types";
-import { cn } from "@/lib/utils";
 import { formatBytes, formatDateTime } from "@/lib/workspace-utils";
+import { cn } from "@/lib/utils";
 
 interface VariantCallingStagePanelProps {
   workspace: Workspace;
   initialSummary: VariantCallingStageSummary;
 }
 
-type BannerState = "blocked" | "ready" | "running" | "completed" | "failed";
+type BannerState = "blocked" | "scaffolded" | "running" | "completed" | "failed";
 
 function bannerStateOf(summary: VariantCallingStageSummary): BannerState {
   if (summary.status === "blocked") return "blocked";
   if (summary.status === "running") return "running";
   if (summary.status === "completed") return "completed";
   if (summary.status === "failed") return "failed";
-  return "ready";
+  return "scaffolded";
 }
 
 const PILL_TONES: Record<BannerState, { label: string; bg: string; dot: string }> = {
   blocked: { label: "Locked", bg: "bg-stone-100 text-stone-500", dot: "bg-stone-400" },
-  ready: { label: "Ready", bg: "bg-emerald-50 text-emerald-700", dot: "bg-emerald-500" },
+  scaffolded: {
+    label: "Coming next",
+    bg: "bg-sky-50 text-sky-700",
+    dot: "bg-sky-500",
+  },
   running: { label: "Running", bg: "bg-amber-50 text-amber-700", dot: "bg-amber-500" },
   completed: { label: "Complete", bg: "bg-emerald-50 text-emerald-700", dot: "bg-emerald-500" },
   failed: { label: "Failed", bg: "bg-rose-50 text-rose-700", dot: "bg-rose-500" },
@@ -49,14 +50,14 @@ function bannerMessage(state: BannerState, workspaceName: string, blockingReason
   switch (state) {
     case "blocked":
       return blockingReason ?? "Finish alignment before calling variants.";
-    case "ready":
-      return `Ready to call somatic variants on ${workspaceName}.`;
+    case "scaffolded":
+      return `Alignment is ready for ${workspaceName}. Variant calling is the next planned step.`;
     case "running":
       return "Variant calling is running…";
     case "completed":
-      return "Variant calling finished. Somatic VCF is ready.";
+      return "A legacy variant-calling run is shown below.";
     case "failed":
-      return "Variant calling failed. Check the details below.";
+      return "A legacy variant-calling run failed. The stage itself is still coming next.";
   }
 }
 
@@ -79,8 +80,6 @@ export default function VariantCallingStagePanel({
   initialSummary,
 }: VariantCallingStagePanelProps) {
   const [summary, setSummary] = useState(initialSummary);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (summary.status !== "running") {
@@ -99,23 +98,6 @@ export default function VariantCallingStagePanel({
   const pill = PILL_TONES[bannerState];
   const latestRun = summary.latestRun;
   const isRunning = summary.status === "running";
-  const canRun = summary.status === "ready" || summary.status === "failed" || summary.status === "completed";
-
-  const handleRun = useCallback(async () => {
-    setIsSubmitting(true);
-    setError(null);
-    try {
-      const next =
-        summary.status === "completed"
-          ? await api.rerunVariantCalling(workspace.id)
-          : await api.runVariantCalling(workspace.id);
-      setSummary(next);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to start variant calling");
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [summary.status, workspace.id]);
 
   const handleOpenArtifact = useCallback(
     async (artifact: VariantCallingArtifact) => {
@@ -154,9 +136,9 @@ export default function VariantCallingStagePanel({
           <div>
             <h3 className="text-[15px] font-semibold text-stone-900">Somatic variant calling</h3>
             <p className="mt-0.5 text-[13px] text-stone-500">
-              Runs GATK Mutect2 on the aligned tumor and normal BAMs, then
-              filters calls to produce a somatic VCF. This stage is scaffolded;
-              the Mutect2 orchestration itself is still work in progress.
+              This page shows the next step after alignment. Mutect2 orchestration
+              is not live yet, so you can review what is coming without starting
+              a run by accident.
             </p>
           </div>
 
@@ -189,28 +171,13 @@ export default function VariantCallingStagePanel({
                 </div>
               </div>
             ) : bannerState !== "blocked" ? (
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-[13px] text-stone-500">
-                  Writes <span className="font-mono text-[12px]">somatic.vcf.gz</span>{" "}
-                  + index + Mutect2 stats. Runs on the existing tumor/normal BAMs.
+              <div className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-3 text-[13px] text-sky-800">
+                <div className="font-medium">Coming next</div>
+                <p className="mt-1 leading-6 text-sky-700">
+                  When this stage ships, it will use the aligned tumor and healthy
+                  BAMs to produce a somatic VCF plus Mutect2 stats. For now, alignment
+                  remains the current working step.
                 </p>
-                <Button
-                  type="button"
-                  size="sm"
-                  className="rounded-full bg-stone-900 px-4 text-white hover:bg-stone-800"
-                  disabled={!canRun || isSubmitting}
-                  onClick={() => void handleRun()}
-                  data-testid="variant-calling-run-button"
-                >
-                  {isSubmitting ? (
-                    <LoaderCircle className="mr-1.5 size-3.5 animate-spin" />
-                  ) : latestRun ? (
-                    <RotateCcw className="mr-1.5 size-3.5" />
-                  ) : (
-                    <Play className="mr-1.5 size-3.5" />
-                  )}
-                  {latestRun ? "Run again" : "Start variant calling"}
-                </Button>
               </div>
             ) : null}
           </div>
@@ -219,12 +186,6 @@ export default function VariantCallingStagePanel({
             <div className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[13px] text-rose-700">
               <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
               <span>{latestRun.error}</span>
-            </div>
-          ) : null}
-
-          {error ? (
-            <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[13px] text-rose-700">
-              {error}
             </div>
           ) : null}
         </div>
@@ -271,7 +232,8 @@ export default function VariantCallingStagePanel({
             </div>
           ) : (
             <p className="text-[13px] text-stone-500">
-              No runs yet. Starting variant calling will populate this section.
+              No live runs yet. Variant calling details will appear here once this
+              stage is implemented.
             </p>
           )}
 
@@ -320,7 +282,7 @@ export default function VariantCallingStagePanel({
               </ul>
             ) : (
               <p className="mt-1.5 text-[13px] text-stone-500">
-                VCF and stats files will appear here after variant calling finishes.
+                Variant-calling output files will appear here once this stage ships.
               </p>
             )}
           </div>
