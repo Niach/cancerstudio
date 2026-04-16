@@ -76,8 +76,25 @@ echo "    Keep an eye on memory; if it spills into swap, kill this and close mor
 echo
 strobealign --create-index -r 150 "${FASTA}"
 
+# GATK Mutect2 (stage 3) needs a sequence dictionary next to the FASTA. Build
+# it now so the variant-calling stage doesn't have to reach for `gatk` on the
+# first run.
+dict_path="${FASTA%.fa}.dict"
+if [[ ! -f "${dict_path}" && ! -f "${FASTA}.dict" ]]; then
+  if command -v gatk > /dev/null; then
+    echo "==> Running gatk CreateSequenceDictionary"
+    gatk CreateSequenceDictionary -R "${FASTA}" -O "${dict_path}"
+  else
+    echo "==> Skipping sequence dictionary (gatk not on PATH)."
+    echo "    Install via scripts/install-bioinformatics-deps.sh and rerun to generate ${dict_path##*/}."
+  fi
+else
+  echo "==> Sequence dictionary already present; skipping CreateSequenceDictionary."
+fi
+
 echo
-echo "==> Done. Index written to ${bundle_dir}:"
+echo "==> Done. Reference bundle at ${bundle_dir}:"
 ls -lh "${bundle_dir}"/genome.fa.* 2>&1 | sed 's/^/    /'
+ls -lh "${bundle_dir}"/genome.dict 2>/dev/null | sed 's/^/    /' || true
 echo
 echo "Restart the backend and the alignment stage will skip bootstrapping."

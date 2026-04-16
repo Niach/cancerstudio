@@ -22,6 +22,13 @@ import type {
   SampledReadStats,
   SystemMemoryResponse,
   SystemResourcesResponse,
+  VariantCallingArtifact,
+  VariantCallingArtifactKind,
+  VariantCallingRun,
+  VariantCallingRunStatus,
+  VariantCallingRuntimePhase,
+  VariantCallingStageStatus,
+  VariantCallingStageSummary,
   Workspace,
   WorkspaceFile,
   ReferencePreset,
@@ -202,6 +209,47 @@ type SystemResourcesDto = {
   app_data_disk_total_bytes: number | null;
   app_data_disk_free_bytes: number | null;
   app_data_root: string;
+};
+
+type VariantCallingMetricsDto = {
+  total_variants: number;
+  snv_count: number;
+  indel_count: number;
+  pass_count: number;
+};
+
+type VariantCallingArtifactDto = {
+  id: string;
+  artifact_kind: VariantCallingArtifactKind;
+  filename: string;
+  size_bytes: number;
+  download_path: string;
+  local_path?: string | null;
+};
+
+type VariantCallingRunDto = {
+  id: string;
+  status: VariantCallingRunStatus;
+  progress: number;
+  runtime_phase?: VariantCallingRuntimePhase | null;
+  created_at: string;
+  updated_at: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+  blocking_reason?: string | null;
+  error?: string | null;
+  command_log: string[];
+  metrics?: VariantCallingMetricsDto | null;
+  artifacts: VariantCallingArtifactDto[];
+};
+
+type VariantCallingStageSummaryDto = {
+  workspace_id: string;
+  status: VariantCallingStageStatus;
+  blocking_reason?: string | null;
+  ready_for_annotation: boolean;
+  latest_run?: VariantCallingRunDto | null;
+  artifacts: VariantCallingArtifactDto[];
 };
 
 type AlignmentSettingsDto = {
@@ -412,6 +460,57 @@ function mapAlignmentRun(dto: AlignmentRunDto): AlignmentRun {
     laneMetrics,
     chunkProgress,
     artifacts: dto.artifacts.map(mapAlignmentArtifact),
+  };
+}
+
+function mapVariantCallingArtifact(
+  dto: VariantCallingArtifactDto
+): VariantCallingArtifact {
+  return {
+    id: dto.id,
+    artifactKind: dto.artifact_kind,
+    filename: dto.filename,
+    sizeBytes: dto.size_bytes,
+    downloadPath: dto.download_path,
+    localPath: dto.local_path ?? null,
+  };
+}
+
+function mapVariantCallingRun(dto: VariantCallingRunDto): VariantCallingRun {
+  return {
+    id: dto.id,
+    status: dto.status,
+    progress: dto.progress,
+    runtimePhase: dto.runtime_phase ?? null,
+    createdAt: dto.created_at,
+    updatedAt: dto.updated_at,
+    startedAt: dto.started_at ?? null,
+    completedAt: dto.completed_at ?? null,
+    blockingReason: dto.blocking_reason ?? null,
+    error: dto.error ?? null,
+    commandLog: dto.command_log,
+    metrics: dto.metrics
+      ? {
+          totalVariants: dto.metrics.total_variants,
+          snvCount: dto.metrics.snv_count,
+          indelCount: dto.metrics.indel_count,
+          passCount: dto.metrics.pass_count,
+        }
+      : null,
+    artifacts: dto.artifacts.map(mapVariantCallingArtifact),
+  };
+}
+
+function mapVariantCallingStageSummary(
+  dto: VariantCallingStageSummaryDto
+): VariantCallingStageSummary {
+  return {
+    workspaceId: dto.workspace_id,
+    status: dto.status,
+    blockingReason: dto.blocking_reason ?? null,
+    readyForAnnotation: dto.ready_for_annotation,
+    latestRun: dto.latest_run ? mapVariantCallingRun(dto.latest_run) : null,
+    artifacts: dto.artifacts.map(mapVariantCallingArtifact),
   };
 }
 
@@ -701,6 +800,26 @@ export const api = {
     mapAlignmentStageSummary(
       await request<AlignmentStageSummaryDto>(
         `/api/workspaces/${workspaceId}/alignment/rerun`,
+        { method: "POST" }
+      )
+    ),
+  getVariantCallingStageSummary: async (workspaceId: string) =>
+    mapVariantCallingStageSummary(
+      await request<VariantCallingStageSummaryDto>(
+        `/api/workspaces/${workspaceId}/variant-calling`
+      )
+    ),
+  runVariantCalling: async (workspaceId: string) =>
+    mapVariantCallingStageSummary(
+      await request<VariantCallingStageSummaryDto>(
+        `/api/workspaces/${workspaceId}/variant-calling/run`,
+        { method: "POST" }
+      )
+    ),
+  rerunVariantCalling: async (workspaceId: string) =>
+    mapVariantCallingStageSummary(
+      await request<VariantCallingStageSummaryDto>(
+        `/api/workspaces/${workspaceId}/variant-calling/rerun`,
         { method: "POST" }
       )
     ),

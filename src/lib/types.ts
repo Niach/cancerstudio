@@ -263,6 +263,61 @@ export type AlignmentSettingsPatch = Partial<AlignmentSettingsDefaults> & {
   reset?: boolean;
 };
 
+export type VariantCallingRunStatus = "pending" | "running" | "completed" | "failed";
+export type VariantCallingStageStatus =
+  | "blocked"
+  | "ready"
+  | "running"
+  | "completed"
+  | "failed";
+export type VariantCallingRuntimePhase =
+  | "preparing_reference"
+  | "calling"
+  | "filtering"
+  | "finalizing";
+export type VariantCallingArtifactKind = "vcf" | "tbi" | "stats";
+
+export interface VariantCallingMetrics {
+  totalVariants: number;
+  snvCount: number;
+  indelCount: number;
+  passCount: number;
+}
+
+export interface VariantCallingArtifact {
+  id: string;
+  artifactKind: VariantCallingArtifactKind;
+  filename: string;
+  sizeBytes: number;
+  downloadPath: string;
+  localPath?: string | null;
+}
+
+export interface VariantCallingRun {
+  id: string;
+  status: VariantCallingRunStatus;
+  progress: number;
+  runtimePhase?: VariantCallingRuntimePhase | null;
+  createdAt: string;
+  updatedAt: string;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  blockingReason?: string | null;
+  error?: string | null;
+  commandLog: string[];
+  metrics?: VariantCallingMetrics | null;
+  artifacts: VariantCallingArtifact[];
+}
+
+export interface VariantCallingStageSummary {
+  workspaceId: string;
+  status: VariantCallingStageStatus;
+  blockingReason?: string | null;
+  readyForAnnotation: boolean;
+  latestRun?: VariantCallingRun | null;
+  artifacts: VariantCallingArtifact[];
+}
+
 export interface DLAAllele {
   name: string;
   locus: "DLA-88" | "DLA-DRB1" | "DLA-DQA1" | "DLA-DQB1";

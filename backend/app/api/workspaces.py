@@ -7,6 +7,7 @@ from app.models.schemas import (
     IngestionLanePreviewResponse,
     LocalFileRegistrationRequest,
     SampleLane,
+    VariantCallingStageSummaryResponse,
     WorkspaceAnalysisProfileUpdateRequest,
     WorkspaceCreateRequest,
     WorkspaceResponse,
@@ -17,6 +18,13 @@ from app.services.alignment import (
     load_alignment_artifact_download,
     load_alignment_stage_summary,
     rerun_alignment,
+)
+from app.services.variant_calling import (
+    VariantCallingArtifactNotFoundError,
+    create_variant_calling_run,
+    load_variant_calling_artifact_download,
+    load_variant_calling_stage_summary,
+    rerun_variant_calling,
 )
 from app.services.tool_preflight import (
     ALIGNMENT_TOOLS,
@@ -162,6 +170,67 @@ async def download_alignment_artifact(
             filename=artifact.filename,
         )
     except AlignmentArtifactNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.get(
+    "/{workspace_id}/variant-calling",
+    response_model=VariantCallingStageSummaryResponse,
+)
+async def get_variant_calling_stage_summary(workspace_id: str):
+    try:
+        return load_variant_calling_stage_summary(workspace_id)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except Exception as error:
+        raise unexpected_workspace_error("Variant calling summary load", error) from error
+
+
+@router.post(
+    "/{workspace_id}/variant-calling/run",
+    response_model=VariantCallingStageSummaryResponse,
+)
+async def run_variant_calling_stage(workspace_id: str):
+    try:
+        return create_variant_calling_run(workspace_id)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except Exception as error:
+        raise unexpected_workspace_error("Variant calling run", error) from error
+
+
+@router.post(
+    "/{workspace_id}/variant-calling/rerun",
+    response_model=VariantCallingStageSummaryResponse,
+)
+async def rerun_variant_calling_stage(workspace_id: str):
+    try:
+        return rerun_variant_calling(workspace_id)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except Exception as error:
+        raise unexpected_workspace_error("Variant calling rerun", error) from error
+
+
+@router.get("/{workspace_id}/variant-calling/artifacts/{artifact_id}/download")
+async def download_variant_calling_artifact(
+    workspace_id: str,
+    artifact_id: str,
+):
+    try:
+        artifact = load_variant_calling_artifact_download(workspace_id, artifact_id)
+        return FileResponse(
+            path=artifact.local_path,
+            media_type=artifact.content_type or "application/octet-stream",
+            filename=artifact.filename,
+        )
+    except VariantCallingArtifactNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error

@@ -309,6 +309,75 @@ class AlignmentStageSummaryResponse(BaseModel):
     artifacts: List[AlignmentArtifactResponse] = Field(default_factory=list)
 
 
+class VariantCallingRunStatus(str, Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class VariantCallingStageStatus(str, Enum):
+    BLOCKED = "blocked"
+    READY = "ready"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class VariantCallingRuntimePhase(str, Enum):
+    PREPARING_REFERENCE = "preparing_reference"
+    CALLING = "calling"
+    FILTERING = "filtering"
+    FINALIZING = "finalizing"
+
+
+class VariantCallingArtifactKind(str, Enum):
+    VCF = "vcf"
+    VCF_INDEX = "tbi"
+    STATS = "stats"
+
+
+class VariantCallingMetricsResponse(BaseModel):
+    total_variants: int = 0
+    snv_count: int = 0
+    indel_count: int = 0
+    pass_count: int = 0
+
+
+class VariantCallingArtifactResponse(BaseModel):
+    id: str
+    artifact_kind: VariantCallingArtifactKind
+    filename: str
+    size_bytes: int
+    download_path: str
+    local_path: Optional[str] = None
+
+
+class VariantCallingRunResponse(BaseModel):
+    id: str
+    status: VariantCallingRunStatus
+    progress: float = 0.0
+    runtime_phase: Optional[VariantCallingRuntimePhase] = None
+    created_at: str
+    updated_at: str
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    blocking_reason: Optional[str] = None
+    error: Optional[str] = None
+    command_log: List[str] = Field(default_factory=list)
+    metrics: Optional[VariantCallingMetricsResponse] = None
+    artifacts: List[VariantCallingArtifactResponse] = Field(default_factory=list)
+
+
+class VariantCallingStageSummaryResponse(BaseModel):
+    workspace_id: str
+    status: VariantCallingStageStatus
+    blocking_reason: Optional[str] = None
+    ready_for_annotation: bool = False
+    latest_run: Optional[VariantCallingRunResponse] = None
+    artifacts: List[VariantCallingArtifactResponse] = Field(default_factory=list)
+
+
 class DLAAllele(BaseModel):
     name: str
     locus: str

@@ -8,12 +8,14 @@ import { ChevronDown, Dna, LockKeyhole, Plus } from "lucide-react";
 import AlignmentStagePanel from "@/components/workspaces/AlignmentStagePanel";
 import IngestionStagePanel from "@/components/workspaces/IngestionStagePanel";
 import FutureStagePanel from "@/components/workspaces/FutureStagePanel";
+import VariantCallingStagePanel from "@/components/workspaces/VariantCallingStagePanel";
 import { Badge } from "@/components/ui/badge";
 
 import type {
   AlignmentStageSummary,
   PipelineStage,
   PipelineStageId,
+  VariantCallingStageSummary,
   Workspace,
 } from "@/lib/types";
 import {
@@ -143,6 +145,7 @@ interface WorkspaceStageShellProps {
   workspaces: Workspace[];
   currentStageId: PipelineStageId;
   initialAlignmentSummary: AlignmentStageSummary;
+  initialVariantCallingSummary: VariantCallingStageSummary;
 }
 
 export default function WorkspaceStageShell({
@@ -150,6 +153,7 @@ export default function WorkspaceStageShell({
   workspaces: initialWorkspaces,
   currentStageId,
   initialAlignmentSummary,
+  initialVariantCallingSummary,
 }: WorkspaceStageShellProps) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -159,6 +163,9 @@ export default function WorkspaceStageShell({
   );
   const [alignmentSummary, setAlignmentSummary] = useState(
     initialAlignmentSummary
+  );
+  const [variantCallingSummary, setVariantCallingSummary] = useState(
+    initialVariantCallingSummary
   );
 
   useEffect(() => {
@@ -198,7 +205,13 @@ export default function WorkspaceStageShell({
     setWorkspaces((current) => mergeWorkspaces(current, updatedWorkspace));
     void api
       .getAlignmentStageSummary(updatedWorkspace.id)
-      .then(setAlignmentSummary)
+      .then((nextAlignment) => {
+        setAlignmentSummary(nextAlignment);
+        void api
+          .getVariantCallingStageSummary(updatedWorkspace.id)
+          .then(setVariantCallingSummary)
+          .catch(() => {});
+      })
       .catch(() => {});
   }
 
@@ -301,7 +314,9 @@ export default function WorkspaceStageShell({
           </nav>
 
           <main className="space-y-4">
-            {currentStageId === "ingestion" || currentStageId === "alignment" ? null : (
+            {currentStageId === "ingestion" ||
+            currentStageId === "alignment" ||
+            currentStageId === "variant-calling" ? null : (
               <div className="rounded-[24px] border border-black/5 bg-white/70 px-6 py-5 shadow-sm shadow-black/5 backdrop-blur">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
@@ -338,6 +353,11 @@ export default function WorkspaceStageShell({
                 summary={alignmentSummary}
                 onWorkspaceChange={handleWorkspaceChange}
                 onSummaryChange={setAlignmentSummary}
+              />
+            ) : currentStageId === "variant-calling" ? (
+              <VariantCallingStagePanel
+                workspace={workspace}
+                initialSummary={variantCallingSummary}
               />
             ) : (
               <FutureStagePanel
