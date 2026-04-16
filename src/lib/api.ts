@@ -218,11 +218,64 @@ type SystemResourcesDto = {
   app_data_root: string;
 };
 
+type ChromosomeMetricsDto = {
+  chromosome: string;
+  length: number;
+  total: number;
+  pass_count: number;
+  snv_count: number;
+  indel_count: number;
+};
+
+type FilterBreakdownDto = {
+  name: string;
+  count: number;
+  is_pass: boolean;
+};
+
+type VafHistogramBinDto = {
+  bin_start: number;
+  bin_end: number;
+  count: number;
+};
+
+type TopVariantEntryDto = {
+  chromosome: string;
+  position: number;
+  ref: string;
+  alt: string;
+  variant_type: "snv" | "insertion" | "deletion" | "mnv";
+  filter: string;
+  is_pass: boolean;
+  tumor_vaf?: number | null;
+  tumor_depth?: number | null;
+  normal_depth?: number | null;
+};
+
 type VariantCallingMetricsDto = {
   total_variants: number;
   snv_count: number;
   indel_count: number;
+  insertion_count: number;
+  deletion_count: number;
+  mnv_count: number;
   pass_count: number;
+  pass_snv_count: number;
+  pass_indel_count: number;
+  ti_tv_ratio?: number | null;
+  transitions: number;
+  transversions: number;
+  mean_vaf?: number | null;
+  median_vaf?: number | null;
+  tumor_mean_depth?: number | null;
+  normal_mean_depth?: number | null;
+  tumor_sample?: string | null;
+  normal_sample?: string | null;
+  reference_label?: string | null;
+  per_chromosome: ChromosomeMetricsDto[];
+  filter_breakdown: FilterBreakdownDto[];
+  vaf_histogram: VafHistogramBinDto[];
+  top_variants: TopVariantEntryDto[];
 };
 
 type VariantCallingArtifactDto = {
@@ -520,7 +573,52 @@ function mapVariantCallingRun(dto: VariantCallingRunDto): VariantCallingRun {
           totalVariants: dto.metrics.total_variants,
           snvCount: dto.metrics.snv_count,
           indelCount: dto.metrics.indel_count,
+          insertionCount: dto.metrics.insertion_count,
+          deletionCount: dto.metrics.deletion_count,
+          mnvCount: dto.metrics.mnv_count,
           passCount: dto.metrics.pass_count,
+          passSnvCount: dto.metrics.pass_snv_count,
+          passIndelCount: dto.metrics.pass_indel_count,
+          tiTvRatio: dto.metrics.ti_tv_ratio ?? null,
+          transitions: dto.metrics.transitions,
+          transversions: dto.metrics.transversions,
+          meanVaf: dto.metrics.mean_vaf ?? null,
+          medianVaf: dto.metrics.median_vaf ?? null,
+          tumorMeanDepth: dto.metrics.tumor_mean_depth ?? null,
+          normalMeanDepth: dto.metrics.normal_mean_depth ?? null,
+          tumorSample: dto.metrics.tumor_sample ?? null,
+          normalSample: dto.metrics.normal_sample ?? null,
+          referenceLabel: dto.metrics.reference_label ?? null,
+          perChromosome: dto.metrics.per_chromosome.map((entry) => ({
+            chromosome: entry.chromosome,
+            length: entry.length,
+            total: entry.total,
+            passCount: entry.pass_count,
+            snvCount: entry.snv_count,
+            indelCount: entry.indel_count,
+          })),
+          filterBreakdown: dto.metrics.filter_breakdown.map((entry) => ({
+            name: entry.name,
+            count: entry.count,
+            isPass: entry.is_pass,
+          })),
+          vafHistogram: dto.metrics.vaf_histogram.map((bin) => ({
+            binStart: bin.bin_start,
+            binEnd: bin.bin_end,
+            count: bin.count,
+          })),
+          topVariants: dto.metrics.top_variants.map((variant) => ({
+            chromosome: variant.chromosome,
+            position: variant.position,
+            ref: variant.ref,
+            alt: variant.alt,
+            variantType: variant.variant_type,
+            filter: variant.filter,
+            isPass: variant.is_pass,
+            tumorVaf: variant.tumor_vaf ?? null,
+            tumorDepth: variant.tumor_depth ?? null,
+            normalDepth: variant.normal_depth ?? null,
+          })),
         }
       : null,
     artifacts: dto.artifacts.map(mapVariantCallingArtifact),
@@ -802,6 +900,7 @@ export const api = {
         body: JSON.stringify({
           display_name: input.displayName,
           species: input.species,
+          assay_type: input.assayType ?? null,
         }),
       })
     ),
@@ -902,6 +1001,27 @@ export const api = {
     mapVariantCallingStageSummary(
       await request<VariantCallingStageSummaryDto>(
         `/api/workspaces/${workspaceId}/variant-calling`
+      )
+    ),
+  runVariantCalling: async (workspaceId: string) =>
+    mapVariantCallingStageSummary(
+      await request<VariantCallingStageSummaryDto>(
+        `/api/workspaces/${workspaceId}/variant-calling/run`,
+        { method: "POST" }
+      )
+    ),
+  rerunVariantCalling: async (workspaceId: string) =>
+    mapVariantCallingStageSummary(
+      await request<VariantCallingStageSummaryDto>(
+        `/api/workspaces/${workspaceId}/variant-calling/rerun`,
+        { method: "POST" }
+      )
+    ),
+  cancelVariantCalling: async (workspaceId: string, runId: string) =>
+    mapVariantCallingStageSummary(
+      await request<VariantCallingStageSummaryDto>(
+        `/api/workspaces/${workspaceId}/variant-calling/runs/${runId}/cancel`,
+        { method: "POST" }
       )
     ),
   getSystemMemory: async (): Promise<SystemMemoryResponse> => {

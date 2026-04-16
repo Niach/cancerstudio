@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
-  Check,
   LoaderCircle,
   Pause,
   Play,
@@ -20,7 +19,6 @@ import type {
   AlignmentLaneMetrics,
   AlignmentRun,
   AlignmentStageSummary,
-  AssayType,
   Workspace,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -32,19 +30,6 @@ interface AlignmentStagePanelProps {
   onWorkspaceChange: (workspace: Workspace) => void;
   onSummaryChange: (summary: AlignmentStageSummary) => void;
 }
-
-const ASSAY_OPTIONS: Array<{ value: AssayType; label: string; hint: string }> = [
-  {
-    value: "wgs",
-    label: "Whole-genome (WGS)",
-    hint: "Reads across the whole DNA sequence. Slower, but most thorough.",
-  },
-  {
-    value: "wes",
-    label: "Whole-exome (WES)",
-    hint: "Reads the protein-coding genes only. Faster and lighter to run.",
-  },
-];
 
 const METRIC_DEFINITIONS = [
   {
@@ -122,7 +107,7 @@ function bannerMessage(state: BannerState, hasRun: boolean, blockingReason?: str
     default:
       return hasRun
         ? "You can run alignment again at any time."
-        : "Choose WGS or WES, then start alignment.";
+        : "Ready to start alignment.";
   }
 }
 
@@ -293,7 +278,7 @@ function PhaseSubBars({ run }: { run: AlignmentRun }) {
     {
       label: "Finalizing",
       value: finalizing,
-      detail: "merge · sort · markdup · stats",
+      detail: "preparing your aligned files",
       active: run.runtimePhase === "finalizing",
     },
   ];
@@ -341,8 +326,6 @@ function NextStepCallout({
 
   if (!workspace.ingestion.readyForAlignment) {
     body = "Add both the tumor and healthy sample files before alignment can start.";
-  } else if (!workspace.analysisProfile.assayType) {
-    body = "Choose whether the sequencing method was WGS or WES before you start.";
   } else if (summary.status === "running") {
     tone = "border-amber-200 bg-amber-50 text-amber-800";
     body = "The next step stays blocked until this run finishes and the QC result is a pass.";
@@ -354,9 +337,8 @@ function NextStepCallout({
     body = "This run needs another try before the workflow can move forward.";
   } else if (summary.readyForVariantCalling) {
     tone = "border-emerald-200 bg-emerald-50 text-emerald-800";
-    title = "Next step preview unlocked";
-    body =
-      "Alignment passed QC. Variant calling is shown next as a read-only preview until that stage ships.";
+    title = "Ready for the next step";
+    body = "Alignment passed QC. You can move on and search for mutations now.";
   } else if (summary.qcVerdict === "warn" || summary.blockingReason) {
     tone = "border-amber-200 bg-amber-50 text-amber-800";
     title = "Review needed";
@@ -376,10 +358,8 @@ function NextStepCallout({
 export default function AlignmentStagePanel({
   workspace,
   summary,
-  onWorkspaceChange,
   onSummaryChange,
 }: AlignmentStagePanelProps) {
-  const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [isPausing, setIsPausing] = useState(false);
@@ -436,7 +416,6 @@ export default function AlignmentStagePanel({
 
   const bannerState = bannerStateOf(summary);
   const pill = PILL_TONES[bannerState];
-  const assayType = workspace.analysisProfile.assayType ?? null;
   const latestRun = summary.latestRun;
   const isRunning = summary.status === "running";
   const isPaused = summary.status === "paused";
@@ -444,32 +423,6 @@ export default function AlignmentStagePanel({
     summary.status === "ready" ||
     summary.status === "completed" ||
     summary.status === "failed";
-
-  async function handleAssaySelect(nextAssayType: AssayType) {
-    if (assayType === nextAssayType || isSavingProfile) {
-      return;
-    }
-
-    setError(null);
-    setIsSavingProfile(true);
-    try {
-      const updatedWorkspace = await api.updateWorkspaceAnalysisProfile(workspace.id, {
-        assayType: nextAssayType,
-        referencePreset: workspace.analysisProfile.referencePreset,
-        referenceOverride: workspace.analysisProfile.referenceOverride,
-      });
-      onWorkspaceChange(updatedWorkspace);
-      onSummaryChange(await api.getAlignmentStageSummary(workspace.id));
-    } catch (updateError) {
-      setError(
-        updateError instanceof Error
-          ? updateError.message
-          : "Unable to update the sequencing method."
-      );
-    } finally {
-      setIsSavingProfile(false);
-    }
-  }
 
   async function handleRun() {
     if (!canRun || isSubmitting) {
@@ -629,57 +582,6 @@ export default function AlignmentStagePanel({
           <NextStepCallout workspace={workspace} summary={summary} />
 
           <div className="border-t border-stone-100 pt-4">
-            <h4 className="text-[13px] font-medium text-stone-900">
-              Sequencing method
-            </h4>
-            <p className="mt-0.5 text-[12px] text-stone-500">
-              Check the lab report. It usually says WGS or WES.
-            </p>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              {ASSAY_OPTIONS.map((option) => {
-                const selected = assayType === option.value;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    data-testid={`alignment-assay-${option.value}`}
-                    onClick={() => void handleAssaySelect(option.value)}
-                    disabled={isSavingProfile || isRunning}
-                    className={cn(
-                      "rounded-xl border px-4 py-3 text-left transition disabled:opacity-50",
-                      selected
-                        ? "border-emerald-300 bg-emerald-50/60"
-                        : "border-stone-200 bg-white hover:border-stone-300"
-                    )}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={cn(
-                          "flex size-4 shrink-0 items-center justify-center rounded-full border transition-colors",
-                          selected
-                            ? "border-emerald-500 bg-emerald-500"
-                            : "border-stone-300 bg-white"
-                        )}
-                        aria-hidden="true"
-                      >
-                        {selected ? (
-                          <Check className="size-2.5 text-white" strokeWidth={4} />
-                        ) : null}
-                      </span>
-                      <span className="text-[13px] font-medium text-stone-900">
-                        {option.label}
-                      </span>
-                    </div>
-                    <p className="mt-1.5 pl-6 text-[12px] leading-5 text-stone-500">
-                      {option.hint}
-                    </p>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="border-t border-stone-100 pt-4">
             {isRunning && latestRun ? (
               <div className="space-y-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -811,7 +713,7 @@ export default function AlignmentStagePanel({
                   type="button"
                   size="sm"
                   className="rounded-full bg-stone-900 px-4 text-white hover:bg-stone-800"
-                  disabled={!canRun || isSubmitting || isSavingProfile}
+                  disabled={!canRun || isSubmitting}
                   onClick={() => void handleRun()}
                   data-testid="alignment-run-button"
                 >

@@ -181,6 +181,7 @@ class IngestionSummaryResponse(BaseModel):
 class WorkspaceCreateRequest(BaseModel):
     display_name: str
     species: WorkspaceSpecies = WorkspaceSpecies.HUMAN
+    assay_type: Optional[AnalysisAssayType] = None
 
 
 class WorkspaceResponse(BaseModel):
@@ -345,11 +346,71 @@ class VariantCallingArtifactKind(str, Enum):
     STATS = "stats"
 
 
+class VariantTypeKind(str, Enum):
+    SNV = "snv"
+    INSERTION = "insertion"
+    DELETION = "deletion"
+    MNV = "mnv"
+
+
+class ChromosomeMetricsEntry(BaseModel):
+    chromosome: str
+    length: int = 0
+    total: int = 0
+    pass_count: int = 0
+    snv_count: int = 0
+    indel_count: int = 0
+
+
+class FilterBreakdownEntry(BaseModel):
+    name: str
+    count: int
+    is_pass: bool = False
+
+
+class VafHistogramBin(BaseModel):
+    bin_start: float
+    bin_end: float
+    count: int
+
+
+class TopVariantEntry(BaseModel):
+    chromosome: str
+    position: int
+    ref: str
+    alt: str
+    variant_type: VariantTypeKind
+    filter: str
+    is_pass: bool
+    tumor_vaf: Optional[float] = None
+    tumor_depth: Optional[int] = None
+    normal_depth: Optional[int] = None
+
+
 class VariantCallingMetricsResponse(BaseModel):
     total_variants: int = 0
     snv_count: int = 0
     indel_count: int = 0
+    insertion_count: int = 0
+    deletion_count: int = 0
+    mnv_count: int = 0
     pass_count: int = 0
+    pass_snv_count: int = 0
+    pass_indel_count: int = 0
+    ti_tv_ratio: Optional[float] = None
+    transitions: int = 0
+    transversions: int = 0
+    mean_vaf: Optional[float] = None
+    median_vaf: Optional[float] = None
+    tumor_mean_depth: Optional[float] = None
+    normal_mean_depth: Optional[float] = None
+    tumor_sample: Optional[str] = None
+    normal_sample: Optional[str] = None
+    reference_label: Optional[str] = None
+    per_chromosome: List[ChromosomeMetricsEntry] = Field(default_factory=list)
+    filter_breakdown: List[FilterBreakdownEntry] = Field(default_factory=list)
+    vaf_histogram: List[VafHistogramBin] = Field(default_factory=list)
+    top_variants: List[TopVariantEntry] = Field(default_factory=list)
 
 
 class VariantCallingArtifactResponse(BaseModel):

@@ -1,24 +1,24 @@
 # cancerstudio
 
-cancerstudio is a desktop-first studio for the first guided steps of a personalized cancer vaccine workflow. Today it helps a non-technical operator bring in local tumor and matched-normal sequencing files, prepare alignment-ready inputs on disk, run alignment against a species reference, and review a read-only preview of what comes next. Downstream vaccine-design stages stay visible as roadmap items, not runnable promises.
+cancerstudio is a desktop-first studio for the first guided steps of a personalized cancer vaccine workflow. Today it helps a non-technical operator bring in local tumor and matched-normal sequencing files, prepare alignment-ready inputs on disk, run alignment against a species reference, and search for the cancer-specific mutations with an interactive karyogram and filter view. Downstream vaccine-design stages stay visible as roadmap items, not runnable promises.
 
 Project site: <https://niach.github.io/cancerstudio/>
 
 ## Screenshots
 
-| Pick a species | Stage the samples | Run alignment | Call variants |
+| Pick a species | Stage the samples | Run alignment | Find the mutations |
 | --- | --- | --- | --- |
 | ![landing](docs/screenshots/landing.png) | ![ingestion](docs/screenshots/ingestion.png) | ![alignment](docs/screenshots/alignment.png) | ![variant calling](docs/screenshots/variant-calling.png) |
 
 ## Pipeline
 
-`Ingestion → Alignment → Variant Calling preview → Annotation → Neoantigen Prediction → Epitope Selection → mRNA Construct Design → Construct Output`
+`Ingestion → Alignment → Variant Calling → Annotation → Neoantigen Prediction → Epitope Selection → mRNA Construct Design → Construct Output`
 
 | # | Stage | State | Tools |
 | --- | --- | --- | --- |
 | 1 | Ingestion | **Live** | samtools, pigz, fastp |
 | 2 | Alignment | **Live** | strobealign, samtools |
-| 3 | Variant Calling | **Scaffolded** — visible read-only preview; run/rerun stay blocked until Mutect2 orchestration exists | GATK Mutect2 |
+| 3 | Variant Calling | **Live** — GATK Mutect2 + FilterMutectCalls, rendered as karyogram, plain-language filter buckets, VAF histogram, and a top-variants table | GATK Mutect2 |
 | 4 | Annotation | Planned | Ensembl VEP |
 | 5 | Neoantigen Prediction | Planned | pVACseq, NetMHCpan |
 | 6 | Epitope Selection | Planned | pVACview |
@@ -37,18 +37,29 @@ The panel surfaces honest progress for multi-hour runs: blended progress bar (5 
 
 Verified end-to-end on COLO829 100× WGS (~2B tumor + 754M normal read pairs) on a 32-core workstation with 62 GB RAM: alignment finished in ~6h 26m, QC verdict pass, 98.91% tumor mapped / 98.86% normal mapped, 10 artifacts persisted.
 
+### Stage 3: pet-owner-first variant calling
+
+Stage 3 runs GATK Mutect2 + FilterMutectCalls on the aligned tumor/normal BAMs and parses the filtered VCF into four visual payoffs that a non-technical owner can actually read:
+
+- **Karyogram** of every somatic call across the species' chromosomes, sized by VAF, colored by PASS vs. filtered status.
+- **Metrics ribbon** — PASS calls, SNV:indel ratio, Ti/Tv, median VAF, and tumor/normal depth.
+- **Plain-language filter breakdown** — raw Mutect2 flags (`panel_of_normals`, `strand_bias`, `weak_evidence`, …) are bucketed into four owner-friendly categories (Kept / Probably inherited / Low evidence / Sequencing artifact) with a one-click "Show technical breakdown" toggle for experts.
+- **Top variants table** with locus, ref→alt, VAF bars, and T/N depth.
+
+Tool names live in the Technical details drawer. The primary CTA is *Find mutations*, not *Run Mutect2*; the ready callout says "This runs on your computer using the reference genome for your pet's species" instead of "a filtered somatic VCF with its Tabix index and Mutect2 stats file".
+
 ## How it works
 
 - Desktop-first runtime: Electron shell + local Next.js renderer + local FastAPI pipeline engine. No cloud, no Docker, no object storage.
 - Reference-in-place intake: your source FASTQ/BAM/CRAM files stay where they live. Only derived artifacts (canonical FASTQ, BAM/BAI, QC, reference bundles, SQLite) land in the app-data directory.
 - Species presets: human `GRCh38`, dog `CanFam4`, cat `felCat9`. Missing references are downloaded and indexed on first alignment.
-- Paired-lane model: tumor and normal are separate lanes. Alignment unlocks only when both lanes are ready; a QC pass reveals the variant-calling preview, while `warn` or `fail` keeps the workflow blocked in plain language.
+- Paired-lane model: tumor and normal are separate lanes. Alignment unlocks only when both lanes are ready; a QC pass unlocks variant calling, while `warn` or `fail` keeps the workflow blocked in plain language.
 
 ## Stack
 
 - Frontend: Next.js 15.5, React 19, TypeScript, Tailwind CSS
 - Desktop shell: Electron
-- Backend: FastAPI, SQLAlchemy, samtools, pigz, strobealign, GATK Mutect2 scaffolding
+- Backend: FastAPI, SQLAlchemy, samtools, pigz, strobealign, GATK Mutect2
 - Storage: local filesystem + SQLite
 
 ## Local development
@@ -104,7 +115,7 @@ cancerstudio shells out to bioinformatics binaries from the FastAPI backend. The
 | `samtools` ≥ 1.16 | BAM/CRAM normalization, sort, index, flagstat, idxstats, stats, markdup, merge | Ingestion + Alignment |
 | `strobealign` ≥ 0.17 | Reference indexing and paired-end alignment | Alignment |
 | `pigz` ≥ 2.6 | Multithreaded FASTQ compression, parallel chunk splitting | Ingestion + Alignment |
-| `gatk` ≥ 4.5 (+ JDK 17) | Optional future Mutect2 caller, CreateSequenceDictionary | Variant Calling (scaffolded preview) |
+| `gatk` ≥ 4.5 (+ JDK 17) | Mutect2 + FilterMutectCalls + CreateSequenceDictionary | Variant Calling |
 
 If any required tool is missing the backend rejects the relevant API call up-front with a structured `503 missing_tools` response, and the UI surfaces a friendly callout listing what to install — no more raw `[Errno 2]` stack traces.
 

@@ -27,6 +27,7 @@ import { PIPELINE_STAGES } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import {
   formatReferencePreset,
+  formatReferencePresetCodename,
   formatSpeciesLabel,
 } from "@/lib/workspace-utils";
 
@@ -51,7 +52,7 @@ function NavigationStageItem({
   disabledLabel?: string;
 }) {
   const { stage, enterable, actionable } = policy;
-  const secondaryLabel = disabledLabel ?? (enterable ? "Read only" : "Upcoming");
+  const secondaryLabel = disabledLabel ?? (enterable ? "Locked" : "Upcoming");
   const content = (
     <>
       <span
@@ -204,7 +205,10 @@ export default function WorkspaceStageShell({
                 </Badge>
                 <Badge
                   variant="outline"
-                  className="border-black/10 bg-white/80 font-mono text-[10px] tracking-[0.2em] uppercase text-slate-600"
+                  className="border-black/10 bg-white/80 text-[11px] text-slate-600"
+                  title={formatReferencePresetCodename(
+                    workspace.analysisProfile.referencePreset
+                  )}
                 >
                   {formatReferencePreset(workspace.analysisProfile.referencePreset)}
                 </Badge>
@@ -324,6 +328,7 @@ export default function WorkspaceStageShell({
               />
             ) : currentStageId === "variant-calling" ? (
               <VariantCallingStagePanel
+                key={workspace.id}
                 workspace={workspace}
                 initialSummary={variantCallingSummary}
               />

@@ -152,6 +152,21 @@ export function formatAssayType(assayType?: "wgs" | "wes" | null) {
 
 export function formatReferencePreset(referencePreset?: ReferencePreset | null) {
   if (referencePreset === "canfam4") {
+    return "Dog reference";
+  }
+  if (referencePreset === "felcat9") {
+    return "Cat reference";
+  }
+  if (referencePreset === "grch38") {
+    return "Human reference";
+  }
+  return "Custom reference";
+}
+
+export function formatReferencePresetCodename(
+  referencePreset?: ReferencePreset | null
+) {
+  if (referencePreset === "canfam4") {
     return "CanFam4";
   }
   if (referencePreset === "felcat9") {

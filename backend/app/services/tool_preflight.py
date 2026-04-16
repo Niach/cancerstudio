@@ -89,6 +89,24 @@ ALIGNMENT_TOOLS: tuple[ToolRequirement, ...] = (
 )
 
 
+GATK_REQUIREMENT = ToolRequirement(
+    name="gatk",
+    env_var="GATK_BINARY",
+    default_binary="gatk",
+    install_hint=(
+        "Install GATK 4: bash scripts/install-bioinformatics-deps.sh  "
+        "(requires OpenJDK 17+). Manual: download gatk-4.x.zip from "
+        "https://github.com/broadinstitute/gatk/releases and put the `gatk` wrapper on PATH."
+    ),
+)
+
+
+VARIANT_CALLING_TOOLS: tuple[ToolRequirement, ...] = (
+    SAMTOOLS_REQUIREMENT,
+    GATK_REQUIREMENT,
+)
+
+
 def ingestion_tools_for_paths(paths: Iterable[str]) -> tuple[ToolRequirement, ...]:
     """Return only the tools the actual ingestion path will exercise.
 

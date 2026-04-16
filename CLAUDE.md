@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A desktop-first pipeline for designing personalized mRNA cancer vaccines. You provide two DNA samples (tumor + normal) by pointing the app at local sequencing files, and the product guides you through intake and alignment today, with variant calling visible as the next scaffolded step and the downstream neoantigen and construct work kept as roadmap stages.
+A desktop-first pipeline for designing personalized mRNA cancer vaccines. You provide two DNA samples (tumor + normal) by pointing the app at local sequencing files, and the product guides you through intake, alignment, and somatic variant calling today, with the downstream annotation, neoantigen, and construct work kept as roadmap stages.
 
 Supports multiple species: human, dog, and cat. The canine case came first, but the architecture is species-flexible.
 
@@ -18,7 +18,7 @@ Inspired by Paul Conyngham's work creating a personalized mRNA vaccine for his d
 |---|-------|--------|-------|-------------|
 | 1 | Ingestion | **Live** | samtools, fastp | Choose local FASTQ/BAM/CRAM files, normalize to canonical paired FASTQ |
 | 2 | Alignment | **Live** | strobealign, samtools | Chunked pipeline with stop-and-resume; aligns canonical tumor/normal FASTQ pairs, persists BAMs, and scores QC |
-| 3 | Variant Calling | Scaffolded | GATK Mutect2 | Visible read-only preview after QC-pass alignment; run/rerun stay blocked until orchestration ships |
+| 3 | Variant Calling | **Live** | GATK Mutect2 | Runs Mutect2 + FilterMutectCalls on the aligned tumor/normal BAMs; parses the filtered VCF into per-chromosome counts, filter breakdown, VAF histogram, and top variants; renders a karyogram and metrics console |
 | 4 | Annotation | Planned | Ensembl VEP | Annotate variants with functional consequences |
 | 5 | Neoantigen Prediction | Planned | pVACseq, NetMHCpan-4.1 | Predict MHC binding for mutant peptides |
 | 6 | Epitope Selection | Planned | pVACview, custom scoring | Rank and select optimal vaccine targets |

@@ -29,7 +29,7 @@ function variantBlockedReason(
   if (variantCallingSummary.status === "blocked") {
     return variantCallingSummary.blockingReason ?? "Finish alignment first.";
   }
-  return variantCallingSummary.blockingReason ?? "Variant calling is visible here, but not yet available.";
+  return variantCallingSummary.blockingReason ?? null;
 }
 
 export function getPipelinePolicy(
@@ -90,25 +90,35 @@ export function getPipelinePolicy(
               : alignmentNeedsReview(alignmentSummary)
                 ? "Review the quality warnings or rerun alignment."
                 : alignmentSummary.readyForVariantCalling
-                  ? "Alignment is finished. Variant calling is the next planned step."
-                  : "Choose WGS or WES, then start alignment.",
+                  ? "Alignment is finished. You can now search for mutations."
+                  : "Start alignment when you are ready.",
       };
       continue;
     }
 
     if (stage.id === "variant-calling") {
+      const isBlocked = variantCallingSummary.status === "blocked";
+      const isRunning = variantCallingSummary.status === "running";
+      const isCompleted = variantCallingSummary.status === "completed";
+      const isFailed = variantCallingSummary.status === "failed";
+
       policies[stage.id] = {
         stage,
         visible: true,
         enterable: true,
-        actionable: false,
+        actionable: !isBlocked,
         blockedReason: variantBlockedReason(alignmentSummary, variantCallingSummary),
-        nextStep:
-          variantCallingSummary.status === "blocked"
-            ? latestActionableStage === "alignment"
-              ? "Finish alignment cleanly first."
-              : "Complete ingestion first."
-            : "This read-only preview shows what comes next once Mutect2 is implemented.",
+        nextStep: isBlocked
+          ? latestActionableStage === "alignment"
+            ? "Finish alignment cleanly first."
+            : "Complete ingestion first."
+          : isRunning
+            ? "Mutect2 is running on your local machine."
+            : isFailed
+              ? "Review the error, then rerun variant calling."
+              : isCompleted
+                ? "The mutations are in. Annotation is the next step on the roadmap."
+                : "Find the mutations that are only in the cancer.",
       };
       continue;
     }
@@ -174,9 +184,6 @@ export function describeWorkspaceProgress(
   if (!workspace.ingestion.readyForAlignment) {
     return "We’re still preparing the sequencing files for alignment.";
   }
-  if (alignmentSummary.status === "blocked" && !workspace.analysisProfile.assayType) {
-    return "Choose whether the sequencing was WGS or WES.";
-  }
   if (alignmentSummary.status === "running") {
     return "Alignment is running on your local machine.";
   }
@@ -190,7 +197,7 @@ export function describeWorkspaceProgress(
     return "Alignment finished, but the quality warnings need review.";
   }
   if (alignmentSummary.readyForVariantCalling) {
-    return "Alignment is complete. Variant calling is shown as the next planned step.";
+    return "Alignment is complete. You can now search for mutations.";
   }
   return "Alignment is the next step.";
 }

@@ -212,11 +212,6 @@ h1 {
   background: linear-gradient(135deg, rgba(223, 245, 232, 0.65), var(--surface-strong));
 }
 
-.stage-scaffolded {
-  border-color: rgba(79, 70, 229, 0.24);
-  background: linear-gradient(135deg, rgba(238, 235, 255, 0.6), var(--surface-strong));
-}
-
 .stage-num {
   display: inline-flex;
   align-items: center;
@@ -267,11 +262,6 @@ h1 {
 .chip-planned {
   background: var(--amber-soft);
   color: var(--amber);
-}
-
-.chip-scaffolded {
-  background: rgba(79, 70, 229, 0.12);
-  color: #4f46e5;
 }
 
 /* ─── Footer ─── */

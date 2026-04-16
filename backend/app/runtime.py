@@ -103,6 +103,12 @@ def get_alignment_run_root(workspace_id: str, run_id: str) -> Path:
     return root
 
 
+def get_variant_calling_run_root(workspace_id: str, run_id: str) -> Path:
+    root = get_workspace_root(workspace_id) / "variant-calling" / run_id
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
 def get_reference_bundle_root() -> Path:
     configured = os.getenv("REFERENCE_BUNDLE_ROOT")
     root = Path(configured).expanduser() if configured else get_app_data_root() / "references"

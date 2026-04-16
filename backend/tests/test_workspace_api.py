@@ -517,8 +517,7 @@ async def test_alignment_run_persists_local_artifacts_and_exposes_variant_previe
     assert variant_summary_response.status_code == 200, variant_summary_response.text
     variant_summary = variant_summary_response.json()
     assert variant_summary["status"] == "scaffolded"
-    assert variant_summary["blocking_reason"]
-    assert "not available yet" in variant_summary["blocking_reason"]
+    assert variant_summary["blocking_reason"] is None
     assert variant_summary["latest_run"] is None
 
     bam_artifact = next(
@@ -673,13 +672,15 @@ async def test_variant_calling_summary_is_blocked_before_alignment_completes(
 
 
 @pytest.mark.anyio
-async def test_variant_calling_run_surfaces_not_implemented_after_alignment(
+async def test_variant_calling_run_creates_pending_record_after_alignment(
     client: httpx.AsyncClient,
     queued_batches: list[tuple[str, str]],
     queued_alignment_runs: list[tuple[str, str]],
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ):
+    from app.services import variant_calling as variant_calling_service
+
     workspace = await prepare_alignment_ready_workspace(client, queued_batches, tmp_path)
     install_fake_alignment(monkeypatch, tmp_path)
 
@@ -698,28 +699,38 @@ async def test_variant_calling_run_surfaces_not_implemented_after_alignment(
     assert preview_payload["status"] == "scaffolded"
     assert preview_payload["latest_run"] is None
 
+    # The variant-calling stage is now live. Queue runs without actually
+    # invoking GATK so the test exercises the API + DB wiring.
+    queued_variant_runs: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        variant_calling_service,
+        "enqueue_variant_calling_run",
+        lambda workspace_id, run_id: queued_variant_runs.append((workspace_id, run_id)),
+    )
+
     run_response = await client.post(
         f"/api/workspaces/{workspace['id']}/variant-calling/run"
     )
-    assert run_response.status_code == 409, run_response.text
-    run_payload = run_response.json()["detail"]
-    assert run_payload["code"] == "stage_not_actionable"
-    assert run_payload["stage"] == "variant-calling"
-    assert "not available yet" in run_payload["message"]
+    assert run_response.status_code == 200, run_response.text
+    payload = run_response.json()
+    assert payload["status"] == "running"
+    assert payload["latest_run"]["status"] == "pending"
+    assert queued_variant_runs and queued_variant_runs[0][0] == workspace["id"]
 
     rerun_response = await client.post(
         f"/api/workspaces/{workspace['id']}/variant-calling/rerun"
     )
-    assert rerun_response.status_code == 409, rerun_response.text
-    rerun_payload = rerun_response.json()["detail"]
-    assert rerun_payload["code"] == "stage_not_actionable"
+    # A run is already pending/running, so a rerun attempt should be rejected
+    # until the first terminates — mirroring the alignment pattern.
+    assert rerun_response.status_code == 400, rerun_response.text
 
     with session_scope() as session:
-        variant_runs = session.scalars(
-            select(PipelineRunRecord).where(
+        variant_run_statuses = session.scalars(
+            select(PipelineRunRecord.status).where(
                 PipelineRunRecord.workspace_id == workspace["id"],
                 PipelineRunRecord.stage_id == "variant-calling",
             )
         ).all()
 
-    assert variant_runs == []
+    assert len(variant_run_statuses) == 1
+    assert variant_run_statuses[0] == "pending"

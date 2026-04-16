@@ -6,7 +6,7 @@
     <title>cancerstudio</title>
     <meta
       name="description"
-      content="A desktop studio for the guided first steps of a personalized cancer vaccine workflow: local intake, alignment, and a preview of what comes next."
+      content="A desktop studio for the guided first steps of a personalized cancer vaccine workflow: local intake, alignment, and finding the cancer-specific mutations with an interactive karyogram."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -24,8 +24,9 @@
         <p class="lede">
           A desktop studio for the first guided steps of a personalized mRNA
           cancer vaccine workflow. Give it tumor DNA and matched-normal DNA.
-          Today it helps you prepare the files, run local alignment, and see
-          the next stage honestly as a preview. For humans, dogs, and cats,
+          Today it helps you prepare the files, run local alignment, and find
+          the cancer-specific mutations — rendered as a karyogram, plain-language
+          filter buckets, and a top-variants table. For humans, dogs, and cats,
           all on your local machine.
         </p>
         <div class="hero-actions">
@@ -85,11 +86,12 @@
             <p class="eyebrow">Align</p>
             <h2>Plain-language alignment first. Advanced controls when needed.</h2>
             <p class="section-sub">
-              Pick whole-genome or whole-exome and hit start. The main card
-              tells you what is happening in plain language, how long it may
-              take, and what the next step depends on. All of the chunk grids,
-              command tails, and compute settings live under one advanced
-              section instead of crowding the default workflow.
+              One button: <em>Start alignment</em>. The main card tells you what
+              is happening in plain language, how long it may take, and what the
+              next step depends on. The sequencing method (whole genome or
+              exome) is set once when you create the workspace, not on every
+              run. Chunk grids, command tails, and compute settings live under
+              one advanced section instead of crowding the default workflow.
             </p>
             <p class="section-sub">
               Multi-hour runs need multi-hour UX: blended progress bar with
@@ -102,7 +104,7 @@
           <figure class="shot">
             <img
               src="./screenshots/alignment.png"
-              alt="alignment stage showing completed COLO829 run with QC metrics and compute settings"
+              alt="alignment stage showing a completed run with QC pass, a next-step callout, and the advanced details drawer"
               loading="lazy"
             />
           </figure>
@@ -110,20 +112,29 @@
 
         <section class="section">
           <div class="section-heading">
-            <p class="eyebrow">Call variants</p>
-            <h2>Visible next, but not runnable yet.</h2>
+            <p class="eyebrow">Find mutations</p>
+            <h2>One click. Then the karyogram does the talking.</h2>
             <p class="section-sub">
-              Variant calling appears as a read-only preview after alignment
-              passes QC. If alignment finishes with warnings, the page stays
-              visible but blocked with a plain-language explanation. The UI and
-              API shape are scaffolded now; Mutect2 orchestration is the next
-              implementation step.
+              After alignment passes QC, hit <em>Find mutations</em>. cancerstudio
+              compares the cancer sample to the healthy sample, sets aside
+              sequencing glitches and inherited variants, and shows you what's
+              left: every cancer-specific mutation across the genome as a glowing
+              karyogram.
+            </p>
+            <p class="section-sub">
+              Raw Mutect2 filter flags like
+              <code>panel_of_normals</code>, <code>strand_bias</code>,
+              <code>weak_evidence</code> are grouped into four plain-language
+              buckets — Kept, Probably inherited, Low evidence, Sequencing
+              artifact — with a one-click technical breakdown for experts. The
+              metrics ribbon, VAF spectrum, and top-variants table give you the
+              full story without asking you to learn a VCF format along the way.
             </p>
           </div>
           <figure class="shot">
             <img
               src="./screenshots/variant-calling.png"
-              alt="variant calling stage shown as the next read-only preview step"
+              alt="variant calling stage with karyogram, plain-language filter buckets, metrics ribbon, VAF histogram, and top variants table"
               loading="lazy"
             />
           </figure>
@@ -134,9 +145,9 @@
             <p class="eyebrow">The pipeline</p>
             <h2>Three guided core steps, then the roadmap.</h2>
             <p class="section-sub">
-              Ingestion and alignment are live today. Variant calling is a
-              visible read-only scaffold. The rest of the stages stay visible
-              as disabled roadmap items so the workflow stays honest.
+              Ingestion, alignment, and variant calling are live today. The rest
+              of the stages stay visible as disabled roadmap items so the
+              workflow stays honest.
             </p>
           </div>
 
@@ -157,13 +168,13 @@
               </div>
               <span class="chip chip-live">Live</span>
             </li>
-            <li class="stage stage-scaffolded">
+            <li class="stage stage-live">
               <span class="stage-num">3</span>
               <div class="stage-body">
                 <strong>Variant calling</strong>
-                <p>Somatic mutations from tumor vs normal BAMs with GATK Mutect2. Visible preview only; orchestration is still in progress.</p>
+                <p>GATK Mutect2 + FilterMutectCalls, rendered as a karyogram, plain-language filter buckets, VAF spectrum, and top-variants table.</p>
               </div>
-              <span class="chip chip-scaffolded">Scaffolded</span>
+              <span class="chip chip-live">Live</span>
             </li>
             <li class="stage">
               <span class="stage-num">4</span>

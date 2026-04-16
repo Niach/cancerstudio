@@ -40,12 +40,11 @@ test("variant calling stays visible but read only while blocked", async ({
     "blocked"
   );
   await expect(
-    page.getByText("you can review what is coming without starting a run by accident", {
-      exact: false,
-    })
+    page.getByText("Finish alignment", { exact: false })
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: /start variant calling/i })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /run again/i })).toHaveCount(0);
+  // While blocked, no run controls are shown.
+  await expect(page.getByTestId("variant-calling-run-button")).toHaveCount(0);
+  await expect(page.getByTestId("variant-calling-rerun-button")).toHaveCount(0);
 });
 
 test("header plus returns to the home workspace foyer", async ({ page, request }) => {

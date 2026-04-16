@@ -125,6 +125,7 @@ export interface IngestionSummary {
 export interface CreateWorkspaceInput {
   displayName: string;
   species: WorkspaceSpecies;
+  assayType?: AssayType | null;
 }
 
 export interface AnalysisProfile {
@@ -296,11 +297,66 @@ export type VariantCallingRuntimePhase =
   | "finalizing";
 export type VariantCallingArtifactKind = "vcf" | "tbi" | "stats";
 
+export type VariantTypeKind = "snv" | "insertion" | "deletion" | "mnv";
+
+export interface ChromosomeMetricsEntry {
+  chromosome: string;
+  length: number;
+  total: number;
+  passCount: number;
+  snvCount: number;
+  indelCount: number;
+}
+
+export interface FilterBreakdownEntry {
+  name: string;
+  count: number;
+  isPass: boolean;
+}
+
+export interface VafHistogramBin {
+  binStart: number;
+  binEnd: number;
+  count: number;
+}
+
+export interface TopVariantEntry {
+  chromosome: string;
+  position: number;
+  ref: string;
+  alt: string;
+  variantType: VariantTypeKind;
+  filter: string;
+  isPass: boolean;
+  tumorVaf?: number | null;
+  tumorDepth?: number | null;
+  normalDepth?: number | null;
+}
+
 export interface VariantCallingMetrics {
   totalVariants: number;
   snvCount: number;
   indelCount: number;
+  insertionCount: number;
+  deletionCount: number;
+  mnvCount: number;
   passCount: number;
+  passSnvCount: number;
+  passIndelCount: number;
+  tiTvRatio?: number | null;
+  transitions: number;
+  transversions: number;
+  meanVaf?: number | null;
+  medianVaf?: number | null;
+  tumorMeanDepth?: number | null;
+  normalMeanDepth?: number | null;
+  tumorSample?: string | null;
+  normalSample?: string | null;
+  referenceLabel?: string | null;
+  perChromosome: ChromosomeMetricsEntry[];
+  filterBreakdown: FilterBreakdownEntry[];
+  vafHistogram: VafHistogramBin[];
+  topVariants: TopVariantEntry[];
 }
 
 export interface VariantCallingArtifact {
@@ -396,7 +452,7 @@ export const PIPELINE_STAGES: PipelineStage[] = [
     description: "Call somatic variants from the aligned tumor and normal BAMs",
     icon: "Search",
     tools: ["GATK Mutect2"],
-    implementationState: "scaffolded",
+    implementationState: "live",
     group: "primary",
   },
   {

@@ -967,7 +967,7 @@ def create_workspace(request: WorkspaceCreateRequest) -> WorkspaceResponse:
             id=str(uuid.uuid4()),
             display_name=display_name,
             species=request.species.value,
-            assay_type=None,
+            assay_type=request.assay_type.value if request.assay_type else None,
             reference_preset=default_reference_preset_for_species(request.species.value).value,
             reference_override=None,
             active_stage=PipelineStageId.INGESTION.value,
