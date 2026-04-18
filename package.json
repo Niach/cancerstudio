@@ -6,10 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "desktop:frontend": "next dev",
-    "desktop:backend": "docker compose up -d && docker compose logs -f backend",
-    "desktop:electron": "wait-on http-get://127.0.0.1:3000 && electron electron/main.cjs",
-    "desktop:dev": "concurrently -k -n frontend,electron \"npm run desktop:frontend\" \"npm run desktop:electron\"",
+    "backend": "docker compose up",
+    "backend:detached": "docker compose up -d && docker compose logs -f backend",
+    "backend:down": "docker compose down",
+    "dev:all": "concurrently -k -n next,backend \"npm run dev\" \"npm run backend\"",
     "lint": "eslint",
     "test:fast": "npm run lint && npx tsc --noEmit && npm run test:backend:fast",
     "test:backend:fast": "./.venv/bin/pytest -m \"not integration and not real_data\" backend/tests",
@@ -44,11 +44,9 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "concurrently": "^9.2.1",
-    "electron": "^37.3.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.2",
     "tailwindcss": "^4",
-    "typescript": "^5",
-    "wait-on": "^8.0.5"
+    "typescript": "^5"
   }
 }

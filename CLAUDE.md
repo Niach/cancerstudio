@@ -6,7 +6,7 @@ A desktop-first pipeline for designing personalized mRNA cancer vaccines. You pr
 
 Supports multiple species: human, dog, and cat. The canine case came first, but the architecture is species-flexible.
 
-Runtime today: an Electron shell over a local Next.js renderer and a local FastAPI engine, with workspace artifacts and SQLite stored under an app-data directory. No cloud services, no Docker, no object storage — everything stays on disk.
+Runtime today: Docker Compose orchestrates a containerized FastAPI backend; the Next.js frontend runs on the host (`npm run dev`) and is accessed at `http://localhost:3000`. Workspace artifacts and SQLite live under a host directory (default `~/cancerstudio-data`) bind-mounted into the backend container as `/app-data`. No cloud services, no object storage — everything stays on disk.
 
 ## Origin
 

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 const repoRoot = path.resolve(__dirname, "..", "..");
 const sampleDir =
@@ -30,26 +30,10 @@ function selectedFile(filename: string) {
   };
 }
 
-async function installDesktopMock(page: Page) {
-  // The OS file-picker is gone; ingestion now reads from the inbox folder
-  // exposed at /api/inbox. This stub keeps the desktop bridge populated so
-  // optional desktop-only UI (Reveal in file manager) doesn't error. The
-  // real test bodies that follow are skipped until rewritten against the
-  // inbox API.
-  await page.addInitScript(() => {
-    window.cancerstudioDesktop = {
-      openPath: async () => {},
-      getAppDataPath: async () => "/tmp/cancerstudio",
-      getDataRoot: async () => "/tmp/cancerstudio-data",
-    };
-  });
-}
-
 // TODO: rewrite against the inbox flow — drop fixtures into the inbox dir and
 // drive the InboxPicker UI instead of stubbing pickSequencingFiles.
 test.skip("desktop ingestion smoke reaches alignment-ready state", async ({ page }) => {
   const stamp = Date.now();
-  await installDesktopMock(page);
   // Reference the helpers so unused-import lint doesn't fire while the test
   // body is skipped pending a rewrite against the inbox API.
   void selectedFile;

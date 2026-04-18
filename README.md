@@ -67,18 +67,17 @@ Verified end-to-end on a canine DLBCL workspace (PRJNA805123, SRR15540953 tumor 
 
 ## How it works
 
-- Desktop-first runtime: Electron shell + local Next.js renderer + a single all-in-one Docker container that bundles the FastAPI engine and every bioinformatics tool (samtools, pigz, strobealign, GATK, NVIDIA Parabricks, Ensembl VEP + plugins). No cloud, no object storage.
-- Inbox intake: drop FASTQ/BAM/CRAM files into `<data-root>/inbox/` (the path you pick on first launch) and the app lists them for registration into a workspace — no OS file-picker, no host-path plumbing.
+- Local-only runtime: a single all-in-one Docker container bundles the FastAPI engine and every bioinformatics tool (samtools, pigz, strobealign, GATK, NVIDIA Parabricks, Ensembl VEP + plugins); the Next.js frontend runs on the host and is accessed in a browser at `http://localhost:3000`. No cloud, no object storage.
+- Inbox intake: drop FASTQ/BAM/CRAM files into `<data-root>/inbox/` (defaults to `~/cancerstudio-data/inbox/`, override with `CANCERSTUDIO_DATA_ROOT` in `.env`). The app lists them for registration into a workspace — no OS file-picker, no host-path plumbing.
 - Species presets: human `GRCh38`, dog `CanFam4`, cat `felCat9`. Missing references are downloaded and indexed on first alignment.
 - Paired-lane model: tumor and normal are separate lanes. Alignment unlocks only when both lanes are ready; a QC pass unlocks variant calling, while `warn` or `fail` keeps the workflow blocked in plain language.
 - GPU-accelerated variant calling: when the container sees an NVIDIA GPU, stage 3 runs NVIDIA Parabricks `mutectcaller` (5–15× faster than CPU Mutect2 on a single RTX 4090). Without a GPU it falls back to CPU GATK Mutect2 in the same image.
 
 ## Stack
 
-- Frontend: Next.js 15.5, React 19, TypeScript, Tailwind CSS
-- Desktop shell: Electron
-- Backend: FastAPI + SQLAlchemy + samtools, pigz, strobealign, GATK Mutect2, NVIDIA Parabricks, Ensembl VEP 111 with Frameshift/Wildtype/Downstream plugins (all shipped in one container image)
-- Storage: local filesystem + SQLite under a user-chosen data root
+- Frontend: Next.js 15.5, React 19, TypeScript, Tailwind CSS (runs on the host)
+- Backend: FastAPI + SQLAlchemy + samtools, pigz, strobealign, GATK Mutect2, NVIDIA Parabricks, Ensembl VEP 111 with Frameshift/Wildtype/Downstream plugins (all shipped in one Docker image, orchestrated by `docker compose`)
+- Storage: local filesystem + SQLite under a host-directory data root (default `~/cancerstudio-data`)
 
 ## Local development
 
@@ -89,18 +88,18 @@ npm install
 docker compose build       # ~10 GB image, first build is slow
 ```
 
-Run the desktop app in development:
+Run the app in development:
 
 ```bash
-docker compose up -d       # backend container on :8000
-npm run desktop:frontend   # Next.js on :3000
-npm run desktop:electron   # Electron shell
+npm run backend            # docker compose up — FastAPI on :8000
+npm run dev                # Next.js on :3000
+# Then open http://localhost:3000 in your browser.
 ```
 
-Or all three in one go once the image is built:
+Or both in one go:
 
 ```bash
-npm run desktop:dev
+npm run dev:all            # concurrently runs `next dev` + `docker compose up`
 ```
 
 The backend container bind-mounts `<data-root>` (defaults to `~/cancerstudio-data`, override via `CANCERSTUDIO_DATA_ROOT` in `.env`) at `/app-data` and `<data-root>/inbox/` at `/inbox`. Backend source in `backend/app` is bind-mounted for `uvicorn --reload`. Python tests run against the container: `docker compose run --rm backend pytest`.

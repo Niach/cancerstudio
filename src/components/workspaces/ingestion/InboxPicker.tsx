@@ -1,11 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { FolderOpen, RefreshCw, X } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Clipboard, RefreshCw, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { api, type InboxEntry } from "@/lib/api";
-import { getDesktopBridge } from "@/lib/desktop";
 import { formatBytes } from "@/lib/workspace-utils";
 import { cn } from "@/lib/utils";
 
@@ -61,8 +60,6 @@ export default function InboxPicker({
     }
   }, [open, refresh]);
 
-  const desktop = useMemo(() => getDesktopBridge(), []);
-
   const toggle = (path: string) => {
     setSelected((current) => {
       const next = new Set(current);
@@ -72,10 +69,17 @@ export default function InboxPicker({
     });
   };
 
-  const handleReveal = useCallback(async () => {
-    if (!desktop || !root) return;
-    await desktop.openPath(root);
-  }, [desktop, root]);
+  const [copied, setCopied] = useState(false);
+  const handleCopyPath = useCallback(async () => {
+    if (!root) return;
+    try {
+      await navigator.clipboard.writeText(root);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard blocked — no-op */
+    }
+  }, [root]);
 
   const handleConfirm = () => {
     if (selected.size === 0) return;
@@ -126,15 +130,16 @@ export default function InboxPicker({
               <RefreshCw className={cn("mr-1.5 h-3.5 w-3.5", loading && "animate-spin")} />
               Refresh
             </Button>
-            {desktop && root ? (
+            {root ? (
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
-                onClick={() => void handleReveal()}
+                onClick={() => void handleCopyPath()}
+                title="Copy the inbox path so you can open it in your OS file manager"
               >
-                <FolderOpen className="mr-1.5 h-3.5 w-3.5" />
-                Reveal in file manager
+                <Clipboard className="mr-1.5 h-3.5 w-3.5" />
+                {copied ? "Copied" : "Copy path"}
               </Button>
             ) : null}
           </div>
