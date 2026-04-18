@@ -137,8 +137,12 @@ VEP_RELEASE = os.getenv("CANCERSTUDIO_VEP_RELEASE", "111")
 
 
 VEP_SPECIES_CONFIG: dict[WorkspaceSpecies, VepSpeciesConfig] = {
+    # species_slug is the *plain* species name. The merged/refseq suffix is
+    # tacked on for INSTALL.pl (which selects cache flavour via species name)
+    # and for the on-disk cache directory; the VEP runtime needs the plain
+    # name + an explicit --merged / --refseq flag.
     WorkspaceSpecies.HUMAN: VepSpeciesConfig(
-        species_slug="homo_sapiens_merged",
+        species_slug="homo_sapiens",
         assembly="GRCh38",
         label="Human (GRCh38)",
         cache_type="merged",
@@ -157,13 +161,25 @@ VEP_SPECIES_CONFIG: dict[WorkspaceSpecies, VepSpeciesConfig] = {
     ),
     WorkspaceSpecies.CAT: VepSpeciesConfig(
         # Felis_catus_9.0 cache similarly lacks SIFT/PolyPhen scores.
-        species_slug="felis_catus_merged",
+        species_slug="felis_catus",
         assembly="Felis_catus_9.0",
         label="Cat (Felis_catus_9.0)",
         cache_type="merged",
         expected_cache_megabytes=552,
     ),
 }
+
+
+def _vep_cache_species_name(vep_config: "VepSpeciesConfig") -> str:
+    """Return the species name used by INSTALL.pl and the cache directory
+    layout. Merged / RefSeq caches live under a `_merged` / `_refseq`
+    suffixed species directory; ensembl caches use the plain slug.
+    """
+    if vep_config.cache_type == "merged":
+        return f"{vep_config.species_slug}_merged"
+    if vep_config.cache_type == "refseq":
+        return f"{vep_config.species_slug}_refseq"
+    return vep_config.species_slug
 
 
 def resolve_vep_species_config(species: str) -> VepSpeciesConfig:
@@ -1145,7 +1161,7 @@ def vep_cache_dir_for_species(vep_config: VepSpeciesConfig) -> Path:
 def vep_cache_species_dir(vep_config: VepSpeciesConfig) -> Path:
     return (
         vep_cache_dir_for_species(vep_config)
-        / vep_config.species_slug
+        / _vep_cache_species_name(vep_config)
         / f"{VEP_RELEASE}_{vep_config.assembly}"
     )
 
@@ -1173,14 +1189,15 @@ def ensure_vep_cache(
         f"{vep_config.species_slug} / {vep_config.assembly} (~{vep_config.expected_cache_megabytes} MB)"
     )
 
-    # Map cache_type to the flag vep_install expects.
-    cache_flag_map = {"ensembl": "ensembl", "refseq": "refseq", "merged": "merged"}
-    cache_type_flag = cache_flag_map.get(vep_config.cache_type, "ensembl")
-
+    # VEP's INSTALL.pl selects cache flavour via a species-name suffix
+    # (`homo_sapiens_merged`, `homo_sapiens_refseq`), not a CLI flag. VEP's
+    # runtime is the mirror image and wants the plain species name + an
+    # explicit --merged/--refseq flag; we keep species_slug in the plain
+    # form and synthesise the installer form here.
     cmd = [
         *_vep_install_command(),
         "--AUTO", "cf",
-        "--SPECIES", vep_config.species_slug,
+        "--SPECIES", _vep_cache_species_name(vep_config),
         "--ASSEMBLY", vep_config.assembly,
         "--CACHEDIR", str(cache_root),
         "--CACHE_VERSION", VEP_RELEASE,
@@ -1189,10 +1206,6 @@ def ensure_vep_cache(
         "--NO_UPDATE",
         "--NO_BIOPERL",
     ]
-    if cache_type_flag == "refseq":
-        cmd.append("--REFSEQ")
-    elif cache_type_flag == "merged":
-        cmd.append("--MERGED")
     on_log(" ".join(cmd))
     _run_subprocess(cmd, run_id=run_id)
     return True
