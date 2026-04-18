@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 import type { AnnotationImpactTier, CancerGeneHit } from "@/lib/types";
 
 import { Card, Eyebrow, MonoLabel } from "@/components/ui-kit";
@@ -8,6 +10,7 @@ interface CancerGeneHitsProps {
   hits: CancerGeneHit[];
   selectedSymbol?: string | null;
   onSelect?: (symbol: string) => void;
+  footer?: ReactNode;
 }
 
 const IMPACT_COLOR: Record<AnnotationImpactTier, { fill: string; label: string }> = {
@@ -21,6 +24,7 @@ export default function CancerGeneHits({
   hits,
   selectedSymbol,
   onSelect,
+  footer,
 }: CancerGeneHitsProps) {
   if (!hits.length) return null;
 
@@ -194,6 +198,17 @@ export default function CancerGeneHits({
           );
         })}
       </div>
+      {footer ? (
+        <div
+          style={{
+            padding: "0 22px 18px",
+            display: "flex",
+            justifyContent: "flex-start",
+          }}
+        >
+          {footer}
+        </div>
+      ) : null}
     </Card>
   );
 }

@@ -28,6 +28,7 @@ import {
 } from "@/lib/api";
 import type {
   AnnotationStageSummary,
+  CancerGeneHit,
   GeneFocus,
   Workspace,
 } from "@/lib/types";
@@ -72,6 +73,49 @@ export default function AnnotationStagePanel({
   const latestRun = summary.latestRun;
   const metrics = latestRun?.metrics ?? null;
   const status = summary.status;
+
+  const IMPACT_RANK: Record<string, number> = useMemo(
+    () => ({ HIGH: 0, MODERATE: 1, LOW: 2, MODIFIER: 3 }),
+    [],
+  );
+
+  const sortedHits = useMemo<CancerGeneHit[]>(() => {
+    if (!metrics) return [];
+    return [...metrics.cancerGeneHits].sort((a, b) => {
+      const rankDiff =
+        (IMPACT_RANK[a.highestImpact] ?? 99) -
+        (IMPACT_RANK[b.highestImpact] ?? 99);
+      if (rankDiff !== 0) return rankDiff;
+      return b.variantCount - a.variantCount;
+    });
+  }, [metrics, IMPACT_RANK]);
+
+  const impactfulHits = useMemo(
+    () =>
+      sortedHits.filter(
+        (h: CancerGeneHit) =>
+          h.highestImpact === "HIGH" || h.highestImpact === "MODERATE",
+      ),
+    [sortedHits],
+  );
+  const quietHits = useMemo(
+    () =>
+      sortedHits.filter(
+        (h: CancerGeneHit) =>
+          h.highestImpact !== "HIGH" && h.highestImpact !== "MODERATE",
+      ),
+    [sortedHits],
+  );
+
+  const [showAllHits, setShowAllHits] = useState(false);
+  const displayedHits = useMemo(() => {
+    if (showAllHits) return sortedHits;
+    // Pet-owner default view: every impactful gene, plus a short tail from
+    // quiet hits so the card grid stays populated when there are few
+    // impactful genes. Floods are held behind the "Show all" toggle.
+    const tailSlots = Math.max(0, 8 - impactfulHits.length);
+    return [...impactfulHits, ...quietHits.slice(0, tailSlots)];
+  }, [showAllHits, sortedHits, impactfulHits, quietHits]);
 
   const activeFocus: GeneFocus | null = useMemo(() => {
     if (!metrics?.topGeneFocus) return null;
@@ -412,17 +456,27 @@ export default function AnnotationStagePanel({
               <span style={{ color: "var(--muted)" }}>
                 None of them landed in the curated cancer-gene list for this run.
               </span>
+            ) : impactfulHits.length === 0 ? (
+              <span style={{ color: "var(--muted)" }}>
+                None of them changed a protein in a cancer-linked gene —{" "}
+                <Tnum>{quietHits.length}</Tnum> cancer gene
+                {quietHits.length === 1 ? " took" : "s took"} quieter
+                non-coding hits.
+              </span>
             ) : (
               <>
                 <span style={{ color: "var(--accent-ink)", fontWeight: 500 }}>
-                  <Tnum>{metrics.cancerGeneVariantCount}</Tnum>
+                  <Tnum>{impactfulHits.length}</Tnum>
                 </span>{" "}
-                fell in{" "}
-                <span style={{ color: "var(--accent-ink)", fontWeight: 500 }}>
-                  <Tnum>{metrics.cancerGeneHits.length}</Tnum>
-                </span>{" "}
-                gene{metrics.cancerGeneHits.length === 1 ? "" : "s"} linked to
-                cancer before.
+                gene{impactfulHits.length === 1 ? "" : "s"} on the cancer list
+                took protein-changing hits.
+                {quietHits.length > 0 ? (
+                  <span style={{ color: "var(--muted-2)", fontWeight: 400 }}>
+                    {" "}
+                    + <Tnum>{quietHits.length}</Tnum> more took quieter
+                    non-coding hits.
+                  </span>
+                ) : null}
               </>
             )}
           </h2>
@@ -444,9 +498,29 @@ export default function AnnotationStagePanel({
       <ImpactSummary metrics={metrics} />
 
       <CancerGeneHits
-        hits={metrics.cancerGeneHits}
+        hits={displayedHits}
         selectedSymbol={focusedGene ?? metrics.topGeneFocus?.symbol ?? null}
         onSelect={setFocusedGene}
+        footer={
+          sortedHits.length > displayedHits.length || showAllHits ? (
+            <Btn
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowAllHits((v) => !v)}
+            >
+              {showAllHits
+                ? `Show fewer — hide ${sortedHits.length - (impactfulHits.length + Math.max(0, 8 - impactfulHits.length))} quiet hit${
+                    sortedHits.length -
+                      (impactfulHits.length +
+                        Math.max(0, 8 - impactfulHits.length)) ===
+                    1
+                      ? ""
+                      : "s"
+                  }`
+                : `Show all ${sortedHits.length} cancer-gene hits (${quietHits.length} quiet)`}
+            </Btn>
+          ) : null
+        }
       />
 
       {activeFocus && activeFocus.variants.length > 0 ? (
