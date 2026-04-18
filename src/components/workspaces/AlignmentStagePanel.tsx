@@ -128,7 +128,10 @@ export default function AlignmentStagePanel({
           <div className="cs-crumb">{workspace.displayName} / 02 Alignment</div>
           <h1>
             {bannerState === "fresh" && `Align reads to ${referenceCode}.`}
-            {bannerState === "running" && "Aligning."}
+            {bannerState === "running" &&
+              (latestRun?.runtimePhase === "finalizing"
+                ? "Finishing the BAM."
+                : "Aligning.")}
             {bannerState === "paused" && "Paused. Progress kept."}
             {bannerState === "complete" &&
               (summary.qcVerdict === "warn" ? (
@@ -293,19 +296,35 @@ export default function AlignmentStagePanel({
                 </div>
                 <div style={{ textAlign: "right" }}>
                   {bannerState === "running" ? (
-                    <>
-                      <MonoLabel>ETA</MonoLabel>
-                      <div
-                        style={{
-                          fontFamily: "var(--font-mono)",
-                          fontSize: 18,
-                          marginTop: 4,
-                          color: "var(--ink-2)",
-                        }}
-                      >
-                        {formatEta(latestRun?.etaSeconds) ?? "estimating…"}
-                      </div>
-                    </>
+                    latestRun?.runtimePhase === "finalizing" ? (
+                      <>
+                        <MonoLabel>Finishing BAM</MonoLabel>
+                        <div
+                          style={{
+                            fontFamily: "var(--font-mono)",
+                            fontSize: 14,
+                            marginTop: 4,
+                            color: "var(--ink-2)",
+                          }}
+                        >
+                          markdup · stats
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <MonoLabel>ETA</MonoLabel>
+                        <div
+                          style={{
+                            fontFamily: "var(--font-mono)",
+                            fontSize: 18,
+                            marginTop: 4,
+                            color: "var(--ink-2)",
+                          }}
+                        >
+                          {formatEta(latestRun?.etaSeconds) ?? "estimating…"}
+                        </div>
+                      </>
+                    )
                   ) : bannerState === "paused" ? (
                     <>
                       <MonoLabel>Paused</MonoLabel>

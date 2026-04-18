@@ -1864,6 +1864,15 @@ def run_chunked_strobealign_pipeline(
 
     Returns the flat command log (split + per-chunk pipelines + merge).
     """
+    # Resume shortcut: a prior run of this lane finished the merge and left
+    # the coordinate-sorted BAM in place. Chunk BAMs get unlinked right after
+    # merge (see end of this function) so the chunk dir may now be empty,
+    # which would otherwise trip the "produced no chunks" guard below.
+    if output_path.exists() and output_path.stat().st_size > 0:
+        if on_progress is not None:
+            on_progress("merging", 0, 0, 0)
+        return ["# chunked alignment: skipped (lane BAM already merged)"]
+
     chunk_dir.mkdir(parents=True, exist_ok=True)
     commands: list[str] = []
 
@@ -2352,6 +2361,16 @@ def execute_alignment_lane(
         lane_value=sample_lane.value,
     )
 
+    # Chunks are done — the rest of this lane is samtools markdup + index
+    # + flagstat + idxstats + stats, which is single-threaded and slow on
+    # WGS-scale BAMs. Flip the runtime phase so the UI reads "Finishing
+    # BAM" instead of sitting at "Aligning" with an expired ETA.
+    set_alignment_runtime_phase(
+        workspace_id,
+        run_id,
+        AlignmentRuntimePhase.FINALIZING,
+    )
+
     samtools_threads_str = str(get_samtools_thread_count())
 
     # Finalize steps below are made idempotent for resume: if the final output
@@ -2666,6 +2685,33 @@ def update_alignment_run_progress(
         session.add(run.workspace)
 
 
+def set_alignment_runtime_phase(
+    workspace_id: str,
+    run_id: str,
+    runtime_phase: AlignmentRuntimePhase,
+) -> None:
+    """Update runtime_phase without touching the stored progress int.
+
+    The progress int is a coarse persist-level value; the card's live
+    percentage is recomputed by the API from chunk_progress + phase on
+    every read. This helper lets lane execution flip the phase to
+    ``FINALIZING`` while the per-lane samtools suite runs, without having
+    to guess a phase-specific progress number.
+    """
+    with session_scope() as session:
+        run = get_alignment_run_record(session, workspace_id, run_id)
+        if run.status not in {
+            AlignmentRunStatus.PENDING.value,
+            AlignmentRunStatus.RUNNING.value,
+        }:
+            return
+        run.runtime_phase = runtime_phase.value
+        run.updated_at = utc_now()
+        run.workspace.updated_at = run.updated_at
+        session.add(run)
+        session.add(run.workspace)
+
+
 def mark_alignment_run_cancelled(
     workspace_id: str,
     run_id: str,
@@ -2863,11 +2909,21 @@ def run_alignment(
                     run_dir=run_dir,
                 )
             )
+            # Between lanes: reset to ALIGNING so the UI labels the next
+            # lane's chunk work correctly. After the last lane, leave
+            # phase at FINALIZING (set from inside execute_alignment_lane
+            # when the lane's chunks completed) — the next update moves
+            # progress to 90 and stays in FINALIZING.
+            next_phase = (
+                AlignmentRuntimePhase.ALIGNING
+                if index < len(LANES)
+                else AlignmentRuntimePhase.FINALIZING
+            )
             update_alignment_run_progress(
                 workspace_id,
                 run_id,
                 35 if index == 1 else 75,
-                runtime_phase=AlignmentRuntimePhase.ALIGNING,
+                runtime_phase=next_phase,
             )
         update_alignment_run_progress(
             workspace_id,
