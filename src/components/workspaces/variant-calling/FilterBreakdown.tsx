@@ -9,61 +9,46 @@ interface FilterBreakdownProps {
   totalVariants: number;
 }
 
-type BucketId = "pass" | "inherited" | "low_evidence" | "artifact" | "combined" | "other";
-
 interface Bucket {
-  id: BucketId;
+  id: "pass" | "inherited" | "low_evidence" | "artifact";
   label: string;
   hint: string;
-  tone: string;
+  color: string;
 }
 
-const BUCKETS: Record<BucketId, Bucket> = {
-  pass: {
+const BUCKETS: Bucket[] = [
+  {
     id: "pass",
     label: "Kept",
     hint: "Passed every filter",
-    tone: "bg-emerald-400",
+    color: "var(--accent)",
   },
-  inherited: {
+  {
     id: "inherited",
     label: "Probably inherited",
     hint: "Looks like a normal genetic variant, not a cancer change",
-    tone: "bg-amber-400",
+    color: "var(--warm)",
   },
-  low_evidence: {
+  {
     id: "low_evidence",
     label: "Low evidence",
     hint: "Too little signal to call confidently",
-    tone: "bg-rose-400",
+    color: "oklch(0.65 0.15 15)",
   },
-  artifact: {
+  {
     id: "artifact",
     label: "Sequencing artifact",
     hint: "Looks like a reading glitch, not a real mutation",
-    tone: "bg-fuchsia-400",
+    color: "oklch(0.65 0.18 330)",
   },
-  combined: {
-    id: "combined",
-    label: "Multiple flags",
-    hint: "Flagged by more than one filter",
-    tone: "bg-stone-400",
-  },
-  other: {
-    id: "other",
-    label: "Other",
-    hint: "Uncategorized filters",
-    tone: "bg-violet-400",
-  },
-};
+];
 
-const INHERITED_FLAGS = new Set([
+const INHERITED = new Set([
   "germline",
   "normal_artifact",
   "panel_of_normals",
 ]);
-
-const LOW_EVIDENCE_FLAGS = new Set([
+const LOW = new Set([
   "weak_evidence",
   "low_allele_frac",
   "base_qual",
@@ -71,8 +56,7 @@ const LOW_EVIDENCE_FLAGS = new Set([
   "fragment",
   "contamination",
 ]);
-
-const ARTIFACT_FLAGS = new Set([
+const ART = new Set([
   "strand_bias",
   "clustered_events",
   "haplotype",
@@ -82,171 +66,230 @@ const ARTIFACT_FLAGS = new Set([
   "n_ratio",
 ]);
 
-function bucketForFilter(name: string, isPass: boolean): BucketId {
+function bucketOf(name: string, isPass: boolean): Bucket["id"] {
   if (isPass) return "pass";
-  if (name.includes(";")) return "combined";
-  if (INHERITED_FLAGS.has(name)) return "inherited";
-  if (LOW_EVIDENCE_FLAGS.has(name)) return "low_evidence";
-  if (ARTIFACT_FLAGS.has(name)) return "artifact";
-  return "other";
+  if (INHERITED.has(name)) return "inherited";
+  if (LOW.has(name)) return "low_evidence";
+  if (ART.has(name)) return "artifact";
+  return "low_evidence";
 }
 
-function humanizeFilter(name: string) {
-  if (name === ".") return "unmarked";
-  if (name === "PASS") return "PASS";
-  return name.replace(/_/g, " ");
-}
-
-interface BucketTotal {
-  bucket: Bucket;
-  count: number;
-  entries: FilterBreakdownEntry[];
-}
-
-function aggregate(entries: FilterBreakdownEntry[]): BucketTotal[] {
-  const map = new Map<BucketId, BucketTotal>();
-  for (const entry of entries) {
-    const id = bucketForFilter(entry.name, entry.isPass);
-    const existing = map.get(id);
-    if (existing) {
-      existing.count += entry.count;
-      existing.entries.push(entry);
-    } else {
-      map.set(id, {
-        bucket: BUCKETS[id],
-        count: entry.count,
-        entries: [entry],
-      });
-    }
-  }
-  const order: BucketId[] = [
-    "pass",
-    "inherited",
-    "low_evidence",
-    "artifact",
-    "combined",
-    "other",
-  ];
-  return order
-    .map((id) => map.get(id))
-    .filter((value): value is BucketTotal => value !== undefined && value.count > 0);
-}
-
-export default function FilterBreakdown({ entries, totalVariants }: FilterBreakdownProps) {
+export default function FilterBreakdown({
+  entries,
+  totalVariants,
+}: FilterBreakdownProps) {
   const [showTechnical, setShowTechnical] = useState(false);
 
-  if (!entries.length || totalVariants === 0) {
-    return (
-      <div className="rounded-2xl border border-stone-200 bg-white px-4 py-5 text-sm text-stone-500">
-        No filter breakdown available.
-      </div>
-    );
+  const tallies: Record<Bucket["id"], number> = {
+    pass: 0,
+    inherited: 0,
+    low_evidence: 0,
+    artifact: 0,
+  };
+  for (const e of entries) {
+    const b = bucketOf(e.name, e.isPass);
+    tallies[b] += e.count;
   }
-
-  const buckets = aggregate(entries);
-  const passCount = buckets.find((bucket) => bucket.bucket.id === "pass")?.count ?? 0;
+  const total = Math.max(1, totalVariants);
+  const passPct = Math.round((tallies.pass / total) * 100);
 
   return (
-    <div className="rounded-2xl border border-stone-200 bg-white p-4">
-      <div className="flex items-baseline justify-between">
+    <div className="cs-card">
+      <div className="cs-card-head">
         <div>
-          <div className="font-mono text-[10px] uppercase tracking-[0.24em] text-stone-400">
-            Filter breakdown
+          <div style={{ marginBottom: 6 }}>
+            <span className="cs-mono-label">Filter breakdown</span>
           </div>
-          <h4 className="mt-1 font-display text-[18px] font-light text-stone-900">
-            What we kept vs. set aside
-          </h4>
+          <h3>What we kept vs. set aside</h3>
         </div>
-        <div className="text-right">
-          <div className="font-display text-[20px] leading-none font-light text-stone-900">
-            {Math.round((passCount / totalVariants) * 100)}%
+        <div style={{ textAlign: "right" }}>
+          <div
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: 28,
+              fontWeight: 300,
+              letterSpacing: "-0.01em",
+              lineHeight: 1,
+              color: "var(--ink)",
+            }}
+          >
+            {passPct}%
           </div>
-          <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-stone-400">
+          <div className="cs-mono-label" style={{ fontSize: 9 }}>
             kept
           </div>
         </div>
       </div>
-
-      <div className="mt-4 flex h-3 w-full overflow-hidden rounded-full bg-stone-100">
-        {buckets.map((bucketTotal) => {
-          const share = Math.max(0, bucketTotal.count / totalVariants);
-          if (share <= 0) return null;
-          return (
-            <div
-              key={bucketTotal.bucket.id}
-              className={`${bucketTotal.bucket.tone} transition-[width] duration-700`}
-              style={{
-                width: `${share * 100}%`,
-                boxShadow:
-                  bucketTotal.bucket.id === "pass"
-                    ? "inset 0 0 8px rgba(255,255,255,0.35)"
-                    : undefined,
-              }}
-              title={`${bucketTotal.bucket.label} · ${bucketTotal.count.toLocaleString()}`}
-            />
-          );
-        })}
-      </div>
-
-      <ul className="mt-4 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-        {buckets.map((bucketTotal) => (
-          <li
-            key={bucketTotal.bucket.id}
-            className="flex items-center justify-between gap-3 rounded-lg border border-stone-100 bg-stone-50/60 px-2.5 py-1.5"
-          >
-            <div className="flex min-w-0 items-center gap-2">
-              <span
-                className={`inline-block size-1.5 shrink-0 rounded-full ${bucketTotal.bucket.tone}`}
+      <div style={{ padding: "16px 22px" }}>
+        <div
+          style={{
+            display: "flex",
+            height: 12,
+            width: "100%",
+            borderRadius: 999,
+            overflow: "hidden",
+            background: "color-mix(in oklch, var(--ink) 6%, transparent)",
+          }}
+        >
+          {BUCKETS.map((b) => {
+            const share = tallies[b.id] / total;
+            if (share <= 0) return null;
+            return (
+              <div
+                key={b.id}
+                style={{
+                  width: `${share * 100}%`,
+                  background: b.color,
+                  boxShadow:
+                    b.id === "pass"
+                      ? "inset 0 0 8px rgba(255,255,255,0.35)"
+                      : undefined,
+                  transition: "width 700ms ease",
+                }}
+                title={`${b.label} · ${tallies[b.id]}`}
               />
-              <div className="min-w-0">
-                <div className="truncate text-[12px] text-stone-700">
-                  {bucketTotal.bucket.label}
-                </div>
-                <div className="truncate text-[11px] text-stone-500">
-                  {bucketTotal.bucket.hint}
-                </div>
-              </div>
-            </div>
-            <span
-              className="font-mono text-[11px] tracking-[0.14em] text-stone-500"
-              style={{ fontVariantNumeric: "tabular-nums" }}
-            >
-              {bucketTotal.count.toLocaleString()}
-            </span>
-          </li>
-        ))}
-      </ul>
+            );
+          })}
+        </div>
 
-      <div className="mt-4 border-t border-stone-100 pt-3">
+        <ul
+          style={{
+            listStyle: "none",
+            padding: 0,
+            margin: "16px 0 0",
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 8,
+          }}
+        >
+          {BUCKETS.map((b) =>
+            tallies[b.id] > 0 ? (
+              <li
+                key={b.id}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "8px 12px",
+                  borderRadius: 10,
+                  border: "1px solid var(--line)",
+                  background: "var(--surface-sunk)",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    minWidth: 0,
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: 999,
+                      background: b.color,
+                      flexShrink: 0,
+                      boxShadow: `0 0 8px ${b.color}`,
+                    }}
+                  />
+                  <div style={{ minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: 14.5,
+                        fontWeight: 500,
+                        color: "var(--ink)",
+                      }}
+                    >
+                      {b.label}
+                    </div>
+                    <div className="cs-tiny" style={{ fontSize: 12.5 }}>
+                      {b.hint}
+                    </div>
+                  </div>
+                </div>
+                <span
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 13.5,
+                    fontVariantNumeric: "tabular-nums",
+                    color: "var(--ink-2)",
+                    fontWeight: 500,
+                  }}
+                >
+                  {tallies[b.id].toLocaleString()}
+                </span>
+              </li>
+            ) : null
+          )}
+        </ul>
+
         <button
           type="button"
-          onClick={() => setShowTechnical((value) => !value)}
-          aria-expanded={showTechnical}
-          className="flex items-center gap-1.5 text-[11px] font-medium text-stone-500 transition hover:text-stone-800"
+          onClick={() => setShowTechnical(!showTechnical)}
+          style={{
+            marginTop: 14,
+            background: "transparent",
+            border: "none",
+            fontFamily: "inherit",
+            fontSize: 11.5,
+            color: "var(--muted)",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            padding: 0,
+          }}
         >
           <span
-            className={`inline-block size-0 border-y-[4px] border-l-[6px] border-y-transparent border-l-current transition-transform duration-200 ${
-              showTechnical ? "rotate-90" : ""
-            }`}
+            style={{
+              display: "inline-block",
+              width: 0,
+              height: 0,
+              borderTop: "4px solid transparent",
+              borderBottom: "4px solid transparent",
+              borderLeft: "6px solid currentColor",
+              transform: showTechnical ? "rotate(90deg)" : "none",
+              transition: "transform 0.2s",
+            }}
           />
           {showTechnical ? "Hide technical breakdown" : "Show technical breakdown"}
         </button>
 
         {showTechnical ? (
-          <ul className="mt-2 grid grid-cols-1 gap-1 text-[11px] text-stone-600 sm:grid-cols-2">
-            {entries.map((entry) => (
+          <ul
+            style={{
+              listStyle: "none",
+              padding: 0,
+              margin: "10px 0 0",
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 6,
+            }}
+          >
+            {entries.map((e) => (
               <li
-                key={entry.name}
-                className="flex items-center justify-between gap-3 rounded-md border border-stone-100 bg-white px-2 py-1"
+                key={e.name}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  padding: "5px 10px",
+                  borderRadius: 6,
+                  background: "var(--surface-sunk)",
+                  border: "1px solid var(--line)",
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 11,
+                }}
               >
-                <span className="truncate font-mono text-[11px] text-stone-700">
-                  {humanizeFilter(entry.name)}
-                </span>
+                <span style={{ color: "var(--ink-2)" }}>{e.name}</span>
                 <span
-                  className="font-mono text-[10px] tracking-[0.14em] text-stone-500"
-                  style={{ fontVariantNumeric: "tabular-nums" }}
+                  style={{
+                    color: "var(--muted)",
+                    fontVariantNumeric: "tabular-nums",
+                  }}
                 >
-                  {entry.count.toLocaleString()}
+                  {e.count.toLocaleString()}
                 </span>
               </li>
             ))}

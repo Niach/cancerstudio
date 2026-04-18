@@ -2,129 +2,198 @@
 
 import type { AnnotationImpactTier, CancerGeneHit } from "@/lib/types";
 
+import { Card, Eyebrow, MonoLabel } from "@/components/ui-kit";
+
 interface CancerGeneHitsProps {
   hits: CancerGeneHit[];
   selectedSymbol?: string | null;
   onSelect?: (symbol: string) => void;
 }
 
-const IMPACT_TONE: Record<AnnotationImpactTier, { stripe: string; label: string; text: string }> = {
-  HIGH: {
-    stripe: "from-rose-300 via-rose-500 to-rose-600",
-    label: "high impact",
-    text: "text-rose-700",
-  },
-  MODERATE: {
-    stripe: "from-amber-300 via-amber-500 to-amber-600",
-    label: "moderate impact",
-    text: "text-amber-700",
-  },
-  LOW: {
-    stripe: "from-sky-300 via-sky-500 to-sky-600",
-    label: "low impact",
-    text: "text-sky-700",
-  },
-  MODIFIER: {
-    stripe: "from-stone-200 via-stone-400 to-stone-500",
-    label: "modifier",
-    text: "text-stone-600",
-  },
+const IMPACT_COLOR: Record<AnnotationImpactTier, { fill: string; label: string }> = {
+  HIGH: { fill: "#e11d48", label: "high impact" },
+  MODERATE: { fill: "#d97706", label: "moderate impact" },
+  LOW: { fill: "#0284c7", label: "low impact" },
+  MODIFIER: { fill: "#78716c", label: "modifier" },
 };
-
-function plainConsequence(raw: string | null | undefined) {
-  if (!raw) return null;
-  return raw.split("&")[0].replace(/_/g, " ");
-}
 
 export default function CancerGeneHits({
   hits,
   selectedSymbol,
   onSelect,
 }: CancerGeneHitsProps) {
-  if (!hits.length) {
-    return (
-      <div className="rounded-2xl border border-dashed border-stone-200 bg-white px-4 py-6 text-center">
-        <div className="font-mono text-[10px] uppercase tracking-[0.24em] text-stone-400">
-          Cancer gene matches
-        </div>
-        <p className="mt-2 text-sm text-stone-500">
-          No mutations landed in the known cancer-gene list for this run.
-        </p>
-        <p className="mt-1 text-[12px] text-stone-400">
-          This happens often with low mutation counts and is not a reason to worry.
-          All annotated mutations remain available below.
-        </p>
-      </div>
-    );
-  }
+  if (!hits.length) return null;
 
   return (
-    <div className="rounded-2xl border border-stone-200 bg-white">
-      <div className="flex items-baseline justify-between border-b border-stone-100 px-4 py-3">
+    <Card style={{ marginBottom: 18 }}>
+      <div
+        style={{
+          padding: "18px 22px 10px",
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
         <div>
-          <div className="font-mono text-[10px] uppercase tracking-[0.24em] text-stone-400">
-            Cancer gene matches
-          </div>
-          <h4 className="mt-0.5 font-display text-[18px] font-light text-stone-900">
+          <Eyebrow>Cancer gene matches</Eyebrow>
+          <h3
+            style={{
+              margin: "4px 0 0",
+              fontFamily: "var(--font-display)",
+              fontWeight: 500,
+              fontSize: 22,
+              letterSpacing: "-0.02em",
+              color: "var(--ink)",
+            }}
+          >
             {hits.length} gene{hits.length === 1 ? "" : "s"} hit in this tumor
-          </h4>
+          </h3>
         </div>
-        <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-stone-400">
-          click a card to focus
-        </span>
+        <MonoLabel>click a card to focus the map below</MonoLabel>
       </div>
-      <div className="grid grid-cols-1 gap-2 p-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div
+        style={{
+          padding: "0 18px 18px",
+          display: "grid",
+          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+          gap: 10,
+        }}
+      >
         {hits.map((hit) => {
-          const tone = IMPACT_TONE[hit.highestImpact];
+          const tone = IMPACT_COLOR[hit.highestImpact];
           const isSelected = selectedSymbol === hit.symbol;
-          const change =
-            hit.topHgvsp?.split(":").pop() ||
-            plainConsequence(hit.topConsequence) ||
-            "—";
           return (
             <button
               key={hit.symbol}
               type="button"
               onClick={() => onSelect?.(hit.symbol)}
-              className={`group relative overflow-hidden rounded-2xl border bg-white px-4 py-3 text-left transition ${
-                isSelected
-                  ? "border-emerald-500 ring-2 ring-emerald-200"
-                  : "border-stone-200 hover:border-stone-300 hover:shadow-sm"
-              }`}
+              style={{
+                position: "relative",
+                textAlign: "left",
+                padding: "14px 16px",
+                borderRadius: "var(--radius-cs-lg)",
+                border: isSelected
+                  ? "1.5px solid var(--accent)"
+                  : "1px solid var(--line)",
+                background: isSelected
+                  ? "color-mix(in oklch, var(--accent) 8%, var(--surface-strong))"
+                  : "var(--surface-strong)",
+                boxShadow: isSelected
+                  ? "0 0 0 4px color-mix(in oklch, var(--accent) 16%, transparent)"
+                  : "none",
+                fontFamily: "inherit",
+                color: "var(--ink)",
+                cursor: "pointer",
+                transition: "all 120ms ease",
+              }}
             >
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <div className="font-display text-[22px] leading-none font-semibold tracking-wide text-stone-900">
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  justifyContent: "space-between",
+                  gap: 8,
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontFamily: "var(--font-display)",
+                      fontSize: 24,
+                      fontWeight: 600,
+                      letterSpacing: "0.02em",
+                      lineHeight: 1,
+                      color: "var(--ink)",
+                    }}
+                  >
                     {hit.symbol}
                   </div>
-                  <div className="mt-1 text-[11px] text-stone-500">{hit.role}</div>
+                  <div
+                    style={{
+                      marginTop: 6,
+                      fontSize: 12,
+                      color: "var(--muted)",
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    {hit.role}
+                  </div>
                 </div>
-                <span className="rounded-full bg-stone-100 px-2 py-0.5 font-mono text-[10px] font-medium tracking-wide text-stone-600">
+                <span
+                  style={{
+                    padding: "3px 8px",
+                    borderRadius: 999,
+                    background: "var(--surface-sunk)",
+                    border: "1px solid var(--line)",
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 11,
+                    color: "var(--muted)",
+                    fontVariantNumeric: "tabular-nums",
+                    fontWeight: 600,
+                    whiteSpace: "nowrap",
+                  }}
+                >
                   {hit.variantCount}× mut
                 </span>
               </div>
-
-              <div className="mt-3 flex items-center gap-2">
+              <div
+                style={{
+                  marginTop: 14,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
                 <span
-                  className={`font-mono text-[10px] uppercase tracking-[0.2em] ${tone.text}`}
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 10.5,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.18em",
+                    color: tone.fill,
+                    fontWeight: 600,
+                    whiteSpace: "nowrap",
+                  }}
                 >
                   {tone.label}
                 </span>
-                <div className="h-1 flex-1 overflow-hidden rounded-full bg-stone-100">
-                  <div className={`h-full w-full bg-gradient-to-r ${tone.stripe}`} />
+                <div
+                  style={{
+                    flex: 1,
+                    height: 4,
+                    borderRadius: 999,
+                    background: "var(--surface-sunk)",
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    style={{
+                      height: "100%",
+                      width: "100%",
+                      background: `linear-gradient(90deg, ${tone.fill}60, ${tone.fill})`,
+                    }}
+                  />
                 </div>
               </div>
-
-              <div
-                className="mt-2 truncate font-mono text-[11px] text-stone-700"
-                title={hit.topHgvsp ?? hit.topConsequence ?? ""}
-              >
-                {change}
-              </div>
+              {hit.topHgvsp ? (
+                <div
+                  style={{
+                    marginTop: 8,
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 12.5,
+                    color: "var(--ink-2)",
+                    fontWeight: 500,
+                  }}
+                >
+                  {hit.topHgvsp}
+                </div>
+              ) : null}
             </button>
           );
         })}
       </div>
-    </div>
+    </Card>
   );
 }

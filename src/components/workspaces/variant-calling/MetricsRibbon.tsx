@@ -6,114 +6,120 @@ interface MetricsRibbonProps {
   metrics: VariantCallingMetrics;
 }
 
-function formatNumber(value: number) {
+function fmt(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) return "—";
   return value.toLocaleString();
 }
 
-function formatRatio(value?: number | null, digits = 2) {
-  if (value === null || value === undefined || Number.isNaN(value)) return "—";
-  return value.toFixed(digits);
-}
-
-function formatVaf(value?: number | null) {
-  if (value === null || value === undefined) return "—";
-  return `${(value * 100).toFixed(1)}%`;
-}
-
-function formatDepth(value?: number | null) {
-  if (value === null || value === undefined) return "—";
-  return `${value.toFixed(0)}×`;
-}
-
 export default function MetricsRibbon({ metrics }: MetricsRibbonProps) {
-  const indelRatio =
-    metrics.snvCount > 0
-      ? (metrics.indelCount / metrics.snvCount).toFixed(2)
-      : "—";
-
-  const items: Array<{
-    label: string;
-    value: string;
-    hint: string;
-    accent?: "emerald" | "sky" | "amber" | "rose" | "stone";
-  }> = [
+  const items: Array<{ label: string; value: string; hint: string; accent: string }> = [
     {
       label: "PASS calls",
-      value: formatNumber(metrics.passCount),
-      hint: `of ${formatNumber(metrics.totalVariants)} total`,
-      accent: "emerald",
+      value: fmt(metrics.passCount),
+      hint: `of ${fmt(metrics.totalVariants)} total`,
+      accent: "var(--accent)",
     },
     {
       label: "SNV : indel",
-      value: `${formatNumber(metrics.snvCount)} / ${formatNumber(metrics.indelCount)}`,
-      hint: `${indelRatio} indels per SNV`,
-      accent: "sky",
+      value: `${fmt(metrics.snvCount)} / ${fmt(metrics.indelCount)}`,
+      hint:
+        metrics.snvCount > 0
+          ? `${(metrics.indelCount / Math.max(1, metrics.snvCount)).toFixed(2)} indels / SNV`
+          : "—",
+      accent: "var(--cool)",
     },
     {
       label: "Ti / Tv",
-      value: formatRatio(metrics.tiTvRatio),
-      hint: `${formatNumber(metrics.transitions)} Ti · ${formatNumber(metrics.transversions)} Tv`,
-      accent: "amber",
+      value: metrics.tiTvRatio != null ? metrics.tiTvRatio.toFixed(2) : "—",
+      hint:
+        metrics.transitions > 0 || metrics.transversions > 0
+          ? `${fmt(metrics.transitions)} Ti · ${fmt(metrics.transversions)} Tv`
+          : "—",
+      accent: "var(--warm)",
     },
     {
       label: "Median VAF",
-      value: formatVaf(metrics.medianVaf),
-      hint: `mean ${formatVaf(metrics.meanVaf)}`,
-      accent: "emerald",
+      value:
+        metrics.medianVaf != null
+          ? `${(metrics.medianVaf * 100).toFixed(1)}%`
+          : "—",
+      hint:
+        metrics.meanVaf != null
+          ? `mean ${(metrics.meanVaf * 100).toFixed(1)}%`
+          : "—",
+      accent: "var(--accent)",
     },
     {
       label: "Tumor depth",
-      value: formatDepth(metrics.tumorMeanDepth),
+      value:
+        metrics.tumorMeanDepth != null ? `${Math.round(metrics.tumorMeanDepth)}×` : "—",
       hint: metrics.tumorSample ?? "tumor",
-      accent: "stone",
+      accent: "var(--muted)",
     },
     {
       label: "Normal depth",
-      value: formatDepth(metrics.normalMeanDepth),
+      value:
+        metrics.normalMeanDepth != null ? `${Math.round(metrics.normalMeanDepth)}×` : "—",
       hint: metrics.normalSample ?? "normal",
-      accent: "stone",
+      accent: "var(--muted)",
     },
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
-      {items.map((item) => (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(6, 1fr)",
+        gap: 8,
+      }}
+    >
+      {items.map((it) => (
         <div
-          key={item.label}
-          className="relative overflow-hidden rounded-2xl border border-stone-200 bg-gradient-to-br from-white via-white to-stone-50 px-4 py-3"
+          key={it.label}
+          className="cs-card"
+          style={{
+            position: "relative",
+            padding: "14px 16px",
+            borderRadius: 18,
+            overflow: "hidden",
+          }}
         >
-          <div className="font-mono text-[9px] uppercase tracking-[0.26em] text-stone-400">
-            {item.label}
+          <div className="cs-mono-label" style={{ fontSize: 9 }}>
+            {it.label}
           </div>
           <div
-            className="mt-1 font-display text-[26px] leading-none font-light text-stone-900"
-            style={{ fontVariantNumeric: "tabular-nums" }}
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: 24,
+              fontWeight: 400,
+              marginTop: 4,
+              lineHeight: 1,
+              letterSpacing: "-0.015em",
+              fontVariantNumeric: "tabular-nums",
+              color: "var(--ink)",
+            }}
           >
-            {item.value}
+            {it.value}
           </div>
-          <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.18em] text-stone-400">
-            {item.hint}
+          <div
+            className="cs-mono-label"
+            style={{ fontSize: 9, marginTop: 4, color: "var(--muted-2)" }}
+          >
+            {it.hint}
           </div>
-          <AccentStripe accent={item.accent} />
+          <div
+            style={{
+              position: "absolute",
+              left: 12,
+              right: 12,
+              bottom: 0,
+              height: 2,
+              background: `linear-gradient(90deg, transparent, ${it.accent}, transparent)`,
+              opacity: 0.7,
+            }}
+          />
         </div>
       ))}
     </div>
-  );
-}
-
-function AccentStripe({ accent }: { accent?: "emerald" | "sky" | "amber" | "rose" | "stone" }) {
-  const palette: Record<string, string> = {
-    emerald: "from-emerald-400/0 via-emerald-400 to-emerald-400/0",
-    sky: "from-sky-400/0 via-sky-400 to-sky-400/0",
-    amber: "from-amber-400/0 via-amber-400 to-amber-400/0",
-    rose: "from-rose-400/0 via-rose-400 to-rose-400/0",
-    stone: "from-stone-300/0 via-stone-400 to-stone-300/0",
-  };
-  const key = accent ?? "stone";
-  return (
-    <div
-      aria-hidden
-      className={`pointer-events-none absolute inset-x-3 bottom-0 h-px bg-gradient-to-r ${palette[key]}`}
-    />
   );
 }

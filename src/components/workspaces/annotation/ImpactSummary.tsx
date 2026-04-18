@@ -6,84 +6,147 @@ interface ImpactSummaryProps {
   metrics: AnnotationMetrics;
 }
 
-const IMPACT_TILES: {
+const IMPACT_COLOR: Record<AnnotationImpactTier, string> = {
+  HIGH: "#e11d48",
+  MODERATE: "#d97706",
+  LOW: "#0284c7",
+  MODIFIER: "#78716c",
+};
+
+const TILES: Array<{
   tier: AnnotationImpactTier;
   title: string;
   hint: string;
-  bar: string;
-  accent: string;
-}[] = [
+}> = [
   {
     tier: "HIGH",
     title: "Likely to break the protein",
     hint: "stop codons, frameshifts, splice disruptions",
-    bar: "from-rose-300 via-rose-500 to-rose-600",
-    accent: "text-rose-700",
   },
   {
     tier: "MODERATE",
     title: "Likely to change the protein",
     hint: "amino-acid changes, in-frame indels",
-    bar: "from-amber-300 via-amber-500 to-amber-600",
-    accent: "text-amber-700",
   },
   {
     tier: "LOW",
     title: "Minor protein changes",
     hint: "silent changes, near-splice edges",
-    bar: "from-sky-300 via-sky-500 to-sky-600",
-    accent: "text-sky-700",
   },
   {
     tier: "MODIFIER",
     title: "Outside the protein-coding region",
     hint: "introns, UTRs, intergenic",
-    bar: "from-stone-200 via-stone-400 to-stone-500",
-    accent: "text-stone-600",
   },
 ];
 
-function formatNumber(value: number) {
-  return value.toLocaleString();
-}
-
 export default function ImpactSummary({ metrics }: ImpactSummaryProps) {
-  const total = metrics.annotatedVariants || 1;
-
+  const total = Math.max(1, metrics.annotatedVariants);
   return (
-    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
-      {IMPACT_TILES.map((tile) => {
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(4, 1fr)",
+        gap: 12,
+        marginBottom: 18,
+      }}
+    >
+      {TILES.map((tile) => {
         const count = metrics.byImpact[tile.tier] ?? 0;
         const pct = Math.min(100, Math.round((count / total) * 100));
+        const color = IMPACT_COLOR[tile.tier];
         return (
           <div
             key={tile.tier}
-            className="relative overflow-hidden rounded-2xl border border-stone-200 bg-gradient-to-br from-white via-white to-stone-50 px-4 py-3"
+            style={{
+              position: "relative",
+              borderRadius: "var(--radius-cs-lg)",
+              border: "1px solid var(--line)",
+              background: "var(--surface-strong)",
+              padding: "16px 18px",
+              overflow: "hidden",
+            }}
           >
-            <div className="font-mono text-[9px] uppercase tracking-[0.26em] text-stone-400">
+            <div
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 11,
+                fontWeight: 600,
+                textTransform: "uppercase",
+                letterSpacing: "0.26em",
+                color,
+              }}
+            >
               {tile.tier}
             </div>
-            <div className="mt-1 flex items-baseline gap-2">
+            <div
+              style={{
+                marginTop: 6,
+                display: "flex",
+                alignItems: "baseline",
+                gap: 10,
+              }}
+            >
               <div
-                className="font-display text-[30px] leading-none font-light text-stone-900"
-                style={{ fontVariantNumeric: "tabular-nums" }}
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontSize: 40,
+                  fontWeight: 400,
+                  letterSpacing: "-0.03em",
+                  lineHeight: 1,
+                  color: "var(--ink)",
+                  fontVariantNumeric: "tabular-nums",
+                }}
               >
-                {formatNumber(count)}
+                {count.toLocaleString()}
               </div>
-              <span className={`font-mono text-[11px] ${tile.accent}`}>
+              <span
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 13,
+                  color,
+                  fontWeight: 600,
+                }}
+              >
                 {pct}%
               </span>
             </div>
-            <div className="mt-2 text-[13px] font-medium text-stone-900">
+            <div
+              style={{
+                marginTop: 10,
+                fontSize: 14.5,
+                fontWeight: 500,
+                color: "var(--ink)",
+              }}
+            >
               {tile.title}
             </div>
-            <div className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.16em] text-stone-400">
+            <div
+              style={{
+                marginTop: 4,
+                fontSize: 12.5,
+                color: "var(--muted)",
+                lineHeight: 1.45,
+              }}
+            >
               {tile.hint}
             </div>
-            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-stone-100">
+            <div
+              style={{
+                marginTop: 14,
+                height: 6,
+                borderRadius: 999,
+                background: "var(--surface-sunk)",
+                overflow: "hidden",
+              }}
+            >
               <div
-                className={`h-full rounded-full bg-gradient-to-r ${tile.bar}`}
-                style={{ width: `${Math.max(pct, 2)}%` }}
+                style={{
+                  height: "100%",
+                  width: `${Math.max(pct, 2)}%`,
+                  background: `linear-gradient(90deg, ${color}80, ${color})`,
+                  borderRadius: 999,
+                }}
               />
             </div>
           </div>

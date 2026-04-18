@@ -209,3 +209,713 @@
   50%      { box-shadow: 0 0 0 4px color-mix(in oklch, var(--lane-accent) 10%, transparent); }
 }
 
+/* ─────────────────────────────────────────────────────────────────
+   cancerstudio — design system (from Claude Design handoff)
+   Three themes live under [data-theme] on <html>: paper / console / clinical.
+   The tokens here sit alongside the shadcn layer above; design-new components
+   should use these (--ink, --accent, --surface, etc.), existing components
+   can keep using the shadcn tokens.
+   ───────────────────────────────────────────────────────────────── */
+
+:root,
+[data-theme="paper"] {
+  --bg: #eff3ee;
+  --bg-2: #f7f8f4;
+  --surface: rgba(255, 255, 255, 0.78);
+  --surface-strong: rgba(255, 255, 255, 0.96);
+  --surface-sunk: rgba(246, 243, 238, 0.7);
+  --ink: #0f1a14;
+  --ink-2: #1e2a24;
+  --muted: #45544c;
+  --muted-2: #5f6e66;
+  --line: rgba(21, 34, 27, 0.08);
+  --line-strong: rgba(21, 34, 27, 0.16);
+  --accent: oklch(0.55 0.1 152);
+  --accent-soft: oklch(0.94 0.04 152);
+  --accent-ink: oklch(0.3 0.08 152);
+  --warm: oklch(0.62 0.12 55);
+  --warm-soft: oklch(0.95 0.035 60);
+  --cool: oklch(0.58 0.09 210);
+  --cool-soft: oklch(0.95 0.028 210);
+  --danger: oklch(0.58 0.18 25);
+
+  --font-display: var(--font-fraunces), "Iowan Old Style", Georgia, serif;
+  --font-ui: var(--font-inter), "Avenir Next", "Segoe UI", sans-serif;
+  --font-mono: var(--font-jbm), "SFMono-Regular", "SF Mono", monospace;
+
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-cs: 16px;
+  --radius-cs-lg: 22px;
+  --radius-cs-xl: 28px;
+
+  --shadow-cs-sm: 0 6px 16px -8px rgba(21, 34, 27, 0.18);
+  --shadow-cs: 0 20px 50px -30px rgba(21, 34, 27, 0.38);
+  --shadow-cs-lg: 0 40px 100px -50px rgba(21, 34, 27, 0.45);
+
+  --karyo-bg: linear-gradient(180deg, #070a16 0%, #0b1124 100%);
+}
+
+[data-theme="console"] {
+  --bg: #0b0f14;
+  --bg-2: #111720;
+  --surface: rgba(20, 28, 38, 0.85);
+  --surface-strong: rgba(24, 33, 44, 0.96);
+  --surface-sunk: rgba(12, 17, 24, 0.92);
+  --ink: #e8ecf0;
+  --ink-2: #b9c2cc;
+  --muted: #7b8796;
+  --muted-2: #556575;
+  --line: rgba(148, 163, 184, 0.12);
+  --line-strong: rgba(148, 163, 184, 0.22);
+  --accent: oklch(0.78 0.14 152);
+  --accent-soft: oklch(0.25 0.05 152);
+  --accent-ink: oklch(0.85 0.14 152);
+  --warm: oklch(0.74 0.14 55);
+  --warm-soft: oklch(0.28 0.08 55);
+  --cool: oklch(0.72 0.12 210);
+  --cool-soft: oklch(0.25 0.06 210);
+  --shadow-cs-sm: 0 6px 16px -6px rgba(0, 0, 0, 0.6);
+  --shadow-cs: 0 24px 50px -20px rgba(0, 0, 0, 0.8);
+  --shadow-cs-lg: 0 40px 100px -30px rgba(0, 0, 0, 0.9);
+  --font-display: var(--font-jbm), var(--font-fraunces), monospace;
+}
+
+[data-theme="clinical"] {
+  --bg: #f4f6f9;
+  --bg-2: #fafbfc;
+  --surface: rgba(255, 255, 255, 0.92);
+  --surface-strong: #ffffff;
+  --surface-sunk: #f1f4f8;
+  --ink: #0b1220;
+  --ink-2: #141d2d;
+  --muted: #3e4a5f;
+  --muted-2: #6d788c;
+  --line: rgba(15, 23, 36, 0.08);
+  --line-strong: rgba(15, 23, 36, 0.16);
+  --accent: oklch(0.55 0.14 235);
+  --accent-soft: oklch(0.96 0.03 235);
+  --accent-ink: oklch(0.32 0.12 235);
+  --warm: oklch(0.62 0.14 35);
+  --warm-soft: oklch(0.96 0.035 35);
+  --cool: oklch(0.62 0.12 210);
+  --cool-soft: oklch(0.96 0.028 210);
+  --font-display: var(--font-inter), "Helvetica Neue", sans-serif;
+  --font-ui: var(--font-inter), "Helvetica Neue", sans-serif;
+}
+
+/* Only apply the design-system body background when a stage-shell/landing
+   page opts in with the .cs-theme class on a wrapper. This keeps existing
+   Tailwind-styled pages unaffected. */
+.cs-theme {
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 15.5px;
+  line-height: 1.55;
+  font-feature-settings: "ss01", "cv11";
+  min-height: 100vh;
+  position: relative;
+  isolation: isolate;
+}
+
+[data-theme="paper"] .cs-theme,
+:root .cs-theme {
+  background:
+    radial-gradient(circle at 88% -6%, color-mix(in oklch, var(--accent) 22%, transparent), transparent 45%),
+    radial-gradient(circle at 5% 110%, color-mix(in oklch, var(--cool) 12%, transparent), transparent 40%),
+    linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 60%, var(--bg) 100%);
+}
+[data-theme="console"] .cs-theme {
+  background:
+    radial-gradient(circle at 88% -6%, color-mix(in oklch, var(--accent) 12%, transparent), transparent 45%),
+    radial-gradient(circle at 5% 110%, color-mix(in oklch, var(--cool) 10%, transparent), transparent 40%),
+    linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 60%, var(--bg) 100%);
+}
+[data-theme="clinical"] .cs-theme {
+  background: var(--bg);
+}
+
+[data-theme="paper"] .cs-theme::before,
+:root .cs-theme::before,
+[data-theme="console"] .cs-theme::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(color-mix(in oklch, var(--ink) 4%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklch, var(--ink) 4%, transparent) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: radial-gradient(ellipse at center, black 20%, transparent 85%);
+  z-index: 0;
+}
+
+/* ── Typography helpers ── */
+.cs-font-display { font-family: var(--font-display); font-weight: 400; letter-spacing: -0.02em; }
+.cs-font-mono { font-family: var(--font-mono); }
+
+.cs-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: var(--accent-ink);
+  margin: 0;
+}
+[data-theme="console"] .cs-eyebrow { color: var(--accent); }
+
+.cs-mono-label {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--muted);
+}
+
+.cs-mut { color: var(--muted); }
+.cs-mut-2 { color: var(--muted-2); }
+
+/* ── App shell (landing + stage pages) ── */
+.cs-app {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  position: relative;
+  z-index: 1;
+}
+
+.cs-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  border-right: 1px solid var(--line);
+  background: var(--surface);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  padding: 20px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  z-index: 10;
+}
+
+.cs-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 6px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.cs-brand-mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 30% 30%, color-mix(in oklch, var(--accent) 85%, white), var(--accent));
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.2), 0 4px 10px -4px color-mix(in oklch, var(--accent) 60%, transparent);
+  position: relative;
+}
+.cs-brand-mark::after {
+  content: "";
+  position: absolute; inset: 6px;
+  border-radius: 4px;
+  background: repeating-linear-gradient(45deg, rgba(255,255,255,0.55) 0 2px, transparent 2px 4px);
+  mix-blend-mode: overlay;
+}
+.cs-brand-name {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 17px;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+[data-theme="console"] .cs-brand-name { font-family: var(--font-mono); letter-spacing: 0.02em; }
+
+.cs-nav-sec-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: var(--muted-2);
+  padding: 0 8px;
+  margin-bottom: 6px;
+  margin-top: 8px;
+}
+
+.cs-nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink-2);
+  cursor: pointer;
+  min-height: 44px;
+  border: 1px solid transparent;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  text-align: left;
+  width: 100%;
+  background: transparent;
+  font-family: inherit;
+  text-decoration: none;
+}
+.cs-nav-item:hover { background: color-mix(in oklch, var(--ink) 4%, transparent); }
+.cs-nav-item.is-active {
+  background: color-mix(in oklch, var(--accent) 14%, transparent);
+  border-color: color-mix(in oklch, var(--accent) 24%, transparent);
+  color: var(--accent-ink);
+  font-weight: 500;
+}
+[data-theme="console"] .cs-nav-item.is-active { color: var(--accent); }
+.cs-nav-item.is-disabled { color: var(--muted-2); cursor: default; }
+.cs-nav-item.is-disabled:hover { background: transparent; }
+
+.cs-nav-item .cs-step {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--muted);
+  width: 22px;
+}
+.cs-nav-item.is-active .cs-step { color: var(--accent-ink); }
+[data-theme="console"] .cs-nav-item.is-active .cs-step { color: var(--accent); }
+
+/* ── Chips ── */
+.cs-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  height: 18px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.cs-chip-live { background: var(--accent-soft); color: var(--accent-ink); }
+[data-theme="console"] .cs-chip-live { background: color-mix(in oklch, var(--accent) 18%, transparent); color: var(--accent); }
+.cs-chip-planned { background: var(--warm-soft); color: var(--warm); }
+.cs-chip-scaffold { background: color-mix(in oklch, var(--cool) 12%, transparent); color: var(--cool); }
+[data-theme="console"] .cs-chip-scaffold { background: color-mix(in oklch, var(--cool) 22%, transparent); color: var(--cool); }
+
+/* ── View shell ── */
+.cs-view {
+  padding: 28px 40px 80px;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.cs-view-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 28px;
+}
+.cs-view-head h1 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 44px;
+  letter-spacing: -0.025em;
+  line-height: 1.02;
+  margin: 0;
+  color: var(--ink);
+}
+[data-theme="console"] .cs-view-head h1 { font-family: var(--font-mono); letter-spacing: 0; font-weight: 500; font-size: 30px; }
+[data-theme="clinical"] .cs-view-head h1 { font-weight: 600; letter-spacing: -0.02em; }
+
+.cs-view-head .cs-crumb {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
+}
+
+/* ── Cards ── */
+.cs-card {
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-cs-lg);
+  box-shadow: var(--shadow-cs-sm);
+}
+.cs-card-pad { padding: 22px 24px; }
+.cs-card-sunk { background: var(--surface-sunk); }
+.cs-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--line);
+}
+.cs-card-head h3 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 21px;
+  margin: 0 0 2px;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+[data-theme="console"] .cs-card-head h3 { font-family: var(--font-mono); font-size: 14px; letter-spacing: 0.02em; }
+
+/* ── Buttons ── */
+.cs-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink);
+  transition: transform 0.1s, filter 0.15s, background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.cs-btn:hover { transform: translateY(-0.5px); filter: brightness(1.04); }
+.cs-btn:active { transform: translateY(0); }
+.cs-btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+
+.cs-btn-primary {
+  background: var(--ink);
+  color: var(--bg-2);
+}
+[data-theme="clinical"] .cs-btn-primary { background: var(--accent); color: white; }
+[data-theme="console"] .cs-btn-primary {
+  background: var(--accent);
+  color: #08110c;
+  box-shadow: 0 0 20px -4px color-mix(in oklch, var(--accent) 60%, transparent);
+}
+.cs-btn-ghost {
+  border-color: var(--line-strong);
+  color: var(--ink-2);
+  background: color-mix(in oklch, var(--bg) 30%, transparent);
+}
+.cs-btn-ghost:hover { background: var(--surface-strong); }
+
+.cs-btn-sm { height: 36px; min-height: 36px; font-size: 13.5px; padding: 0 14px; }
+
+/* ── Callouts ── */
+.cs-callout {
+  border-radius: var(--radius-cs);
+  padding: 14px 18px;
+  border: 1px solid var(--line);
+  background: color-mix(in oklch, var(--accent) 6%, var(--surface-strong));
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.cs-callout-warm { background: color-mix(in oklch, var(--warm) 8%, var(--surface-strong)); }
+
+/* ── Progress ── */
+.cs-progress {
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--ink) 6%, transparent);
+  overflow: hidden;
+  position: relative;
+}
+[data-theme="console"] .cs-progress { background: rgba(255,255,255,0.06); }
+
+.cs-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), color-mix(in oklch, var(--accent) 65%, var(--cool)));
+  border-radius: 999px;
+  position: relative;
+  transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.cs-progress-fill::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent 60%, rgba(255,255,255,0.28) 78%, transparent 96%);
+  animation: cs-sheen 2.4s ease-in-out infinite;
+}
+@keyframes cs-sheen { 0% { transform: translateX(-40%); } 100% { transform: translateX(40%); } }
+
+.cs-progress-sub {
+  height: 3px;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--ink) 4%, transparent);
+  overflow: hidden;
+}
+.cs-progress-sub-fill {
+  height: 100%;
+  background: var(--accent);
+  opacity: 0.8;
+  transition: width 0.6s ease;
+}
+
+/* ── Lane cards ── */
+.cs-lane-accent-tumor { --lane: var(--warm); --lane-soft: var(--warm-soft); }
+.cs-lane-accent-normal { --lane: var(--cool); --lane-soft: var(--cool-soft); }
+
+.cs-lane-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-cs-lg);
+  background: var(--surface-strong);
+  padding: 18px 20px;
+  position: relative;
+  overflow: hidden;
+}
+.cs-lane-card::before {
+  content: "";
+  position: absolute; inset: 0 auto 0 0; width: 3px;
+  background: var(--lane);
+  opacity: 0.8;
+}
+
+/* ── Data table rows ── */
+.cs-data-row {
+  display: grid;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  font-size: 14.5px;
+}
+.cs-data-row:last-child { border-bottom: none; }
+.cs-data-head {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--muted-2);
+  background: var(--surface-sunk);
+  border-bottom: 1px solid var(--line);
+}
+
+/* ── Tweaks panel ── */
+.cs-tweaks-panel {
+  position: fixed;
+  right: 20px; bottom: 20px;
+  width: 300px;
+  z-index: 50;
+  background: var(--surface-strong);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-cs);
+  box-shadow: var(--shadow-cs-lg);
+  padding: 14px 16px;
+  backdrop-filter: blur(20px);
+  color: var(--ink);
+}
+.cs-tweaks-panel h4 {
+  margin: 0 0 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--muted);
+}
+.cs-tweak-row { margin-bottom: 12px; }
+.cs-tweak-row:last-child { margin-bottom: 0; }
+.cs-tweak-row label {
+  display: block;
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-bottom: 5px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.cs-tweak-seg {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 10px;
+  background: color-mix(in oklch, var(--ink) 5%, transparent);
+}
+.cs-tweak-seg button {
+  border: none; background: transparent;
+  padding: 6px 4px;
+  border-radius: 7px;
+  font-family: inherit;
+  font-size: 11.5px;
+  color: var(--ink-2);
+  cursor: pointer;
+  text-transform: capitalize;
+}
+.cs-tweak-seg button.is-on { background: var(--surface-strong); box-shadow: var(--shadow-cs-sm); color: var(--ink); font-weight: 500; }
+.cs-tweak-toggle {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--ink-2);
+  cursor: pointer;
+  user-select: none;
+}
+.cs-tweak-toggle input { accent-color: var(--accent); }
+
+input[type="range"].cs-tweak-range { width: 100%; accent-color: var(--accent); }
+
+/* ── Helix visual ── */
+.cs-helix-wrap { position: relative; display: inline-block; }
+.cs-helix-scene {
+  transform-style: preserve-3d;
+  perspective: 900px;
+  animation: cs-helix-spin 22s linear infinite;
+}
+.cs-helix-scene.cs-helix-reverse { animation-direction: reverse; }
+@keyframes cs-helix-spin {
+  from { transform: rotateY(0deg); }
+  to   { transform: rotateY(360deg); }
+}
+
+/* ── VAF histogram ── */
+.cs-vaf-bars { display: flex; align-items: flex-end; gap: 2px; height: 80px; }
+.cs-vaf-bar {
+  flex: 1;
+  background: linear-gradient(180deg, var(--accent), color-mix(in oklch, var(--accent) 40%, var(--cool)));
+  border-radius: 3px 3px 0 0;
+  opacity: 0.9;
+}
+[data-theme="console"] .cs-vaf-bar { background: linear-gradient(180deg, var(--accent), color-mix(in oklch, var(--accent) 55%, transparent)); }
+
+/* ── Karyogram (dark canvas, independent of theme) ── */
+.cs-karyo {
+  border-radius: 26px;
+  background: var(--karyo-bg);
+  padding: 22px 24px 26px;
+  color: #e7ecf3;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.05);
+  box-shadow: 0 40px 80px -40px rgba(8, 11, 24, 0.8);
+}
+.cs-karyo::before {
+  content: "";
+  position: absolute; inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 90% 10%, rgba(52,211,153,0.08), transparent 45%),
+    radial-gradient(circle at 10% 95%, rgba(56,189,248,0.08), transparent 55%),
+    radial-gradient(circle at 1px 1px, rgba(148,163,184,0.18) 1px, transparent 0);
+  background-size: auto, auto, 22px 22px;
+  opacity: 0.65;
+}
+.cs-karyo > * { position: relative; }
+
+/* ── Hero banner ── */
+.cs-hero {
+  position: relative;
+  padding: 48px 44px 42px;
+  border-radius: var(--radius-cs-xl);
+  background:
+    radial-gradient(circle at 82% 20%, color-mix(in oklch, var(--accent) 20%, transparent), transparent 55%),
+    radial-gradient(circle at 8% 110%, color-mix(in oklch, var(--cool) 14%, transparent), transparent 55%),
+    var(--surface-strong);
+  border: 1px solid var(--line);
+  overflow: hidden;
+  box-shadow: var(--shadow-cs);
+}
+[data-theme="console"] .cs-hero { border-color: var(--line-strong); }
+
+.cs-hero-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 32px;
+  align-items: center;
+}
+
+/* ── Species picker cards ── */
+.cs-species-card {
+  border-radius: var(--radius-cs-lg);
+  border: 1px solid var(--line);
+  background: var(--surface-strong);
+  padding: 14px 16px;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+  color: var(--ink);
+}
+.cs-species-card:hover { border-color: var(--line-strong); transform: translateY(-1px); }
+.cs-species-card.is-on {
+  border-color: color-mix(in oklch, var(--accent) 70%, transparent);
+  background: color-mix(in oklch, var(--accent) 8%, var(--surface-strong));
+}
+
+.cs-species-portrait {
+  width: 52px; height: 52px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, color-mix(in oklch, var(--accent) 30%, var(--surface-strong)), color-mix(in oklch, var(--cool) 30%, var(--surface-strong)));
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display);
+  font-size: 22px;
+  color: var(--accent-ink);
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+[data-theme="console"] .cs-species-portrait { color: var(--accent); background: color-mix(in oklch, var(--accent) 20%, transparent); }
+.cs-species-portrait::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(45deg, rgba(255,255,255,0.08) 0 3px, transparent 3px 6px);
+}
+
+.cs-tiny { font-size: 13.5px; line-height: 1.6; color: var(--muted); }
+
+/* ── Spinner ── */
+.cs-spinner {
+  display: inline-block;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in oklch, var(--accent) 20%, transparent);
+  border-top-color: var(--accent);
+  animation: cs-spin 0.9s linear infinite;
+}
+@keyframes cs-spin { to { transform: rotate(360deg); } }
+
+/* ── Dot ── */
+.cs-dot {
+  display: inline-block;
+  width: 7px; height: 7px; border-radius: 999px;
+  background: currentColor;
+}
+
+/* ── Fade-in — never stall invisible ── */
+.cs-fade-in { animation: cs-fi 0.4s ease both; opacity: 1; }
+@keyframes cs-fi { from { opacity: 0.01; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* ── Focus ── */
+.cs-theme *:focus-visible {
+  outline: 2.5px solid color-mix(in oklch, var(--accent) 80%, var(--ink));
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* ── Responsive collapse ── */
+@media (max-width: 1000px) {
+  .cs-app { grid-template-columns: 1fr; }
+  .cs-sidebar { position: relative; height: auto; }
+  .cs-view { padding: 20px; }
+  .cs-hero-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .cs-theme *, .cs-theme *::before, .cs-theme *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+

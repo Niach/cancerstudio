@@ -1,22 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { ChevronDown, Dna, LockKeyhole, Plus } from "lucide-react";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 
 import AlignmentStagePanel from "@/components/workspaces/AlignmentStagePanel";
 import AnnotationStagePanel from "@/components/workspaces/AnnotationStagePanel";
 import IngestionStagePanel from "@/components/workspaces/IngestionStagePanel";
 import VariantCallingStagePanel from "@/components/workspaces/VariantCallingStagePanel";
-import { Badge } from "@/components/ui/badge";
+import TweaksPanel from "@/components/dev/TweaksPanel";
+import HelixMini from "@/components/helix/HelixMini";
+import { useTweaks } from "@/components/dev/TweaksProvider";
 import { api } from "@/lib/api";
 import {
-  describeWorkspaceProgress,
   getPipelinePolicy,
   getVisiblePrimaryStages,
   getVisibleResearchStages,
-  type PipelineStagePolicy,
 } from "@/lib/pipeline-policy";
 import type {
   AlignmentStageSummary,
@@ -26,81 +24,11 @@ import type {
   Workspace,
 } from "@/lib/types";
 import { PIPELINE_STAGES } from "@/lib/types";
-import { cn } from "@/lib/utils";
-import {
-  formatReferencePreset,
-  formatReferencePresetCodename,
-  formatSpeciesLabel,
-} from "@/lib/workspace-utils";
 
 function mergeWorkspaces(workspaces: Workspace[], workspace: Workspace) {
   const withoutCurrent = workspaces.filter((item) => item.id !== workspace.id);
   return [workspace, ...withoutCurrent].sort((left, right) =>
     right.updatedAt.localeCompare(left.updatedAt)
-  );
-}
-
-function NavigationStageItem({
-  policy,
-  label,
-  href,
-  isActive,
-  disabledLabel,
-}: {
-  policy: PipelineStagePolicy;
-  label: string;
-  href: string;
-  isActive: boolean;
-  disabledLabel?: string;
-}) {
-  const { stage, enterable, actionable } = policy;
-  const secondaryLabel = disabledLabel ?? (enterable ? "Locked" : "Upcoming");
-  const content = (
-    <>
-      <span
-        className={cn(
-          "flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full px-2 text-xs font-semibold",
-          isActive
-            ? "bg-emerald-600 text-white"
-            : !enterable
-              ? "bg-slate-200 text-slate-500"
-              : "bg-muted text-muted-foreground"
-        )}
-      >
-        {!enterable ? <LockKeyhole className="size-3.5" /> : label}
-      </span>
-      <div className="min-w-0">
-        <div>{stage.name}</div>
-        {!actionable ? (
-          <div className="text-xs font-normal text-slate-500">{secondaryLabel}</div>
-        ) : null}
-      </div>
-    </>
-  );
-
-  if (!enterable) {
-    return (
-      <div
-        aria-disabled="true"
-        className="flex cursor-not-allowed items-center gap-3 rounded-2xl px-3 py-2 text-sm text-slate-400"
-      >
-        {content}
-      </div>
-    );
-  }
-
-  return (
-    <Link
-      href={href}
-      className={cn(
-        "flex items-center gap-3 rounded-2xl px-3 py-2 text-sm transition",
-        isActive
-          ? "bg-emerald-50 font-medium text-emerald-700"
-          : "text-muted-foreground hover:bg-muted hover:text-foreground"
-      )}
-    >
-      {content}
-    </Link>
   );
 }
 
@@ -123,10 +51,8 @@ export default function WorkspaceStageShell({
   initialAnnotationSummary,
   redirectedFromStageId,
 }: WorkspaceStageShellProps) {
-  const router = useRouter();
-  const [, startTransition] = useTransition();
   const [workspace, setWorkspace] = useState(initialWorkspace);
-  const [workspaces, setWorkspaces] = useState(
+  const [, setWorkspaces] = useState(
     mergeWorkspaces(initialWorkspaces, initialWorkspace)
   );
   const [alignmentSummary, setAlignmentSummary] = useState(
@@ -138,6 +64,7 @@ export default function WorkspaceStageShell({
   const [annotationSummary, setAnnotationSummary] = useState(
     initialAnnotationSummary
   );
+  const { tweaks } = useTweaks();
 
   const stagePolicy = getPipelinePolicy(
     workspace,
@@ -147,12 +74,6 @@ export default function WorkspaceStageShell({
   );
   const currentStagePolicy = stagePolicy[currentStageId];
   const primaryStages = getVisiblePrimaryStages(stagePolicy);
-  const coreStages = primaryStages.filter(
-    (stage) => stage.implementationState !== "planned"
-  );
-  const upcomingStages = primaryStages.filter(
-    (stage) => stage.implementationState === "planned"
-  );
   const researchStages = getVisibleResearchStages(stagePolicy);
   const redirectNoticeStage = redirectedFromStageId
     ? PIPELINE_STAGES.find((stage) => stage.id === redirectedFromStageId) ?? null
@@ -162,9 +83,7 @@ export default function WorkspaceStageShell({
     if (workspace.activeStage === currentStageId || !currentStagePolicy.enterable) {
       return;
     }
-
     let ignore = false;
-
     void api
       .updateWorkspaceActiveStage(workspace.id, currentStageId)
       .then((updatedWorkspace) => {
@@ -173,7 +92,6 @@ export default function WorkspaceStageShell({
         setWorkspaces((current) => mergeWorkspaces(current, updatedWorkspace));
       })
       .catch(() => {});
-
     return () => {
       ignore = true;
     };
@@ -199,130 +117,169 @@ export default function WorkspaceStageShell({
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(21,128,61,0.08),_transparent_22%),radial-gradient(circle_at_bottom_right,_rgba(14,165,233,0.08),_transparent_24%),linear-gradient(180deg,_#f8fbf8_0%,_#f2f6f3_100%)]">
-      <header className="border-b border-black/6 bg-white/85 backdrop-blur">
-        <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-4 py-3 lg:px-6">
-          <div className="flex items-center gap-3">
+    <div className="cs-theme">
+      <div className="cs-app">
+        <aside className="cs-sidebar">
+          <Link
+            href="/"
+            className="cs-brand"
+            style={{ textDecoration: "none", color: "inherit" }}
+          >
+            <div className="cs-brand-mark" />
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <span className="cs-brand-name">cancerstudio</span>
+              <span
+                className="cs-mono-label"
+                style={{ fontSize: 9, letterSpacing: "0.18em" }}
+              >
+                v0.4 · desktop
+              </span>
+            </div>
+          </Link>
+
+          <div>
+            <div className="cs-nav-sec-label">Workspace</div>
             <Link
               href="/"
-              className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm shadow-emerald-900/10"
+              className={`cs-nav-item`}
+              style={{ textDecoration: "none" }}
             >
-              <Dna className="size-4" />
+              <span className="cs-step">↖</span>
+              <span>All workspaces</span>
             </Link>
-            <div className="space-y-1">
-              <h1 className="text-lg font-semibold">{workspace.displayName}</h1>
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline">
-                  {formatSpeciesLabel(workspace.species)}
-                </Badge>
-                <Badge
-                  variant="outline"
-                  className="border-black/10 bg-white/80 text-[11px] text-slate-600"
-                  title={formatReferencePresetCodename(
-                    workspace.analysisProfile.referencePreset
-                  )}
-                >
-                  {formatReferencePreset(workspace.analysisProfile.referencePreset)}
-                </Badge>
-                <span className="text-xs text-muted-foreground">
-                  {describeWorkspaceProgress(workspace, alignmentSummary)}
-                </span>
-              </div>
-            </div>
+            <Link
+              href="/workspaces/new"
+              className="cs-nav-item"
+              style={{ textDecoration: "none" }}
+            >
+              <span className="cs-step">+</span>
+              <span>New workspace</span>
+            </Link>
           </div>
 
-          <div className="flex items-center gap-2">
-            <select
-              value={workspace.id}
-              onChange={(event) =>
-                startTransition(() => {
-                  router.push(`/workspaces/${event.target.value}`);
-                })
+          <div>
+            <div
+              className="cs-nav-sec-label"
+              style={{
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+              title={workspace.displayName}
+            >
+              {workspace.displayName}
+            </div>
+            {primaryStages.map((stage, index) => {
+              const policy = stagePolicy[stage.id];
+              const step = String(index + 1).padStart(2, "0");
+              const isActive = stage.id === currentStageId;
+              const isLive = stage.implementationState === "live";
+              const enterable = policy.enterable && isLive;
+
+              if (!enterable) {
+                return (
+                  <div
+                    key={stage.id}
+                    className={`cs-nav-item is-disabled`}
+                    aria-disabled
+                    title={policy.blockedReason ?? "Planned stage"}
+                  >
+                    <span className="cs-step">{step}</span>
+                    <span style={{ flex: 1 }}>{stage.name}</span>
+                    <span
+                      style={{
+                        fontSize: 9,
+                        fontFamily: "var(--font-mono)",
+                        color: "var(--muted-2)",
+                        letterSpacing: "0.14em",
+                      }}
+                    >
+                      SOON
+                    </span>
+                  </div>
+                );
               }
-              className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
-            >
-              {workspaces.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.displayName}
-                </option>
-              ))}
-            </select>
-            <Link
-              href="/"
-              aria-label="New workspace"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-black/10 text-muted-foreground transition hover:bg-muted hover:text-foreground"
-            >
-              <Plus className="size-4" />
-            </Link>
-          </div>
-        </div>
-      </header>
 
-      <div className="mx-auto max-w-[1440px] px-4 py-6 lg:px-6">
-        <div className="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
-          <nav className="rounded-[24px] border border-black/5 bg-white/65 p-3 shadow-sm shadow-black/5 backdrop-blur">
-            <div className="mb-3 px-2 font-mono text-[10px] font-medium tracking-[0.28em] text-slate-400 uppercase">
-              Core workflow
-            </div>
-            <div className="space-y-1">
-              {coreStages.map((stage, index) => (
-                <NavigationStageItem
+              return (
+                <Link
                   key={stage.id}
-                  policy={stagePolicy[stage.id]}
-                  label={`${index + 1}`}
                   href={`/workspaces/${workspace.id}/${stage.id}`}
-                  isActive={stage.id === currentStageId}
-                />
+                  className={`cs-nav-item ${isActive ? "is-active" : ""}`}
+                >
+                  <span className="cs-step">{step}</span>
+                  <span style={{ flex: 1 }}>{stage.name}</span>
+                </Link>
+              );
+            })}
+          </div>
+
+          {researchStages.length > 0 ? (
+            <div>
+              <div className="cs-nav-sec-label">Later research</div>
+              {researchStages.map((stage, index) => (
+                <div
+                  key={stage.id}
+                  className="cs-nav-item is-disabled"
+                  aria-disabled
+                  title="Research-only — not available yet"
+                >
+                  <span className="cs-step">R{index + 1}</span>
+                  <span style={{ flex: 1 }}>{stage.name}</span>
+                  <span
+                    style={{
+                      fontSize: 9,
+                      fontFamily: "var(--font-mono)",
+                      color: "var(--muted-2)",
+                      letterSpacing: "0.14em",
+                    }}
+                  >
+                    R&amp;D
+                  </span>
+                </div>
               ))}
             </div>
+          ) : null}
 
-            <div className="mt-5">
-              <div className="mb-3 px-2 font-mono text-[10px] font-medium tracking-[0.28em] text-slate-400 uppercase">
-                Upcoming
-              </div>
-              <div className="space-y-1">
-                {upcomingStages.map((stage, index) => (
-                  <NavigationStageItem
-                    key={stage.id}
-                    policy={stagePolicy[stage.id]}
-                    label={`${coreStages.length + index + 1}`}
-                    href={`/workspaces/${workspace.id}/${stage.id}`}
-                    isActive={false}
-                    disabledLabel="Upcoming"
-                  />
-                ))}
-              </div>
-            </div>
+          <div
+            style={{
+              marginTop: "auto",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              paddingTop: 16,
+              borderTop: "1px solid var(--line)",
+            }}
+          >
+            <HelixMini size={22} hue={tweaks.accentHue} />
+            <span className="cs-tiny" style={{ fontSize: 13 }}>
+              Everything stays on your computer.
+            </span>
+          </div>
+        </aside>
 
-            <details className="group mt-5 rounded-2xl border border-black/6 bg-white/60">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-slate-700">
-                Later research modules
-                <ChevronDown className="size-4 transition group-open:rotate-180" />
-              </summary>
-              <div className="space-y-1 border-t border-black/6 px-2 py-2">
-                {researchStages.map((stage, index) => (
-                  <NavigationStageItem
-                    key={stage.id}
-                    policy={stagePolicy[stage.id]}
-                    label={`R${index + 1}`}
-                    href={`/workspaces/${workspace.id}/${stage.id}`}
-                    isActive={false}
-                    disabledLabel="Research"
-                  />
-                ))}
-              </div>
-            </details>
-          </nav>
-
-          <main className="space-y-4">
+        <main>
+          <div className="cs-view cs-fade-in" key={`${workspace.id}-${currentStageId}`}>
             {redirectNoticeStage ? (
-              <div className="rounded-[24px] border border-amber-200 bg-amber-50 px-6 py-4 text-sm text-amber-900 shadow-sm shadow-amber-900/5">
-                <div className="font-medium">
-                  {redirectNoticeStage.name} is on the roadmap, but it is not usable yet.
+              <div
+                className="cs-callout cs-callout-warm"
+                style={{ marginBottom: 22 }}
+              >
+                <div className="cs-dot" style={{ color: "var(--warm)" }} />
+                <div style={{ flex: 1 }}>
+                  <div
+                    style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)" }}
+                  >
+                    {redirectNoticeStage.name} is on the roadmap, but it is not
+                    usable yet.
+                  </div>
+                  <p
+                    className="cs-tiny"
+                    style={{ margin: "4px 0 0", fontSize: 13.5 }}
+                  >
+                    We brought you back to the current working step so the
+                    workflow stays simple.
+                  </p>
                 </div>
-                <p className="mt-1 text-amber-800">
-                  We brought you back to the current working step so the workflow stays simple.
-                </p>
               </div>
             ) : null}
 
@@ -351,9 +308,11 @@ export default function WorkspaceStageShell({
                 initialSummary={annotationSummary}
               />
             ) : null}
-          </main>
-        </div>
+          </div>
+        </main>
       </div>
+
+      <TweaksPanel />
     </div>
   );
 }

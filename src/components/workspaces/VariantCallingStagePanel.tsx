@@ -1,93 +1,53 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  AlertTriangle,
-  ChevronRight,
-  FolderOpen,
-  LockKeyhole,
-  Pause,
-  Play,
-  RotateCw,
-  Square,
-  Telescope,
-} from "lucide-react";
+import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
 
+import FilterBreakdown from "@/components/workspaces/variant-calling/FilterBreakdown";
 import Karyogram from "@/components/workspaces/variant-calling/Karyogram";
 import MetricsRibbon from "@/components/workspaces/variant-calling/MetricsRibbon";
-import FilterBreakdown from "@/components/workspaces/variant-calling/FilterBreakdown";
-import VafDistribution from "@/components/workspaces/variant-calling/VafDistribution";
 import TopVariantsTable from "@/components/workspaces/variant-calling/TopVariantsTable";
-
+import VafDistribution from "@/components/workspaces/variant-calling/VafDistribution";
+import Helix from "@/components/helix/Helix";
+import {
+  Btn,
+  Callout,
+  Card,
+  CardHead,
+  Chip,
+  Dot,
+  Eyebrow,
+} from "@/components/ui-kit";
+import { useTweaks } from "@/components/dev/TweaksProvider";
 import {
   api,
   InsufficientMemoryError,
   MissingToolsError,
   StageNotActionableError,
 } from "@/lib/api";
-import { getDesktopBridge } from "@/lib/desktop";
 import type {
-  VariantCallingArtifact,
-  VariantCallingRuntimePhase,
   VariantCallingStageSummary,
   Workspace,
 } from "@/lib/types";
-import { formatBytes, formatDateTime } from "@/lib/workspace-utils";
-import { cn } from "@/lib/utils";
 
 interface VariantCallingStagePanelProps {
   workspace: Workspace;
   initialSummary: VariantCallingStageSummary;
 }
 
-type BannerState =
-  | "blocked"
-  | "ready"
-  | "running"
-  | "paused"
-  | "completed"
-  | "failed";
-
-function bannerStateOf(summary: VariantCallingStageSummary): BannerState {
-  if (summary.status === "blocked") return "blocked";
-  if (summary.status === "running") return "running";
-  if (summary.status === "paused") return "paused";
-  if (summary.status === "completed") return "completed";
-  if (summary.status === "failed") return "failed";
-  return "ready";
-}
-
-const PILL_TONES: Record<BannerState, { label: string; bg: string; dot: string }> = {
-  blocked: { label: "Locked", bg: "bg-stone-100 text-stone-500", dot: "bg-stone-400" },
-  ready: { label: "Ready", bg: "bg-sky-50 text-sky-700", dot: "bg-sky-500" },
-  running: { label: "Running", bg: "bg-amber-50 text-amber-700", dot: "bg-amber-500" },
-  paused: { label: "Paused", bg: "bg-indigo-50 text-indigo-700", dot: "bg-indigo-500" },
-  completed: { label: "Complete", bg: "bg-emerald-50 text-emerald-700", dot: "bg-emerald-500" },
-  failed: { label: "Failed", bg: "bg-rose-50 text-rose-700", dot: "bg-rose-500" },
-};
-
-function artifactKindLabel(kind: VariantCallingArtifact["artifactKind"]) {
-  if (kind === "vcf") return "Somatic VCF";
-  if (kind === "tbi") return "VCF index";
-  return "Mutect2 stats";
-}
-
 export default function VariantCallingStagePanel({
   workspace,
   initialSummary,
 }: VariantCallingStagePanelProps) {
+  const { tweaks } = useTweaks();
   const [summary, setSummary] = useState(initialSummary);
+  const [submitting, setSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [missingTools, setMissingTools] = useState<{
-    tools: string[];
-    hints: string[];
-  } | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const isFirstRender = useRef(true);
+  const [missingTools, setMissingTools] = useState<{ tools: string[]; hints: string[] } | null>(
+    null
+  );
 
-  // Keep the latest initialSummary available when the user changes workspaces
-  // or navigates back into this stage — the parent passes fresh server data
-  // each time.
+  const isFirstRender = useRef(true);
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;
@@ -99,9 +59,7 @@ export default function VariantCallingStagePanel({
   }, [initialSummary]);
 
   useEffect(() => {
-    if (summary.status !== "running" && summary.status !== "paused") {
-      return;
-    }
+    if (summary.status !== "running" && summary.status !== "paused") return;
     const timer = window.setInterval(() => {
       void api
         .getVariantCallingStageSummary(workspace.id)
@@ -111,394 +69,349 @@ export default function VariantCallingStagePanel({
     return () => window.clearInterval(timer);
   }, [summary.status, workspace.id]);
 
-  const bannerState = bannerStateOf(summary);
-  const pill = PILL_TONES[bannerState];
   const latestRun = summary.latestRun;
   const metrics = latestRun?.metrics ?? null;
+  const status = summary.status;
 
-  const handleRun = useCallback(async () => {
-    setActionError(null);
-    setMissingTools(null);
-    setIsSubmitting(true);
-    try {
-      const next = await api.runVariantCalling(workspace.id);
-      setSummary(next);
-    } catch (error) {
-      if (error instanceof MissingToolsError) {
-        setMissingTools({ tools: error.tools, hints: error.hints });
-      } else if (error instanceof InsufficientMemoryError) {
-        setActionError(error.message);
-      } else if (error instanceof StageNotActionableError) {
-        setActionError(error.message);
-      } else if (error instanceof Error) {
-        setActionError(error.message);
-      } else {
-        setActionError("Unable to start variant calling.");
+  const runAction = useCallback(
+    async (action: () => Promise<VariantCallingStageSummary>) => {
+      setSubmitting(true);
+      setActionError(null);
+      setMissingTools(null);
+      try {
+        const next = await action();
+        setSummary(next);
+      } catch (err) {
+        if (err instanceof MissingToolsError) {
+          setMissingTools({ tools: err.tools, hints: err.hints });
+        } else if (err instanceof InsufficientMemoryError) {
+          setActionError(err.message);
+        } else if (err instanceof StageNotActionableError) {
+          setActionError(err.message);
+        } else if (err instanceof Error) {
+          setActionError(err.message);
+        } else {
+          setActionError("Unable to complete the action.");
+        }
+      } finally {
+        setSubmitting(false);
       }
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [workspace.id]);
-
-  const handleRerun = useCallback(async () => {
-    setActionError(null);
-    setMissingTools(null);
-    setIsSubmitting(true);
-    try {
-      const next = await api.rerunVariantCalling(workspace.id);
-      setSummary(next);
-    } catch (error) {
-      if (error instanceof MissingToolsError) {
-        setMissingTools({ tools: error.tools, hints: error.hints });
-      } else if (error instanceof Error) {
-        setActionError(error.message);
-      } else {
-        setActionError("Unable to rerun variant calling.");
-      }
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [workspace.id]);
-
-  const handleCancel = useCallback(async () => {
-    if (!latestRun) return;
-    setActionError(null);
-    setIsSubmitting(true);
-    try {
-      const next = await api.cancelVariantCalling(workspace.id, latestRun.id);
-      setSummary(next);
-    } catch (error) {
-      if (error instanceof Error) {
-        setActionError(error.message);
-      } else {
-        setActionError("Unable to stop the run.");
-      }
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [workspace.id, latestRun]);
-
-  const handlePause = useCallback(async () => {
-    if (!latestRun) return;
-    setActionError(null);
-    setIsSubmitting(true);
-    try {
-      const next = await api.pauseVariantCalling(workspace.id, latestRun.id);
-      setSummary(next);
-    } catch (error) {
-      if (error instanceof Error) {
-        setActionError(error.message);
-      } else {
-        setActionError("Unable to pause the run.");
-      }
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [workspace.id, latestRun]);
-
-  const handleResume = useCallback(async () => {
-    if (!latestRun) return;
-    setActionError(null);
-    setIsSubmitting(true);
-    try {
-      const next = await api.resumeVariantCalling(workspace.id, latestRun.id);
-      setSummary(next);
-    } catch (error) {
-      if (error instanceof Error) {
-        setActionError(error.message);
-      } else {
-        setActionError("Unable to resume the run.");
-      }
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [workspace.id, latestRun]);
-
-  const handleOpenArtifact = useCallback(
-    async (artifact: VariantCallingArtifact) => {
-      const desktop = getDesktopBridge();
-      const localPath = artifact.localPath ?? null;
-      if (!desktop || !localPath) {
-        window.location.href = api.resolveDownloadUrl(artifact.downloadPath);
-        return;
-      }
-      await desktop.openPath(localPath);
     },
     []
   );
 
-  const elapsedLabel = useMemo(() => {
-    if (!latestRun?.startedAt) return null;
-    const started = new Date(latestRun.startedAt).getTime();
-    if (Number.isNaN(started)) return null;
-    const referenceTime = latestRun.completedAt
-      ? new Date(latestRun.completedAt).getTime()
-      : Date.now();
-    const elapsedMs = Math.max(0, referenceTime - started);
-    const minutes = Math.floor(elapsedMs / 60_000);
-    const seconds = Math.floor((elapsedMs % 60_000) / 1000);
-    return `${minutes}m ${seconds.toString().padStart(2, "0")}s`;
-  }, [latestRun?.startedAt, latestRun?.completedAt]);
+  if (status === "blocked") {
+    return (
+      <>
+        <div className="cs-view-head">
+          <div>
+            <div className="cs-crumb">
+              {workspace.displayName} / 03 Variant calling
+            </div>
+            <h1>Variant calling is locked for now.</h1>
+          </div>
+          <Chip kind="live">Stage 03 · Live</Chip>
+        </div>
+        <Callout tone="warm">
+          <Dot style={{ color: "var(--warm)" }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)" }}>
+              {summary.blockingReason ?? "Finish alignment cleanly first."}
+            </div>
+            <p className="cs-tiny" style={{ margin: "4px 0 0" }}>
+              We&apos;ll unlock this step once the alignment run passes QC.
+            </p>
+          </div>
+        </Callout>
+      </>
+    );
+  }
 
-  const showDescription =
-    bannerState !== "running" &&
-    bannerState !== "paused" &&
-    bannerState !== "completed";
-
-  return (
-    <div className="space-y-3" data-testid="variant-calling-stage-panel">
-      <section className="rounded-2xl border border-stone-200 bg-white">
-        <div className="space-y-5 px-5 py-4">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="min-w-0 max-w-2xl">
-              <div className="flex flex-wrap items-center gap-2.5">
-                <h3 className="font-display text-[22px] leading-tight font-light text-stone-900">
-                  Find the cancer-specific mutations
-                </h3>
-                <span
-                  data-testid="variant-calling-stage-status-strip"
-                  data-state={summary.status}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.2em]",
-                    pill.bg
-                  )}
+  if (status === "scaffolded" || (!latestRun && status !== "running")) {
+    return (
+      <>
+        <div className="cs-view-head">
+          <div>
+            <div className="cs-crumb">
+              {workspace.displayName} / 03 Variant calling
+            </div>
+            <h1>Find the cancer-specific mutations.</h1>
+          </div>
+          <Chip kind="live">Stage 03 · Live</Chip>
+        </div>
+        <Card>
+          <div
+            style={{
+              padding: "36px 32px",
+              display: "grid",
+              gridTemplateColumns: "1fr auto",
+              gap: 24,
+              alignItems: "center",
+            }}
+          >
+            <div>
+              <Eyebrow>One click</Eyebrow>
+              <h2
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontSize: 28,
+                  fontWeight: 500,
+                  margin: "6px 0 10px",
+                  letterSpacing: "-0.02em",
+                  color: "var(--ink)",
+                }}
+              >
+                Compare the tumor to the healthy sample.
+              </h2>
+              <p
+                style={{
+                  fontSize: 16,
+                  maxWidth: "54ch",
+                  lineHeight: 1.7,
+                  color: "var(--ink-2)",
+                }}
+              >
+                We compare the tumor DNA to the healthy sample and pull out
+                what&apos;s cancer-specific — ignoring the everyday variations
+                your pet was born with.
+              </p>
+              <div style={{ marginTop: 18 }}>
+                <Btn
+                  data-testid="variant-calling-run-button"
+                  disabled={submitting}
+                  onClick={() => void runAction(() => api.runVariantCalling(workspace.id))}
                 >
-                  <span className={cn("inline-block size-1.5 rounded-full", pill.dot)} />
-                  {pill.label}
-                </span>
-                {latestRun?.accelerationMode === "gpu_parabricks" ? (
-                  <span
-                    data-testid="variant-calling-acceleration-mode"
-                    data-mode="gpu_parabricks"
-                    className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-emerald-700"
-                  >
-                    <span className="inline-block size-1.5 rounded-full bg-emerald-500" />
-                    GPU
-                  </span>
-                ) : latestRun ? (
-                  <span
-                    data-testid="variant-calling-acceleration-mode"
-                    data-mode="cpu_gatk"
-                    className="inline-flex items-center gap-1.5 rounded-full bg-stone-100 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-stone-600"
-                  >
-                    CPU
-                  </span>
-                ) : null}
+                  {submitting ? "Starting…" : "Find mutations"}
+                </Btn>
               </div>
-              {showDescription ? (
-                <p className="mt-2 text-[13px] leading-6 text-stone-500">
-                  We compare the cancer sample to the healthy sample, set aside
-                  anything that looks like a sequencing glitch or an inherited
-                  genetic variant, and show you what is left — the changes that
-                  are only in the cancer.
+              {actionError ? (
+                <p
+                  className="cs-tiny"
+                  style={{ marginTop: 10, color: "var(--danger)" }}
+                >
+                  {actionError}
                 </p>
               ) : null}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {bannerState === "ready" ? (
-                <button
-                  type="button"
-                  data-testid="variant-calling-run-button"
-                  disabled={isSubmitting}
-                  onClick={handleRun}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1.5 text-[12px] font-medium text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <Play className="size-3" />
-                  Find mutations
-                </button>
-              ) : null}
-              {bannerState === "running" && latestRun ? (
-                <>
-                  <button
-                    type="button"
-                    data-testid="variant-calling-pause-button"
-                    disabled={isSubmitting}
-                    onClick={handlePause}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-3 py-1.5 text-[12px] font-medium text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <Pause className="size-3" />
-                    Pause & keep progress
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isSubmitting}
-                    onClick={handleCancel}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-rose-200 bg-white px-3 py-1.5 text-[12px] font-medium text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <Square className="size-3" />
-                    Cancel & discard
-                  </button>
-                </>
-              ) : null}
-              {bannerState === "paused" && latestRun ? (
-                <>
-                  <button
-                    type="button"
-                    disabled={isSubmitting}
-                    onClick={handleCancel}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-rose-200 bg-white px-3 py-1.5 text-[12px] font-medium text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <Square className="size-3" />
-                    Discard & restart
-                  </button>
-                  <button
-                    type="button"
-                    data-testid="variant-calling-resume-button"
-                    disabled={isSubmitting}
-                    onClick={handleResume}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1.5 text-[12px] font-medium text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <Play className="size-3" />
-                    Resume search
-                  </button>
-                </>
-              ) : null}
-              {(bannerState === "completed" || bannerState === "failed") ? (
-                <button
-                  type="button"
-                  data-testid="variant-calling-rerun-button"
-                  disabled={isSubmitting}
-                  onClick={handleRerun}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-3 py-1.5 text-[12px] font-medium text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <RotateCw className="size-3" />
-                  Search again
-                </button>
+              {missingTools ? (
+                <div className="cs-tiny" style={{ marginTop: 10 }}>
+                  Install {missingTools.tools.join(" and ")} first.
+                </div>
               ) : null}
             </div>
+            <Helix size={180} rungs={18} hue={tweaks.accentHue} speed={24} />
           </div>
+        </Card>
+      </>
+    );
+  }
 
-          {bannerState === "blocked" ? (
-            <div className="flex items-start gap-2 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2.5 text-[13px] text-stone-600">
-              <LockKeyhole className="mt-0.5 size-3.5 shrink-0 text-stone-400" />
-              <span>{summary.blockingReason ?? "Locked — finish alignment first."}</span>
+  if (status === "running") {
+    const pct = latestRun
+      ? latestRun.totalShards > 0
+        ? latestRun.completedShards / latestRun.totalShards
+        : latestRun.progress
+      : 0;
+    return (
+      <>
+        <div className="cs-view-head">
+          <div>
+            <div className="cs-crumb">
+              {workspace.displayName} / 03 Variant calling
             </div>
-          ) : null}
-
-          {missingTools ? (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-[13px] text-amber-900">
-              <div className="flex items-center gap-2 font-medium">
-                <AlertTriangle className="size-3.5" />
-                Install {missingTools.tools.join(" and ")} to continue
-              </div>
-              <ul className="mt-2 space-y-1 text-[12px] text-amber-800">
-                {missingTools.hints.map((hint, index) => (
-                  <li key={index} className="font-mono text-[11px] leading-5">
-                    {hint}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-
-          {actionError ? (
-            <div className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[13px] text-rose-700">
-              <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-              <span>{actionError}</span>
-            </div>
-          ) : null}
-
-          {bannerState === "running" && latestRun ? (
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between gap-3 font-mono text-[10px] uppercase tracking-[0.2em] text-stone-500">
-                <span>
-                  {latestRun.totalShards > 0
-                    ? `${latestRun.completedShards} / ${latestRun.totalShards} chromosomes done`
-                    : phaseRunningLabel(latestRun.runtimePhase)}
-                </span>
-                <span className="flex items-center gap-2">
-                  <span>{elapsedLabel}</span>
-                  <span className="text-stone-300">·</span>
-                  <span>{Math.round(latestRun.progress * 100)}%</span>
-                </span>
-              </div>
-              <div className="h-1 overflow-hidden rounded-full bg-stone-200">
+            <h1>Searching the cancer sample for mutations…</h1>
+          </div>
+          <Chip kind="live">Stage 03 · Live</Chip>
+        </div>
+        <Card>
+          <div style={{ padding: "36px 32px", textAlign: "center" }}>
+            <Helix size={220} rungs={20} hue={tweaks.accentHue} speed={16} />
+            <div style={{ marginTop: 20 }}>
+              <div
+                className="cs-progress"
+                style={{ maxWidth: 420, margin: "0 auto", height: 10 }}
+              >
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-emerald-500 via-sky-500 to-indigo-500 transition-[width] duration-500"
-                  style={{
-                    width: `${Math.max(3, Math.round(latestRun.progress * 100))}%`,
-                  }}
+                  className="cs-progress-fill"
+                  style={{ width: `${Math.max(3, Math.round(pct * 100))}%` }}
                 />
               </div>
-              <PhaseTimeline currentPhase={latestRun.runtimePhase} />
-            </div>
-          ) : null}
-
-          {bannerState === "paused" && latestRun ? (
-            <div className="space-y-3 rounded-xl border border-indigo-200 bg-indigo-50/60 px-4 py-3 text-[13px] text-indigo-900">
-              <div className="flex items-start gap-3">
-                <Pause className="mt-0.5 size-4 shrink-0 text-indigo-700" />
-                <div className="flex-1">
-                  <div className="font-medium">
-                    Paused
-                    {latestRun.totalShards > 0
-                      ? ` at ${latestRun.completedShards} / ${latestRun.totalShards} chromosomes`
-                      : ""}
-                  </div>
-                  <p className="mt-1 leading-6 text-indigo-900/80">
-                    Work done so far is saved on disk. Resume picks up from the
-                    next chromosome — discard wipes the progress and starts
-                    fresh.
-                  </p>
-                </div>
-              </div>
-              {latestRun.totalShards > 0 ? (
-                <div className="h-1 overflow-hidden rounded-full bg-indigo-100">
-                  <div
-                    className="h-full rounded-full bg-indigo-500"
-                    style={{
-                      width: `${Math.max(
-                        3,
-                        Math.round(
-                          (latestRun.completedShards / latestRun.totalShards) * 100
-                        )
-                      )}%`,
-                    }}
-                  />
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-
-          {bannerState === "ready" && !latestRun ? (
-            <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-[13px] text-emerald-900">
-              <Telescope className="mt-0.5 size-4 shrink-0 text-emerald-700" />
-              <div>
-                <div className="font-medium">Ready to search</div>
-                <p className="mt-1 leading-6 text-emerald-800/90">
-                  This runs on your computer using the reference genome for
-                  your pet&apos;s species. When it finishes, you get a list of
-                  mutations you can explore below.
-                </p>
-              </div>
-            </div>
-          ) : null}
-
-          {latestRun?.error && bannerState === "failed" ? (
-            <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-[13px] text-rose-800">
-              <div className="flex items-center gap-2 font-medium">
-                <AlertTriangle className="size-3.5" />
-                The search failed
-              </div>
-              <p className="mt-1 font-mono text-[11px] leading-5 text-rose-700">
-                {latestRun.error}
+              <p className="cs-tiny" style={{ marginTop: 14 }}>
+                {latestRun && latestRun.totalShards > 0
+                  ? `${latestRun.completedShards} / ${latestRun.totalShards} chromosomes done`
+                  : "Preparing the reference…"}
               </p>
             </div>
-          ) : null}
-        </div>
-      </section>
+            {latestRun ? (
+              <div style={{ marginTop: 20, display: "flex", gap: 10, justifyContent: "center" }}>
+                <Btn
+                  variant="ghost"
+                  disabled={submitting}
+                  onClick={() =>
+                    void runAction(() =>
+                      api.pauseVariantCalling(workspace.id, latestRun.id)
+                    )
+                  }
+                  data-testid="variant-calling-pause-button"
+                >
+                  ⏸ Pause
+                </Btn>
+                <Btn
+                  variant="ghost"
+                  disabled={submitting}
+                  onClick={() =>
+                    void runAction(() =>
+                      api.cancelVariantCalling(workspace.id, latestRun.id)
+                    )
+                  }
+                  style={{ color: "var(--danger)" }}
+                >
+                  Cancel &amp; discard
+                </Btn>
+              </div>
+            ) : null}
+          </div>
+        </Card>
+      </>
+    );
+  }
 
-      {metrics && metrics.totalVariants > 0 ? (
+  if (status === "paused" && latestRun) {
+    return (
+      <>
+        <div className="cs-view-head">
+          <div>
+            <div className="cs-crumb">
+              {workspace.displayName} / 03 Variant calling
+            </div>
+            <h1>Paused. Your progress is saved.</h1>
+          </div>
+          <Chip kind="live">Stage 03 · Live</Chip>
+        </div>
+        <Callout>
+          <Dot style={{ color: "var(--accent)" }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 15, fontWeight: 500 }}>
+              {latestRun.totalShards > 0
+                ? `Paused at ${latestRun.completedShards} / ${latestRun.totalShards} chromosomes.`
+                : "Paused."}
+            </div>
+            <p className="cs-tiny" style={{ margin: "4px 0 0" }}>
+              Resume picks up from the next chromosome. Discard wipes the
+              progress and starts fresh.
+            </p>
+          </div>
+          <Btn
+            disabled={submitting}
+            onClick={() =>
+              void runAction(() => api.resumeVariantCalling(workspace.id, latestRun.id))
+            }
+            data-testid="variant-calling-resume-button"
+          >
+            Resume search
+          </Btn>
+        </Callout>
+      </>
+    );
+  }
+
+  if (status === "failed") {
+    return (
+      <>
+        <div className="cs-view-head">
+          <div>
+            <div className="cs-crumb">
+              {workspace.displayName} / 03 Variant calling
+            </div>
+            <h1>The search didn&apos;t finish.</h1>
+          </div>
+          <Chip kind="live">Stage 03 · Live</Chip>
+        </div>
+        <Callout tone="warm">
+          <Dot style={{ color: "var(--warm)" }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)" }}>
+              The search failed.
+            </div>
+            <p className="cs-tiny" style={{ margin: "4px 0 0" }}>
+              {latestRun?.error ?? "Try again, or check the command log in expert mode."}
+            </p>
+          </div>
+          <Btn
+            disabled={submitting}
+            onClick={() => void runAction(() => api.rerunVariantCalling(workspace.id))}
+          >
+            Search again
+          </Btn>
+        </Callout>
+      </>
+    );
+  }
+
+  const totalVariants = metrics?.totalVariants ?? 0;
+  const passCount = metrics?.passCount ?? 0;
+
+  return (
+    <>
+      <div className="cs-view-head">
+        <div>
+          <div className="cs-crumb">
+            {workspace.displayName} / 03 Variant calling
+          </div>
+          <h1>
+            {passCount.toLocaleString()} cancer-specific mutations.
+          </h1>
+          <p
+            style={{
+              maxWidth: "62ch",
+              marginTop: 12,
+              fontSize: 16.5,
+              lineHeight: 1.6,
+              color: "var(--ink-2)",
+            }}
+          >
+            These are the changes that appear in the tumor but not in the healthy
+            sample. We kept the high-confidence ones and grouped the rest into
+            plain-language buckets so you can see what was set aside and why.
+          </p>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <Chip kind="live">Stage 03 · Live</Chip>
+          <div
+            style={{
+              marginTop: 6,
+              fontSize: 11.5,
+              fontFamily: "var(--font-mono)",
+              color: "var(--muted)",
+            }}
+          >
+            {latestRun?.accelerationMode === "gpu_parabricks"
+              ? "Parabricks · GPU"
+              : "GATK Mutect2"}
+            {metrics?.referenceLabel ? ` · ${metrics.referenceLabel}` : null}
+          </div>
+        </div>
+      </div>
+
+      {metrics && totalVariants > 0 ? (
         <>
           <Karyogram
             chromosomes={metrics.perChromosome}
             topVariants={metrics.topVariants}
+            referenceLabel={metrics.referenceLabel}
           />
 
-          <MetricsRibbon metrics={metrics} />
+          <div style={{ marginTop: 20 }}>
+            <MetricsRibbon metrics={metrics} />
+          </div>
 
-          <div className="grid gap-3 lg:grid-cols-2">
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1.1fr 1fr",
+              gap: 20,
+              marginTop: 20,
+            }}
+          >
             <FilterBreakdown
               entries={metrics.filterBreakdown}
               totalVariants={metrics.totalVariants}
@@ -510,180 +423,72 @@ export default function VariantCallingStagePanel({
             />
           </div>
 
-          <TopVariantsTable variants={metrics.topVariants} />
+          <div style={{ marginTop: 20 }}>
+            <TopVariantsTable variants={metrics.topVariants} />
+          </div>
         </>
-      ) : null}
+      ) : (
+        <Card style={{ padding: "28px 24px", fontSize: 14 }}>
+          The search finished without finding any mutations. Open the technical
+          details below and check the alignment quality for coverage gaps.
+        </Card>
+      )}
 
-      {bannerState === "completed" && (!metrics || metrics.totalVariants === 0) ? (
-        <div className="rounded-2xl border border-stone-200 bg-white px-5 py-6 text-[13px] text-stone-600">
-          The search finished without finding any mutations. That is unusual
-          on real sequencing data — open the technical details below and
-          check the alignment quality for coverage gaps.
-        </div>
-      ) : null}
-
-      <details className="group rounded-2xl border border-stone-200 bg-white">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 text-[13px] text-stone-600 transition-colors hover:text-stone-900">
-          <div className="flex items-center gap-2">
-            <ChevronRight className="size-3 transition-transform duration-200 group-open:rotate-90" />
-            <span className="font-medium text-stone-900">Technical details</span>
-          </div>
-          <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-stone-400">
-            run info · artifacts · commands
-          </span>
-        </summary>
-
-        <div className="space-y-4 border-t border-stone-100 px-5 py-4">
-          {latestRun ? (
-            <div className="grid gap-3 sm:grid-cols-3">
-              <DetailCell
-                label="Started"
-                value={latestRun.startedAt ? formatDateTime(latestRun.startedAt) : "—"}
-              />
-              <DetailCell
-                label="Completed"
-                value={latestRun.completedAt ? formatDateTime(latestRun.completedAt) : "—"}
-              />
-              <DetailCell label="Status" value={latestRun.status} />
-              {metrics?.referenceLabel ? (
-                <DetailCell label="Reference" value={metrics.referenceLabel} />
-              ) : null}
-              {metrics?.tumorSample ? (
-                <DetailCell label="Tumor sample" value={metrics.tumorSample} />
-              ) : null}
-              {metrics?.normalSample ? (
-                <DetailCell label="Normal sample" value={metrics.normalSample} />
-              ) : null}
-            </div>
-          ) : (
-            <p className="text-[13px] text-stone-500">
-              No runs yet. Start the search from the control bar above —
-              details, command log, and artifacts will land here.
-            </p>
-          )}
-
-          {latestRun && latestRun.commandLog.length > 0 ? (
-            <div>
-              <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-stone-500">
-                Command log
-              </div>
-              <pre className="mt-1.5 max-h-64 overflow-auto rounded-lg border border-stone-200 bg-stone-950 px-3 py-2 font-mono text-[11px] leading-5 text-emerald-200/90">
-                {latestRun.commandLog.join("\n")}
-              </pre>
-            </div>
-          ) : null}
-
-          <div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-stone-500">
-              Output files
-            </div>
-            {summary.artifacts.length > 0 ? (
-              <ul className="mt-2 space-y-1.5">
-                {summary.artifacts.map((artifact) => (
-                  <li
-                    key={artifact.id}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-stone-200 bg-white px-3 py-2"
-                  >
-                    <div className="min-w-0">
-                      <div className="truncate text-[13px] text-stone-900">
-                        {artifact.filename}
-                      </div>
-                      <div className="mt-0.5 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.16em] text-stone-500">
-                        <span>{artifactKindLabel(artifact.artifactKind)}</span>
-                        <span className="text-stone-300">·</span>
-                        <span>{formatBytes(artifact.sizeBytes)}</span>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => void handleOpenArtifact(artifact)}
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-stone-200 px-3 py-1 text-[11px] text-stone-700 transition hover:border-stone-300 hover:bg-stone-50"
-                    >
-                      <FolderOpen className="size-3" />
-                      Open
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-1.5 text-[13px] text-stone-500">
-                Variant-calling output files will appear here once a run
-                completes.
-              </p>
-            )}
-          </div>
-        </div>
-      </details>
-    </div>
-  );
-}
-
-function DetailCell({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-stone-500">
-        {label}
-      </div>
-      <div className="mt-0.5 text-[13px] text-stone-900">{value}</div>
-    </div>
-  );
-}
-
-function phaseRunningLabel(phase: VariantCallingRuntimePhase | null | undefined): string {
-  switch (phase) {
-    case "preparing_reference":
-      return "Preparing reference";
-    case "calling":
-      return "Searching the genome";
-    case "filtering":
-      return "Filtering variants";
-    case "finalizing":
-      return "Wrapping up";
-    default:
-      return "Preparing reference";
-  }
-}
-
-function PhaseTimeline({ currentPhase }: { currentPhase?: VariantCallingRuntimePhase | null }) {
-  const phases: Array<{ id: VariantCallingRuntimePhase; label: string }> = [
-    { id: "preparing_reference", label: "Reference" },
-    { id: "calling", label: "Searching" },
-    { id: "filtering", label: "Filtering" },
-    { id: "finalizing", label: "Wrapping up" },
-  ];
-  const currentIndex = phases.findIndex((phase) => phase.id === currentPhase);
-
-  return (
-    <ol className="mt-2 grid grid-cols-4 gap-1.5 text-[10px] font-mono uppercase tracking-[0.18em] text-stone-500">
-      {phases.map((phase, index) => {
-        const isActive = index === currentIndex;
-        const isDone = currentIndex >= 0 && index < currentIndex;
-        return (
-          <li
-            key={phase.id}
-            className={cn(
-              "flex items-center gap-1.5 rounded-md border px-2 py-1",
-              isActive
-                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                : isDone
-                  ? "border-stone-200 bg-white text-stone-600"
-                  : "border-stone-100 bg-stone-50 text-stone-400"
-            )}
+      {tweaks.expertMode && latestRun?.commandLog.length ? (
+        <Card style={{ marginTop: 20 }}>
+          <CardHead eyebrow="Expert · Mutect2 command" title="Command log" />
+          <pre
+            style={{
+              margin: 0,
+              padding: "16px 22px",
+              fontFamily: "var(--font-mono)",
+              fontSize: 11.5,
+              lineHeight: 1.7,
+              color: "var(--muted)",
+              background: "var(--surface-sunk)",
+              borderBottomLeftRadius: "var(--radius-cs-lg)",
+              borderBottomRightRadius: "var(--radius-cs-lg)",
+              overflow: "auto",
+              maxHeight: 320,
+            }}
           >
-            <span
-              className={cn(
-                "inline-block size-1.5 rounded-full",
-                isActive
-                  ? "bg-emerald-500 animate-pulse"
-                  : isDone
-                    ? "bg-stone-400"
-                    : "bg-stone-300"
-              )}
-            />
-            <span className="truncate">{phase.label}</span>
-          </li>
-        );
-      })}
-    </ol>
+            {latestRun.commandLog.join("\n")}
+          </pre>
+        </Card>
+      ) : null}
+
+      <div
+        style={{
+          marginTop: 24,
+          padding: "18px 22px",
+          borderRadius: "var(--radius-cs)",
+          border: "1px dashed var(--line-strong)",
+          background: "var(--surface-sunk)",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 16,
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <Eyebrow>Next</Eyebrow>
+          <span style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>
+            Annotation (Ensembl VEP) reads what each mutation means.
+          </span>
+          <span className="cs-tiny" style={{ fontSize: 12.5 }}>
+            It checks each mutation against what scientists already know — which
+            gene it&apos;s in, what it changes, and whether that gene matters in
+            cancer.
+          </span>
+        </div>
+        <Link
+          href={`/workspaces/${workspace.id}/annotation`}
+          className="cs-btn cs-btn-ghost"
+        >
+          Open annotation →
+        </Link>
+      </div>
+    </>
   );
 }

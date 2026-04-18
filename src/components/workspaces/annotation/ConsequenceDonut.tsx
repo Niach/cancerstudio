@@ -1,7 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
-
+import { Card, Eyebrow } from "@/components/ui-kit";
 import type { AnnotationConsequenceEntry } from "@/lib/types";
 
 interface ConsequenceDonutProps {
@@ -10,204 +9,174 @@ interface ConsequenceDonutProps {
 }
 
 const PALETTE = [
-  "#059669", // emerald
-  "#0284c7", // sky
-  "#d97706", // amber
-  "#7c3aed", // violet
-  "#db2777", // pink
-  "#0d9488", // teal
-  "#b91c1c", // red
-  "#4338ca", // indigo
-  "#65a30d", // lime
-  "#6b7280", // gray
+  "#059669",
+  "#0284c7",
+  "#d97706",
+  "#7c3aed",
+  "#db2777",
+  "#0d9488",
+  "#b91c1c",
+  "#4338ca",
 ];
 
-function formatNumber(value: number) {
-  return value.toLocaleString();
-}
+export default function ConsequenceDonut({ entries }: ConsequenceDonutProps) {
+  if (!entries.length) return null;
 
-export default function ConsequenceDonut({
-  entries,
-  showRawTerms = false,
-}: ConsequenceDonutProps) {
-  const { total, slices, other } = useMemo(() => {
-    const sum = entries.reduce((acc, e) => acc + e.count, 0);
-    const top = entries.slice(0, 8);
-    const rest = entries.slice(8);
-    const restSum = rest.reduce((acc, e) => acc + e.count, 0);
-    const segs: {
-      entry: AnnotationConsequenceEntry;
-      color: string;
-      start: number;
+  const total = entries.reduce((a, e) => a + e.count, 0);
+  if (total <= 0) return null;
+
+  const size = 180;
+  const r = size / 2 - 12;
+  const ri = r * 0.62;
+  const cx = size / 2;
+  const cy = size / 2;
+
+  const slices = entries.reduce<
+    Array<{
+      e: AnnotationConsequenceEntry;
+      pct: number;
+      s: number;
       end: number;
-      percent: number;
-    }[] = [];
-    let cursor = 0;
-    for (let i = 0; i < top.length; i += 1) {
-      const entry = top[i];
-      const pct = sum > 0 ? entry.count / sum : 0;
-      const start = cursor;
-      const end = cursor + pct;
-      segs.push({
-        entry,
-        color: PALETTE[i % PALETTE.length],
-        start,
-        end,
-        percent: pct,
-      });
-      cursor = end;
-    }
-    if (restSum > 0 && sum > 0) {
-      const pct = restSum / sum;
-      segs.push({
-        entry: {
-          term: "other",
-          label: "Other consequence categories",
-          count: restSum,
-        },
-        color: "#a8a29e",
-        start: cursor,
-        end: cursor + pct,
-        percent: pct,
-      });
-    }
-    return { total: sum, slices: segs, other: rest };
-  }, [entries]);
+      color: string;
+    }>
+  >((acc, e, i) => {
+    const pct = e.count / total;
+    const s = acc.length > 0 ? acc[acc.length - 1].end : 0;
+    acc.push({ e, pct, s, end: s + pct, color: PALETTE[i % PALETTE.length] });
+    return acc;
+  }, []);
 
-  const size = 160;
-  const radius = size / 2 - 10;
-  const innerRadius = radius * 0.6;
-  const center = size / 2;
+  const pct2xy = (R: number, pct: number) => {
+    const a = pct * Math.PI * 2 - Math.PI / 2;
+    return { x: cx + R * Math.cos(a), y: cy + R * Math.sin(a) };
+  };
 
-  if (total === 0) {
-    return (
-      <div className="rounded-2xl border border-stone-200 bg-white px-4 py-5 text-sm text-stone-500">
-        No consequence breakdown available.
-      </div>
-    );
-  }
+  const slicePath = (sl: (typeof slices)[number]) => {
+    const a = pct2xy(r, sl.s);
+    const b = pct2xy(r, sl.end);
+    const c = pct2xy(ri, sl.end);
+    const d = pct2xy(ri, sl.s);
+    const large = sl.end - sl.s > 0.5 ? 1 : 0;
+    return `M ${a.x} ${a.y} A ${r} ${r} 0 ${large} 1 ${b.x} ${b.y} L ${c.x} ${c.y} A ${ri} ${ri} 0 ${large} 0 ${d.x} ${d.y} Z`;
+  };
 
   return (
-    <div className="rounded-2xl border border-stone-200 bg-white p-4">
-      <div className="font-mono text-[10px] uppercase tracking-[0.24em] text-stone-400">
-        What changed
+    <Card>
+      <div style={{ padding: "18px 22px 8px" }}>
+        <Eyebrow>What changed</Eyebrow>
+        <h3
+          style={{
+            margin: "4px 0 0",
+            fontFamily: "var(--font-display)",
+            fontWeight: 500,
+            fontSize: 20,
+            letterSpacing: "-0.02em",
+            color: "var(--ink)",
+          }}
+        >
+          Mutation consequence mix
+        </h3>
       </div>
-      <h4 className="mt-0.5 font-display text-[18px] font-light text-stone-900">
-        Mutation consequence mix
-      </h4>
-
-      <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-[160px_minmax(0,1fr)]">
-        <svg viewBox={`0 0 ${size} ${size}`} className="h-40 w-40" role="img">
-          {slices.map((slice, index) => {
-            const path = donutSlicePath(
-              center,
-              center,
-              radius,
-              innerRadius,
-              slice.start,
-              slice.end
-            );
-            return <path key={index} d={path} fill={slice.color} opacity={0.9} />;
-          })}
-          <circle cx={center} cy={center} r={innerRadius - 2} fill="#fff" />
+      <div
+        style={{
+          padding: "10px 22px 20px",
+          display: "grid",
+          gridTemplateColumns: "180px 1fr",
+          gap: 18,
+          alignItems: "center",
+        }}
+      >
+        <svg
+          viewBox={`0 0 ${size} ${size}`}
+          style={{ width: 180, height: 180 }}
+        >
+          {slices.map((sl, i) => (
+            <path key={i} d={slicePath(sl)} fill={sl.color} opacity={0.92} />
+          ))}
+          <circle cx={cx} cy={cy} r={ri - 2} fill="var(--surface-strong)" />
           <text
-            x={center}
-            y={center - 4}
+            x={cx}
+            y={cy - 4}
             textAnchor="middle"
-            className="fill-stone-500 font-mono"
-            fontSize={9}
+            fill="var(--muted)"
+            fontFamily="var(--font-mono)"
+            fontSize={10.5}
+            letterSpacing="0.2em"
           >
-            total
+            TOTAL
           </text>
           <text
-            x={center}
-            y={center + 14}
+            x={cx}
+            y={cy + 18}
             textAnchor="middle"
-            className="fill-stone-900 font-display"
-            fontSize={22}
+            fill="var(--ink)"
+            fontFamily="var(--font-display)"
+            fontSize={26}
+            fontWeight={500}
           >
-            {formatNumber(total)}
+            {total.toLocaleString()}
           </text>
         </svg>
-
-        <ul className="space-y-1.5 text-[12px]">
-          {slices.map((slice, index) => (
+        <ul
+          style={{
+            margin: 0,
+            padding: 0,
+            listStyle: "none",
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+          }}
+        >
+          {slices.map((sl, i) => (
             <li
-              key={index}
-              className="flex items-center gap-2"
-              title={showRawTerms ? slice.entry.term : slice.entry.label}
+              key={i}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                fontSize: 13,
+              }}
             >
               <span
-                className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm"
-                style={{ backgroundColor: slice.color }}
+                style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: 3,
+                  background: sl.color,
+                  flexShrink: 0,
+                }}
               />
-              <span className="flex-1 truncate text-stone-700">
-                {showRawTerms ? slice.entry.term : slice.entry.label}
+              <span
+                style={{
+                  flex: 1,
+                  color: "var(--ink-2)",
+                  minWidth: 0,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+                title={sl.e.term}
+              >
+                {sl.e.label}
               </span>
               <span
-                className="font-mono text-[11px] text-stone-500"
-                style={{ fontVariantNumeric: "tabular-nums" }}
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 12,
+                  color: "var(--muted)",
+                  fontVariantNumeric: "tabular-nums",
+                  whiteSpace: "nowrap",
+                }}
               >
-                {formatNumber(slice.entry.count)}
-                <span className="ml-2 text-stone-400">
-                  {Math.round(slice.percent * 100)}%
+                {sl.e.count}
+                <span style={{ color: "var(--muted-2)", marginLeft: 6 }}>
+                  {Math.round(sl.pct * 100)}%
                 </span>
               </span>
             </li>
           ))}
         </ul>
       </div>
-
-      {other.length > 0 ? (
-        <div className="mt-3 font-mono text-[10px] text-stone-400">
-          {other.length} smaller categor{other.length === 1 ? "y" : "ies"} grouped as “other”.
-        </div>
-      ) : null}
-    </div>
+    </Card>
   );
-}
-
-function donutSlicePath(
-  cx: number,
-  cy: number,
-  outer: number,
-  inner: number,
-  startPct: number,
-  endPct: number
-) {
-  const start = pct2xy(cx, cy, outer, startPct);
-  const end = pct2xy(cx, cy, outer, endPct);
-  const startInner = pct2xy(cx, cy, inner, endPct);
-  const endInner = pct2xy(cx, cy, inner, startPct);
-  const large = endPct - startPct > 0.5 ? 1 : 0;
-  if (endPct - startPct >= 0.999) {
-    // Full circle — draw as two half-arcs
-    const mid = pct2xy(cx, cy, outer, (startPct + endPct) / 2);
-    const midInner = pct2xy(cx, cy, inner, (startPct + endPct) / 2);
-    return [
-      `M ${start.x} ${start.y}`,
-      `A ${outer} ${outer} 0 1 1 ${mid.x} ${mid.y}`,
-      `A ${outer} ${outer} 0 1 1 ${end.x} ${end.y}`,
-      `L ${startInner.x} ${startInner.y}`,
-      `A ${inner} ${inner} 0 1 0 ${midInner.x} ${midInner.y}`,
-      `A ${inner} ${inner} 0 1 0 ${endInner.x} ${endInner.y}`,
-      "Z",
-    ].join(" ");
-  }
-  return [
-    `M ${start.x} ${start.y}`,
-    `A ${outer} ${outer} 0 ${large} 1 ${end.x} ${end.y}`,
-    `L ${startInner.x} ${startInner.y}`,
-    `A ${inner} ${inner} 0 ${large} 0 ${endInner.x} ${endInner.y}`,
-    "Z",
-  ].join(" ");
-}
-
-function pct2xy(cx: number, cy: number, r: number, pct: number) {
-  // Start at the top (12 o'clock), sweep clockwise.
-  const angle = pct * Math.PI * 2 - Math.PI / 2;
-  return {
-    x: cx + r * Math.cos(angle),
-    y: cy + r * Math.sin(angle),
-  };
 }
