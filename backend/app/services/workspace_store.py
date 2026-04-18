@@ -993,6 +993,24 @@ def store_workspace_neoantigen_config(
     workspace.neoantigen_config = json.dumps(config)
 
 
+def load_workspace_epitope_config(workspace: WorkspaceRecord) -> dict:
+    raw = workspace.epitope_config
+    if raw:
+        try:
+            data = json.loads(raw)
+            if isinstance(data, dict):
+                return data
+        except (TypeError, ValueError):
+            pass
+    return {"selection": []}
+
+
+def store_workspace_epitope_config(
+    workspace: WorkspaceRecord, config: dict
+) -> None:
+    workspace.epitope_config = json.dumps(config)
+
+
 def create_workspace(request: WorkspaceCreateRequest) -> WorkspaceResponse:
     display_name = request.display_name.strip()
     if not display_name:

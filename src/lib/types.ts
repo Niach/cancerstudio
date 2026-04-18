@@ -710,6 +710,66 @@ export interface NeoantigenStageSummary {
   artifacts: NeoantigenArtifact[];
 }
 
+export type EpitopeStageStatus =
+  | "blocked"
+  | "scaffolded"
+  | "completed";
+
+export type EpitopeTier = "strong" | "moderate";
+export type EpitopeRisk = "critical" | "elevated" | "mild";
+
+export interface EpitopeCandidate {
+  id: string;
+  seq: string;
+  gene: string;
+  mutation: string;
+  length: number;
+  class: MhcClass;
+  alleleId: string;
+  ic50Nm: number;
+  agretopicity: number;
+  vaf: number;
+  tpm: number;
+  cancerGene: boolean;
+  driverContext?: string | null;
+  tier: EpitopeTier;
+  flags: string[];
+}
+
+export interface EpitopeSafetyFlag {
+  peptideId: string;
+  selfHit: string;
+  identity: number;
+  risk: EpitopeRisk;
+  note: string;
+}
+
+export interface EpitopeAllele {
+  id: string;
+  class: MhcClass;
+  color: string;
+}
+
+export type EpitopeGoalId =
+  | "size"
+  | "gene-diverse"
+  | "allele-cov"
+  | "class-balance"
+  | "no-passenger"
+  | "safety";
+
+export interface EpitopeStageSummary {
+  workspaceId: string;
+  status: EpitopeStageStatus;
+  blockingReason?: string | null;
+  candidates: EpitopeCandidate[];
+  safety: Record<string, EpitopeSafetyFlag>;
+  alleles: EpitopeAllele[];
+  defaultPicks: string[];
+  selection: string[];
+  readyForConstructDesign: boolean;
+}
+
 export interface VaccineConstruct {
   id: string;
   name: string;
@@ -777,7 +837,7 @@ export const PIPELINE_STAGES: PipelineStage[] = [
     description: "Rank and select optimal vaccine targets",
     icon: "ListChecks",
     tools: ["pVACview", "custom scoring"],
-    implementationState: "planned",
+    implementationState: "scaffolded",
     group: "primary",
   },
   {

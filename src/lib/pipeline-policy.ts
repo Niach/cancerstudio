@@ -1,6 +1,7 @@
 import type {
   AlignmentStageSummary,
   AnnotationStageSummary,
+  EpitopeStageSummary,
   NeoantigenStageSummary,
   PipelineStage,
   PipelineStageId,
@@ -39,7 +40,8 @@ export function getPipelinePolicy(
   alignmentSummary: AlignmentStageSummary,
   variantCallingSummary: VariantCallingStageSummary,
   annotationSummary?: AnnotationStageSummary | null,
-  neoantigenSummary?: NeoantigenStageSummary | null
+  neoantigenSummary?: NeoantigenStageSummary | null,
+  epitopeSummary?: EpitopeStageSummary | null
 ): PipelinePolicyMap {
   const latestActionableStage =
     workspace.ingestion.readyForAlignment && alignmentSummary.status !== "blocked"
@@ -191,6 +193,29 @@ export function getPipelinePolicy(
                 : isCompleted
                   ? "The candidate peptides are ready to explore."
                   : "Predict which mutant fragments the immune system can see.",
+      };
+      continue;
+    }
+
+    if (stage.id === "epitope-selection") {
+      const neoantigenReady = neoantigenSummary?.readyForEpitopeSelection ?? false;
+      const status = epitopeSummary?.status ?? (neoantigenReady ? "scaffolded" : "blocked");
+      const isBlocked = !neoantigenReady;
+      const isCompleted = status === "completed";
+
+      policies[stage.id] = {
+        stage,
+        visible: true,
+        enterable: true,
+        actionable: !isBlocked,
+        blockedReason: isBlocked
+          ? "Finish neoantigen prediction before curating the cassette."
+          : epitopeSummary?.blockingReason ?? null,
+        nextStep: isBlocked
+          ? "Finish neoantigen prediction first."
+          : isCompleted
+            ? "The shortlist is ready for mRNA construct design."
+            : "Shortlist the fragments the vaccine will carry.",
       };
       continue;
     }

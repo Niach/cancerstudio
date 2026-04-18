@@ -797,3 +797,67 @@ class NeoantigenStageSummaryResponse(BaseModel):
 
 class NeoantigenAllelesUpdate(BaseModel):
     alleles: List[PatientAllele]
+
+
+class EpitopeStageStatus(str, Enum):
+    BLOCKED = "blocked"
+    SCAFFOLDED = "scaffolded"
+    COMPLETED = "completed"
+
+
+EpitopeTier = Literal["strong", "moderate"]
+EpitopeRisk = Literal["critical", "elevated", "mild"]
+
+
+class EpitopeCandidateResponse(BaseModel):
+    id: str
+    seq: str
+    gene: str
+    mutation: str
+    length: int
+    mhc_class: MhcClass = Field(..., alias="class")
+    allele_id: str
+    ic50_nm: float
+    agretopicity: float
+    vaf: float
+    tpm: float
+    cancer_gene: bool = False
+    driver_context: Optional[str] = None
+    tier: EpitopeTier
+    flags: List[str] = Field(default_factory=list)
+
+    class Config:
+        populate_by_name = True
+
+
+class EpitopeSafetyFlagResponse(BaseModel):
+    peptide_id: str
+    self_hit: str
+    identity: int
+    risk: EpitopeRisk
+    note: str
+
+
+class EpitopeAlleleResponse(BaseModel):
+    id: str
+    mhc_class: MhcClass = Field(..., alias="class")
+    color: str
+
+    class Config:
+        populate_by_name = True
+
+
+class EpitopeStageSummaryResponse(BaseModel):
+    workspace_id: str
+    status: EpitopeStageStatus
+    blocking_reason: Optional[str] = None
+    candidates: List[EpitopeCandidateResponse] = Field(default_factory=list)
+    safety: Dict[str, EpitopeSafetyFlagResponse] = Field(default_factory=dict)
+    alleles: List[EpitopeAlleleResponse] = Field(default_factory=list)
+    default_picks: List[str] = Field(default_factory=list)
+    selection: List[str] = Field(default_factory=list)
+    ready_for_construct_design: bool = False
+
+
+class EpitopeSelectionUpdate(BaseModel):
+    peptide_ids: List[str] = Field(default_factory=list)

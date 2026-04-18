@@ -1,0 +1,28 @@
+{
+  "dog": {
+    "species_label": "Dog (DLA)",
+    "alleles": [
+      { "allele": "DLA-88*034:01",  "class": "I",  "typing": "inferred", "frequency": 0.14, "source": "Breed-prior · German Shepherd" },
+      { "allele": "DLA-88*508:01",  "class": "I",  "typing": "inferred", "frequency": 0.09, "source": "Breed-prior · German Shepherd" },
+      { "allele": "DLA-12*01:01",   "class": "I",  "typing": "inferred", "frequency": 0.21, "source": "Breed-prior · German Shepherd" },
+      { "allele": "DLA-64*01:01",   "class": "I",  "typing": "inferred", "frequency": 0.18, "source": "Breed-prior · German Shepherd" },
+      { "allele": "DLA-DRB1*015:01", "class": "II", "typing": "inferred", "frequency": 0.11, "source": "Breed-prior · German Shepherd" },
+      { "allele": "DLA-DQB1*008:01", "class": "II", "typing": "inferred", "frequency": 0.13, "source": "Breed-prior · German Shepherd" }
+    ]
+  },
+  "human": {
+    "species_label": "Human (HLA)",
+    "alleles": [
+      { "allele": "HLA-A*02:01", "class": "I",  "typing": "inferred", "frequency": 0.27, "source": "Population prior · common HLA-A" },
+      { "allele": "HLA-B*07:02", "class": "I",  "typing": "inferred", "frequency": 0.13, "source": "Population prior · common HLA-B" },
+      { "allele": "HLA-C*07:02", "class": "I",  "typing": "inferred", "frequency": 0.15, "source": "Population prior · common HLA-C" },
+      { "allele": "HLA-DRB1*07:01", "class": "II", "typing": "inferred", "frequency": 0.14, "source": "Population prior · HLA-DRB1" }
+    ]
+  },
+  "cat": {
+    "species_label": "Cat (FLA)",
+    "alleles": [
+      { "allele": "FLA-I*01:01", "class": "I", "typing": "inferred", "frequency": 0.18, "source": "Placeholder · feline MHC typing is experimental" }
+    ]
+  }
+}

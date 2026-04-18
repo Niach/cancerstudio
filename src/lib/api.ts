@@ -55,6 +55,11 @@ import type {
   NeoantigenRuntimePhase,
   NeoantigenStageStatus,
   NeoantigenStageSummary,
+  EpitopeAllele,
+  EpitopeCandidate,
+  EpitopeSafetyFlag,
+  EpitopeStageStatus,
+  EpitopeStageSummary,
   PatientAllele,
   BindingBucket,
   BindingTier,
@@ -1153,6 +1158,104 @@ function mapNeoantigenStageSummary(
   };
 }
 
+type EpitopeCandidateDto = {
+  id: string;
+  seq: string;
+  gene: string;
+  mutation: string;
+  length: number;
+  class: MhcClass;
+  allele_id: string;
+  ic50_nm: number;
+  agretopicity: number;
+  vaf: number;
+  tpm: number;
+  cancer_gene: boolean;
+  driver_context?: string | null;
+  tier: "strong" | "moderate";
+  flags: string[];
+};
+
+type EpitopeSafetyFlagDto = {
+  peptide_id: string;
+  self_hit: string;
+  identity: number;
+  risk: "critical" | "elevated" | "mild";
+  note: string;
+};
+
+type EpitopeAlleleDto = {
+  id: string;
+  class: MhcClass;
+  color: string;
+};
+
+type EpitopeStageSummaryDto = {
+  workspace_id: string;
+  status: EpitopeStageStatus;
+  blocking_reason?: string | null;
+  candidates: EpitopeCandidateDto[];
+  safety: Record<string, EpitopeSafetyFlagDto>;
+  alleles: EpitopeAlleleDto[];
+  default_picks: string[];
+  selection: string[];
+  ready_for_construct_design: boolean;
+};
+
+function mapEpitopeCandidate(dto: EpitopeCandidateDto): EpitopeCandidate {
+  return {
+    id: dto.id,
+    seq: dto.seq,
+    gene: dto.gene,
+    mutation: dto.mutation,
+    length: dto.length,
+    class: dto.class,
+    alleleId: dto.allele_id,
+    ic50Nm: dto.ic50_nm,
+    agretopicity: dto.agretopicity,
+    vaf: dto.vaf,
+    tpm: dto.tpm,
+    cancerGene: dto.cancer_gene,
+    driverContext: dto.driver_context ?? null,
+    tier: dto.tier,
+    flags: dto.flags ?? [],
+  };
+}
+
+function mapEpitopeSafetyFlag(dto: EpitopeSafetyFlagDto): EpitopeSafetyFlag {
+  return {
+    peptideId: dto.peptide_id,
+    selfHit: dto.self_hit,
+    identity: dto.identity,
+    risk: dto.risk,
+    note: dto.note,
+  };
+}
+
+function mapEpitopeAllele(dto: EpitopeAlleleDto): EpitopeAllele {
+  return { id: dto.id, class: dto.class, color: dto.color };
+}
+
+function mapEpitopeStageSummary(
+  dto: EpitopeStageSummaryDto
+): EpitopeStageSummary {
+  const safety: Record<string, EpitopeSafetyFlag> = {};
+  for (const [key, value] of Object.entries(dto.safety ?? {})) {
+    safety[key] = mapEpitopeSafetyFlag(value);
+  }
+  return {
+    workspaceId: dto.workspace_id,
+    status: dto.status,
+    blockingReason: dto.blocking_reason ?? null,
+    candidates: (dto.candidates ?? []).map(mapEpitopeCandidate),
+    safety,
+    alleles: (dto.alleles ?? []).map(mapEpitopeAllele),
+    defaultPicks: dto.default_picks ?? [],
+    selection: dto.selection ?? [],
+    readyForConstructDesign: Boolean(dto.ready_for_construct_design),
+  };
+}
+
 function mapVariantCallingStageSummary(
   dto: VariantCallingStageSummaryDto
 ): VariantCallingStageSummary {
@@ -1780,5 +1883,25 @@ export const api = {
     });
     return mapAlignmentSettings(dto);
   },
+  getEpitopeStageSummary: async (workspaceId: string) =>
+    mapEpitopeStageSummary(
+      await request<EpitopeStageSummaryDto>(
+        `/api/workspaces/${workspaceId}/epitope`
+      )
+    ),
+  updateEpitopeSelection: async (
+    workspaceId: string,
+    peptideIds: string[]
+  ) =>
+    mapEpitopeStageSummary(
+      await request<EpitopeStageSummaryDto>(
+        `/api/workspaces/${workspaceId}/epitope/selection`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ peptide_ids: peptideIds }),
+        }
+      )
+    ),
   resolveDownloadUrl: (downloadPath: string) => `${PUBLIC_API_BASE}${downloadPath}`,
 };

@@ -76,6 +76,7 @@ venv/
 *.dict
 *.pdb
 data/
+!backend/app/data/
 
 # IDE
 .idea/

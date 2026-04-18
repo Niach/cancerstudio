@@ -8,6 +8,8 @@ from app.models.schemas import (
     GeneDomainsResponse,
     IngestionLanePreviewResponse,
     LocalFileRegistrationRequest,
+    EpitopeSelectionUpdate,
+    EpitopeStageSummaryResponse,
     NeoantigenAllelesUpdate,
     NeoantigenStageSummaryResponse,
     SampleLane,
@@ -57,6 +59,10 @@ from app.services.neoantigen import (
     rerun_neoantigen,
     resume_neoantigen_run,
     update_neoantigen_alleles,
+)
+from app.services.epitope_selection import (
+    load_epitope_stage_summary,
+    update_epitope_selection,
 )
 from app.services.tool_preflight import (
     ALIGNMENT_TOOLS,
@@ -640,6 +646,43 @@ async def download_neoantigen_artifact(workspace_id: str, artifact_id: str):
         raise HTTPException(status_code=404, detail=str(error)) from error
     except Exception as error:
         raise unexpected_workspace_error("Neoantigen artifact download", error) from error
+
+
+# ----------------------------------------------------------------------------- #
+# Stage 6 — Epitope selection
+# ----------------------------------------------------------------------------- #
+
+
+@router.get(
+    "/{workspace_id}/epitope",
+    response_model=EpitopeStageSummaryResponse,
+)
+async def get_epitope_stage_summary(workspace_id: str):
+    try:
+        return load_epitope_stage_summary(workspace_id)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except Exception as error:
+        raise unexpected_workspace_error("Epitope summary load", error) from error
+
+
+@router.put(
+    "/{workspace_id}/epitope/selection",
+    response_model=EpitopeStageSummaryResponse,
+)
+async def update_epitope_selection_route(
+    workspace_id: str, request: EpitopeSelectionUpdate
+):
+    try:
+        return update_epitope_selection(workspace_id, request)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except Exception as error:
+        raise unexpected_workspace_error("Epitope selection update", error) from error
 
 
 @router.get(

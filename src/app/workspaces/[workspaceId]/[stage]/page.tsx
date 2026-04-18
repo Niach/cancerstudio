@@ -27,6 +27,7 @@ export default async function WorkspaceStagePage({
   let variantCallingSummary;
   let annotationSummary;
   let neoantigenSummary;
+  let epitopeSummary;
 
   try {
     [
@@ -36,6 +37,7 @@ export default async function WorkspaceStagePage({
       variantCallingSummary,
       annotationSummary,
       neoantigenSummary,
+      epitopeSummary,
     ] = await Promise.all([
       api.listWorkspaces(),
       api.getWorkspace(workspaceId),
@@ -43,6 +45,7 @@ export default async function WorkspaceStagePage({
       api.getVariantCallingStageSummary(workspaceId),
       api.getAnnotationStageSummary(workspaceId),
       api.getNeoantigenStageSummary(workspaceId),
+      api.getEpitopeStageSummary(workspaceId),
     ]);
   } catch (error) {
     if (error instanceof Error && error.message.toLowerCase().includes("not found")) {
@@ -57,7 +60,8 @@ export default async function WorkspaceStagePage({
     alignmentSummary,
     variantCallingSummary,
     annotationSummary,
-    neoantigenSummary
+    neoantigenSummary,
+    epitopeSummary
   );
   const redirectedFromStageId = comingSoon && isPipelineStageId(comingSoon) ? comingSoon : null;
   if (!policy[stage].enterable) {
@@ -77,6 +81,7 @@ export default async function WorkspaceStagePage({
       initialVariantCallingSummary={variantCallingSummary}
       initialAnnotationSummary={annotationSummary}
       initialNeoantigenSummary={neoantigenSummary}
+      initialEpitopeSummary={epitopeSummary}
       redirectedFromStageId={redirectedFromStageId}
     />
   );

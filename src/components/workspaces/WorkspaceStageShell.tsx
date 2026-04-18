@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import AlignmentStagePanel from "@/components/workspaces/AlignmentStagePanel";
 import AnnotationStagePanel from "@/components/workspaces/AnnotationStagePanel";
+import EpitopeSelectionStagePanel from "@/components/workspaces/EpitopeSelectionStagePanel";
 import IngestionStagePanel from "@/components/workspaces/IngestionStagePanel";
 import NeoantigenPredictionStagePanel from "@/components/workspaces/NeoantigenPredictionStagePanel";
 import VariantCallingStagePanel from "@/components/workspaces/VariantCallingStagePanel";
@@ -20,6 +21,7 @@ import {
 import type {
   AlignmentStageSummary,
   AnnotationStageSummary,
+  EpitopeStageSummary,
   NeoantigenStageSummary,
   PipelineStageId,
   VariantCallingStageSummary,
@@ -42,6 +44,7 @@ interface WorkspaceStageShellProps {
   initialVariantCallingSummary: VariantCallingStageSummary;
   initialAnnotationSummary: AnnotationStageSummary;
   initialNeoantigenSummary: NeoantigenStageSummary;
+  initialEpitopeSummary: EpitopeStageSummary;
   redirectedFromStageId: PipelineStageId | null;
 }
 
@@ -53,6 +56,7 @@ export default function WorkspaceStageShell({
   initialVariantCallingSummary,
   initialAnnotationSummary,
   initialNeoantigenSummary,
+  initialEpitopeSummary,
   redirectedFromStageId,
 }: WorkspaceStageShellProps) {
   const [workspace, setWorkspace] = useState(initialWorkspace);
@@ -71,6 +75,9 @@ export default function WorkspaceStageShell({
   const [neoantigenSummary, setNeoantigenSummary] = useState(
     initialNeoantigenSummary
   );
+  const [epitopeSummary, setEpitopeSummary] = useState(
+    initialEpitopeSummary
+  );
   const { tweaks } = useTweaks();
 
   const stagePolicy = getPipelinePolicy(
@@ -78,7 +85,8 @@ export default function WorkspaceStageShell({
     alignmentSummary,
     variantCallingSummary,
     annotationSummary,
-    neoantigenSummary
+    neoantigenSummary,
+    epitopeSummary
   );
   const currentStagePolicy = stagePolicy[currentStageId];
   const primaryStages = getVisiblePrimaryStages(stagePolicy);
@@ -325,6 +333,13 @@ export default function WorkspaceStageShell({
                 workspace={workspace}
                 initialSummary={neoantigenSummary}
                 onSummaryChange={setNeoantigenSummary}
+              />
+            ) : currentStageId === "epitope-selection" ? (
+              <EpitopeSelectionStagePanel
+                key={workspace.id}
+                workspace={workspace}
+                initialSummary={epitopeSummary}
+                onSummaryChange={setEpitopeSummary}
               />
             ) : null}
           </div>

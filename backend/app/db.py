@@ -177,6 +177,12 @@ def _ensure_schema_updates() -> None:
         "neoantigen_config",
         "TEXT",
     )
+    _ensure_column(
+        inspector,
+        "workspaces",
+        "epitope_config",
+        "TEXT",
+    )
     _ensure_workspace_file_storage_key_not_unique()
 
 
