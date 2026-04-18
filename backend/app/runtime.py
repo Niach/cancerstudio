@@ -109,6 +109,24 @@ def get_variant_calling_run_root(workspace_id: str, run_id: str) -> Path:
     return root
 
 
+def get_annotation_run_root(workspace_id: str, run_id: str) -> Path:
+    root = get_workspace_root(workspace_id) / "annotation" / run_id
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def get_vep_cache_root() -> Path:
+    """Root for VEP offline caches, shared across workspaces.
+
+    Each species/assembly/release triple lives under a child directory so
+    the lookup ``{root}/{species_slug}/{release}/{cache_dir}`` is unique.
+    """
+    configured = os.getenv("CANCERSTUDIO_VEP_CACHE_DIR")
+    root = Path(configured).expanduser() if configured else get_app_data_root() / "vep-cache"
+    root.mkdir(parents=True, exist_ok=True)
+    return root.resolve()
+
+
 def get_reference_bundle_root() -> Path:
     configured = os.getenv("REFERENCE_BUNDLE_ROOT")
     root = Path(configured).expanduser() if configured else get_app_data_root() / "references"

@@ -10,6 +10,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 ARG STROBEALIGN_VERSION=0.17.0
 ARG GATK_VERSION=4.5.0.0
+ARG VEP_RELEASE=111
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -27,6 +28,22 @@ RUN apt-get update \
         libzstd-dev \
         openjdk-17-jre-headless \
         unzip \
+        git \
+        perl \
+        libperl-dev \
+        libssl-dev \
+        libdbi-perl \
+        libarchive-zip-perl \
+        libjson-perl \
+        libwww-perl \
+        libhttp-tiny-perl \
+        libset-intervaltree-perl \
+        libmodule-build-perl \
+        libperlio-gzip-perl \
+        libbio-perl-perl \
+        libbio-db-hts-perl \
+        libfile-copy-recursive-perl \
+        tabix \
     && update-alternatives --install /usr/bin/python python /usr/bin/python3.11 100 \
     && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 100 \
     && rm -rf /var/lib/apt/lists/*
@@ -55,6 +72,33 @@ RUN curl -fsSL \
         /usr/local/bin/strobealign \
     && rm -rf /tmp/strobealign*
 
+# Ensembl VEP — installed natively so the backend can call `vep` as a subprocess
+# like the other bioinformatics binaries. Bio::DB::HTS comes from the distro
+# libbio-db-hts-perl package (Ubuntu 22.04 ships 3.01), avoiding a from-source
+# cpanm build that requires libhts-dev headers. We install the Perl API only
+# (no cache downloads at build time); caches are lazily downloaded per species
+# on first annotation run and persisted to the host via the shared vep-cache
+# volume.
+RUN git clone --branch "release/${VEP_RELEASE}" --depth 1 \
+        https://github.com/Ensembl/ensembl-vep.git /opt/vep \
+    && cd /opt/vep \
+    && perl INSTALL.pl --AUTO a --NO_HTSLIB --NO_TEST --NO_UPDATE \
+    && ln -sf /opt/vep/vep /usr/local/bin/vep \
+    && printf '#!/bin/sh\nexec perl /opt/vep/INSTALL.pl "$@"\n' > /usr/local/bin/vep_install \
+    && chmod +x /usr/local/bin/vep_install
+
+# VEP plugins: Ensembl's repo + the two pVACseq plugins (Frameshift, Wildtype)
+# so stage 5 (neoantigen prediction) can be a drop-in consumer of stage-4
+# output VCFs.
+RUN git clone --branch "release/${VEP_RELEASE}" --depth 1 \
+        https://github.com/Ensembl/VEP_plugins.git /opt/vep-plugins \
+    && curl -fsSL \
+        https://raw.githubusercontent.com/griffithlab/pVACtools/master/pvactools/tools/pvacseq/VEP_plugins/Wildtype.pm \
+        -o /opt/vep-plugins/Wildtype.pm \
+    && curl -fsSL \
+        https://raw.githubusercontent.com/griffithlab/pVACtools/master/pvactools/tools/pvacseq/VEP_plugins/Frameshift.pm \
+        -o /opt/vep-plugins/Frameshift.pm
+
 WORKDIR /app
 
 COPY backend/requirements.txt /app/requirements.txt
@@ -67,6 +111,9 @@ COPY pytest.ini /app/pytest.ini
 
 ENV CANCERSTUDIO_APP_DATA_DIR=/app-data \
     CANCERSTUDIO_INBOX_DIR=/inbox \
+    CANCERSTUDIO_VEP_CACHE_DIR=/vep-cache \
+    CANCERSTUDIO_VEP_PLUGINS_DIR=/opt/vep-plugins \
+    CANCERSTUDIO_VEP_RELEASE=111 \
     PYTHONPATH=/app
 
 EXPOSE 8000

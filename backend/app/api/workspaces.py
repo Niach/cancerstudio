@@ -4,6 +4,7 @@ from fastapi.responses import FileResponse
 from app.models.schemas import (
     ActiveStageUpdateRequest,
     AlignmentStageSummaryResponse,
+    AnnotationStageSummaryResponse,
     IngestionLanePreviewResponse,
     LocalFileRegistrationRequest,
     SampleLane,
@@ -32,8 +33,19 @@ from app.services.variant_calling import (
     rerun_variant_calling,
     resume_variant_calling_run,
 )
+from app.services.annotation import (
+    AnnotationArtifactNotFoundError,
+    cancel_annotation_run,
+    create_annotation_run,
+    load_annotation_artifact_download,
+    load_annotation_stage_summary,
+    pause_annotation_run,
+    rerun_annotation,
+    resume_annotation_run,
+)
 from app.services.tool_preflight import (
     ALIGNMENT_TOOLS,
+    ANNOTATION_TOOLS,
     InsufficientMemoryError,
     MissingToolError,
     VARIANT_CALLING_TOOLS,
@@ -339,6 +351,122 @@ async def download_variant_calling_artifact(
         raise HTTPException(status_code=404, detail=str(error)) from error
     except Exception as error:
         raise unexpected_workspace_error("Alignment artifact download", error) from error
+
+
+@router.get(
+    "/{workspace_id}/annotation",
+    response_model=AnnotationStageSummaryResponse,
+)
+async def get_annotation_stage_summary(workspace_id: str):
+    try:
+        return load_annotation_stage_summary(workspace_id)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except Exception as error:
+        raise unexpected_workspace_error("Annotation summary load", error) from error
+
+
+@router.post(
+    "/{workspace_id}/annotation/run",
+    response_model=AnnotationStageSummaryResponse,
+)
+async def run_annotation_stage(workspace_id: str):
+    try:
+        verify_tools(ANNOTATION_TOOLS)
+        return create_annotation_run(workspace_id)
+    except MissingToolError as error:
+        raise missing_tools_error(error) from error
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except Exception as error:
+        raise unexpected_workspace_error("Annotation run", error) from error
+
+
+@router.post(
+    "/{workspace_id}/annotation/rerun",
+    response_model=AnnotationStageSummaryResponse,
+)
+async def rerun_annotation_stage(workspace_id: str):
+    try:
+        verify_tools(ANNOTATION_TOOLS)
+        return rerun_annotation(workspace_id)
+    except MissingToolError as error:
+        raise missing_tools_error(error) from error
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except Exception as error:
+        raise unexpected_workspace_error("Annotation rerun", error) from error
+
+
+@router.post(
+    "/{workspace_id}/annotation/runs/{run_id}/cancel",
+    response_model=AnnotationStageSummaryResponse,
+)
+async def cancel_annotation_stage(workspace_id: str, run_id: str):
+    try:
+        return cancel_annotation_run(workspace_id, run_id)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except Exception as error:
+        raise unexpected_workspace_error("Annotation cancel", error) from error
+
+
+@router.post(
+    "/{workspace_id}/annotation/runs/{run_id}/pause",
+    response_model=AnnotationStageSummaryResponse,
+)
+async def pause_annotation_stage(workspace_id: str, run_id: str):
+    try:
+        return pause_annotation_run(workspace_id, run_id)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except Exception as error:
+        raise unexpected_workspace_error("Annotation pause", error) from error
+
+
+@router.post(
+    "/{workspace_id}/annotation/runs/{run_id}/resume",
+    response_model=AnnotationStageSummaryResponse,
+)
+async def resume_annotation_stage(workspace_id: str, run_id: str):
+    try:
+        return resume_annotation_run(workspace_id, run_id)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except Exception as error:
+        raise unexpected_workspace_error("Annotation resume", error) from error
+
+
+@router.get("/{workspace_id}/annotation/artifacts/{artifact_id}/download")
+async def download_annotation_artifact(
+    workspace_id: str,
+    artifact_id: str,
+):
+    try:
+        artifact = load_annotation_artifact_download(workspace_id, artifact_id)
+        return FileResponse(
+            path=artifact.local_path,
+            media_type=artifact.content_type or "application/octet-stream",
+            filename=artifact.filename,
+        )
+    except AnnotationArtifactNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except Exception as error:
+        raise unexpected_workspace_error("Annotation artifact download", error) from error
 
 
 @router.get(

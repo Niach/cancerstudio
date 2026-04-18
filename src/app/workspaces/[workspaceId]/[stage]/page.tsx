@@ -25,13 +25,21 @@ export default async function WorkspaceStagePage({
   let workspace;
   let alignmentSummary;
   let variantCallingSummary;
+  let annotationSummary;
 
   try {
-    [workspaces, workspace, alignmentSummary, variantCallingSummary] = await Promise.all([
+    [
+      workspaces,
+      workspace,
+      alignmentSummary,
+      variantCallingSummary,
+      annotationSummary,
+    ] = await Promise.all([
       api.listWorkspaces(),
       api.getWorkspace(workspaceId),
       api.getAlignmentStageSummary(workspaceId),
       api.getVariantCallingStageSummary(workspaceId),
+      api.getAnnotationStageSummary(workspaceId),
     ]);
   } catch (error) {
     if (error instanceof Error && error.message.toLowerCase().includes("not found")) {
@@ -41,7 +49,12 @@ export default async function WorkspaceStagePage({
     throw error;
   }
 
-  const policy = getPipelinePolicy(workspace, alignmentSummary, variantCallingSummary);
+  const policy = getPipelinePolicy(
+    workspace,
+    alignmentSummary,
+    variantCallingSummary,
+    annotationSummary
+  );
   const redirectedFromStageId = comingSoon && isPipelineStageId(comingSoon) ? comingSoon : null;
   if (!policy[stage].enterable) {
     const fallbackStage = getLatestActionableStageId(policy);
@@ -58,6 +71,7 @@ export default async function WorkspaceStagePage({
       currentStageId={stage}
       initialAlignmentSummary={alignmentSummary}
       initialVariantCallingSummary={variantCallingSummary}
+      initialAnnotationSummary={annotationSummary}
       redirectedFromStageId={redirectedFromStageId}
     />
   );

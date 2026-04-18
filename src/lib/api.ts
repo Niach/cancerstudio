@@ -7,10 +7,23 @@ import type {
   AlignmentStageSummary,
   AlignmentRun,
   AnalysisProfile,
+  AnnotatedVariantEntry,
+  AnnotationArtifact,
+  AnnotationArtifactKind,
+  AnnotationImpactTier,
+  AnnotationMetrics,
+  AnnotationRun,
+  AnnotationRunStatus,
+  AnnotationRuntimePhase,
+  AnnotationStageStatus,
+  AnnotationStageSummary,
+  CancerGeneHit,
   ChunkProgressPhase,
   ChunkProgressState,
   CreateWorkspaceInput,
   FastqReadPreview,
+  GeneFocus,
+  GeneFocusVariant,
   IngestionLaneSummary,
   IngestionLanePreview,
   IngestionLaneProgress,
@@ -310,6 +323,108 @@ type VariantCallingStageSummaryDto = {
   ready_for_annotation: boolean;
   latest_run?: VariantCallingRunDto | null;
   artifacts: VariantCallingArtifactDto[];
+};
+
+type CancerGeneHitDto = {
+  symbol: string;
+  role: string;
+  variant_count: number;
+  highest_impact: AnnotationImpactTier;
+  top_hgvsp?: string | null;
+  top_consequence?: string | null;
+};
+
+type GeneFocusVariantDto = {
+  chromosome: string;
+  position: number;
+  protein_position?: number | null;
+  hgvsp?: string | null;
+  hgvsc?: string | null;
+  consequence: string;
+  impact: AnnotationImpactTier;
+  tumor_vaf?: number | null;
+};
+
+type GeneFocusDto = {
+  symbol: string;
+  role?: string | null;
+  transcript_id?: string | null;
+  protein_length?: number | null;
+  variants: GeneFocusVariantDto[];
+};
+
+type AnnotatedVariantEntryDto = {
+  chromosome: string;
+  position: number;
+  ref: string;
+  alt: string;
+  gene_symbol?: string | null;
+  transcript_id?: string | null;
+  consequence: string;
+  consequence_label: string;
+  impact: AnnotationImpactTier;
+  hgvsc?: string | null;
+  hgvsp?: string | null;
+  protein_position?: number | null;
+  tumor_vaf?: number | null;
+  in_cancer_gene?: boolean;
+};
+
+type AnnotationConsequenceEntryDto = {
+  term: string;
+  label: string;
+  count: number;
+};
+
+type AnnotationMetricsDto = {
+  total_variants: number;
+  annotated_variants: number;
+  by_impact: Record<string, number>;
+  by_consequence: AnnotationConsequenceEntryDto[];
+  cancer_gene_hits: CancerGeneHitDto[];
+  cancer_gene_variant_count: number;
+  top_gene_focus?: GeneFocusDto | null;
+  top_variants: AnnotatedVariantEntryDto[];
+  reference_label?: string | null;
+  species_label?: string | null;
+  vep_release?: string | null;
+};
+
+type AnnotationArtifactDto = {
+  id: string;
+  artifact_kind: AnnotationArtifactKind;
+  filename: string;
+  size_bytes: number;
+  download_path: string;
+  local_path?: string | null;
+};
+
+type AnnotationRunDto = {
+  id: string;
+  status: AnnotationRunStatus;
+  progress: number;
+  runtime_phase?: AnnotationRuntimePhase | null;
+  created_at: string;
+  updated_at: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+  blocking_reason?: string | null;
+  error?: string | null;
+  command_log: string[];
+  metrics?: AnnotationMetricsDto | null;
+  artifacts: AnnotationArtifactDto[];
+  cache_pending?: boolean;
+  cache_species_label?: string | null;
+  cache_expected_megabytes?: number | null;
+};
+
+type AnnotationStageSummaryDto = {
+  workspace_id: string;
+  status: AnnotationStageStatus;
+  blocking_reason?: string | null;
+  ready_for_neoantigen: boolean;
+  latest_run?: AnnotationRunDto | null;
+  artifacts: AnnotationArtifactDto[];
 };
 
 type AlignmentSettingsDto = {
@@ -623,6 +738,138 @@ function mapVariantCallingRun(dto: VariantCallingRunDto): VariantCallingRun {
     completedShards: dto.completed_shards ?? 0,
     totalShards: dto.total_shards ?? 0,
     accelerationMode: dto.acceleration_mode ?? "cpu_gatk",
+  };
+}
+
+function normalizeImpactTier(value: string | undefined | null): AnnotationImpactTier {
+  if (value === "HIGH" || value === "MODERATE" || value === "LOW" || value === "MODIFIER") {
+    return value;
+  }
+  return "MODIFIER";
+}
+
+function mapCancerGeneHit(dto: CancerGeneHitDto): CancerGeneHit {
+  return {
+    symbol: dto.symbol,
+    role: dto.role,
+    variantCount: dto.variant_count,
+    highestImpact: normalizeImpactTier(dto.highest_impact),
+    topHgvsp: dto.top_hgvsp ?? null,
+    topConsequence: dto.top_consequence ?? null,
+  };
+}
+
+function mapGeneFocusVariant(dto: GeneFocusVariantDto): GeneFocusVariant {
+  return {
+    chromosome: dto.chromosome,
+    position: dto.position,
+    proteinPosition: dto.protein_position ?? null,
+    hgvsp: dto.hgvsp ?? null,
+    hgvsc: dto.hgvsc ?? null,
+    consequence: dto.consequence,
+    impact: normalizeImpactTier(dto.impact),
+    tumorVaf: dto.tumor_vaf ?? null,
+  };
+}
+
+function mapGeneFocus(dto: GeneFocusDto | null | undefined): GeneFocus | null {
+  if (!dto) return null;
+  return {
+    symbol: dto.symbol,
+    role: dto.role ?? null,
+    transcriptId: dto.transcript_id ?? null,
+    proteinLength: dto.protein_length ?? null,
+    variants: (dto.variants ?? []).map(mapGeneFocusVariant),
+  };
+}
+
+function mapAnnotatedVariant(dto: AnnotatedVariantEntryDto): AnnotatedVariantEntry {
+  return {
+    chromosome: dto.chromosome,
+    position: dto.position,
+    ref: dto.ref,
+    alt: dto.alt,
+    geneSymbol: dto.gene_symbol ?? null,
+    transcriptId: dto.transcript_id ?? null,
+    consequence: dto.consequence,
+    consequenceLabel: dto.consequence_label,
+    impact: normalizeImpactTier(dto.impact),
+    hgvsc: dto.hgvsc ?? null,
+    hgvsp: dto.hgvsp ?? null,
+    proteinPosition: dto.protein_position ?? null,
+    tumorVaf: dto.tumor_vaf ?? null,
+    inCancerGene: Boolean(dto.in_cancer_gene),
+  };
+}
+
+function mapAnnotationMetrics(dto: AnnotationMetricsDto): AnnotationMetrics {
+  const by_impact = dto.by_impact ?? {};
+  return {
+    totalVariants: dto.total_variants,
+    annotatedVariants: dto.annotated_variants,
+    byImpact: {
+      HIGH: by_impact.HIGH ?? 0,
+      MODERATE: by_impact.MODERATE ?? 0,
+      LOW: by_impact.LOW ?? 0,
+      MODIFIER: by_impact.MODIFIER ?? 0,
+    },
+    byConsequence: (dto.by_consequence ?? []).map((entry) => ({
+      term: entry.term,
+      label: entry.label,
+      count: entry.count,
+    })),
+    cancerGeneHits: (dto.cancer_gene_hits ?? []).map(mapCancerGeneHit),
+    cancerGeneVariantCount: dto.cancer_gene_variant_count ?? 0,
+    topGeneFocus: mapGeneFocus(dto.top_gene_focus ?? null),
+    topVariants: (dto.top_variants ?? []).map(mapAnnotatedVariant),
+    referenceLabel: dto.reference_label ?? null,
+    speciesLabel: dto.species_label ?? null,
+    vepRelease: dto.vep_release ?? null,
+  };
+}
+
+function mapAnnotationArtifact(dto: AnnotationArtifactDto): AnnotationArtifact {
+  return {
+    id: dto.id,
+    artifactKind: dto.artifact_kind,
+    filename: dto.filename,
+    sizeBytes: dto.size_bytes,
+    downloadPath: dto.download_path,
+    localPath: dto.local_path ?? null,
+  };
+}
+
+function mapAnnotationRun(dto: AnnotationRunDto): AnnotationRun {
+  return {
+    id: dto.id,
+    status: dto.status,
+    progress: dto.progress,
+    runtimePhase: dto.runtime_phase ?? null,
+    createdAt: dto.created_at,
+    updatedAt: dto.updated_at,
+    startedAt: dto.started_at ?? null,
+    completedAt: dto.completed_at ?? null,
+    blockingReason: dto.blocking_reason ?? null,
+    error: dto.error ?? null,
+    commandLog: dto.command_log,
+    metrics: dto.metrics ? mapAnnotationMetrics(dto.metrics) : null,
+    artifacts: (dto.artifacts ?? []).map(mapAnnotationArtifact),
+    cachePending: Boolean(dto.cache_pending),
+    cacheSpeciesLabel: dto.cache_species_label ?? null,
+    cacheExpectedMegabytes: dto.cache_expected_megabytes ?? null,
+  };
+}
+
+function mapAnnotationStageSummary(
+  dto: AnnotationStageSummaryDto
+): AnnotationStageSummary {
+  return {
+    workspaceId: dto.workspace_id,
+    status: dto.status,
+    blockingReason: dto.blocking_reason ?? null,
+    readyForNeoantigen: Boolean(dto.ready_for_neoantigen),
+    latestRun: dto.latest_run ? mapAnnotationRun(dto.latest_run) : null,
+    artifacts: (dto.artifacts ?? []).map(mapAnnotationArtifact),
   };
 }
 
@@ -1082,6 +1329,47 @@ export const api = {
     mapVariantCallingStageSummary(
       await request<VariantCallingStageSummaryDto>(
         `/api/workspaces/${workspaceId}/variant-calling/runs/${runId}/resume`,
+        { method: "POST" }
+      )
+    ),
+  getAnnotationStageSummary: async (workspaceId: string) =>
+    mapAnnotationStageSummary(
+      await request<AnnotationStageSummaryDto>(
+        `/api/workspaces/${workspaceId}/annotation`
+      )
+    ),
+  runAnnotation: async (workspaceId: string) =>
+    mapAnnotationStageSummary(
+      await request<AnnotationStageSummaryDto>(
+        `/api/workspaces/${workspaceId}/annotation/run`,
+        { method: "POST" }
+      )
+    ),
+  rerunAnnotation: async (workspaceId: string) =>
+    mapAnnotationStageSummary(
+      await request<AnnotationStageSummaryDto>(
+        `/api/workspaces/${workspaceId}/annotation/rerun`,
+        { method: "POST" }
+      )
+    ),
+  cancelAnnotation: async (workspaceId: string, runId: string) =>
+    mapAnnotationStageSummary(
+      await request<AnnotationStageSummaryDto>(
+        `/api/workspaces/${workspaceId}/annotation/runs/${runId}/cancel`,
+        { method: "POST" }
+      )
+    ),
+  pauseAnnotation: async (workspaceId: string, runId: string) =>
+    mapAnnotationStageSummary(
+      await request<AnnotationStageSummaryDto>(
+        `/api/workspaces/${workspaceId}/annotation/runs/${runId}/pause`,
+        { method: "POST" }
+      )
+    ),
+  resumeAnnotation: async (workspaceId: string, runId: string) =>
+    mapAnnotationStageSummary(
+      await request<AnnotationStageSummaryDto>(
+        `/api/workspaces/${workspaceId}/annotation/runs/${runId}/resume`,
         { method: "POST" }
       )
     ),

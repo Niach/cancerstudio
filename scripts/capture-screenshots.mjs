@@ -497,6 +497,149 @@ function variantCallingSummaryCompleted(workspace) {
   };
 }
 
+// ---- annotation metrics for Rosie ----
+
+const ANNOTATION_CANCER_HITS = [
+  { symbol: "TP53",   role: "tumor suppressor", variant_count: 3, highest_impact: "HIGH",     top_hgvsp: "ENSCAFP00805002691:p.Arg175His",  top_consequence: "missense_variant" },
+  { symbol: "SETD2",  role: "tumor suppressor", variant_count: 2, highest_impact: "HIGH",     top_hgvsp: "ENSCAFP00805016138:p.Arg1625*",   top_consequence: "stop_gained" },
+  { symbol: "FBXW7",  role: "tumor suppressor", variant_count: 1, highest_impact: "MODERATE", top_hgvsp: "ENSCAFP00805035248:p.Arg465Cys",  top_consequence: "missense_variant" },
+  { symbol: "PIK3CA", role: "oncogene",         variant_count: 1, highest_impact: "MODERATE", top_hgvsp: "ENSCAFP00805042493:p.His1047Arg", top_consequence: "missense_variant" },
+  { symbol: "BRCA2",  role: "DNA repair",       variant_count: 2, highest_impact: "MODERATE", top_hgvsp: "ENSCAFP00805048660:p.Glu2590Val", top_consequence: "missense_variant" },
+  { symbol: "NOTCH1", role: "dual role",        variant_count: 1, highest_impact: "MODERATE", top_hgvsp: "ENSCAFP00805015488:p.Pro1614Leu", top_consequence: "missense_variant" },
+  { symbol: "APC",    role: "tumor suppressor", variant_count: 1, highest_impact: "LOW",      top_hgvsp: "ENSCAFP00805020012:p.Ser1400=",   top_consequence: "synonymous_variant" },
+  { symbol: "MYC",    role: "oncogene",         variant_count: 1, highest_impact: "MODERATE", top_hgvsp: "ENSCAFP00805007441:p.Thr58Ala",   top_consequence: "missense_variant" },
+];
+
+const ANNOTATION_TOP_GENE_FOCUS = {
+  symbol: "TP53",
+  role: "tumor suppressor",
+  transcript_id: "ENSCAFT00805002691",
+  protein_length: 394,
+  variants: [
+    { chromosome: "5", position: 32_771_278, protein_position: 175, hgvsp: "ENSCAFP00805002691:p.Arg175His", hgvsc: null, consequence: "missense_variant",  impact: "HIGH",     tumor_vaf: 0.48 },
+    { chromosome: "5", position: 32_771_092, protein_position: 248, hgvsp: "ENSCAFP00805002691:p.Arg248Gln", hgvsc: null, consequence: "missense_variant",  impact: "MODERATE", tumor_vaf: 0.39 },
+    { chromosome: "5", position: 32_770_455, protein_position: 282, hgvsp: "ENSCAFP00805002691:p.Arg282Trp", hgvsc: null, consequence: "missense_variant",  impact: "HIGH",     tumor_vaf: 0.33 },
+  ],
+};
+
+const ANNOTATION_TOP_VARIANTS = [
+  { chromosome: "5",  position: 32_771_278, ref: "C", alt: "T", gene_symbol: "TP53",   transcript_id: "ENSCAFT00805002691", consequence: "missense_variant",  consequence_label: "Amino-acid change",  impact: "HIGH",     hgvsc: "c.524G>A", hgvsp: "ENSCAFP00805002691:p.Arg175His", protein_position: 175, tumor_vaf: 0.482, in_cancer_gene: true },
+  { chromosome: "20", position: 42_161_903, ref: "C", alt: "T", gene_symbol: "SETD2",  transcript_id: "ENSCAFT00805016138", consequence: "stop_gained",        consequence_label: "Protein cut short",  impact: "HIGH",     hgvsc: "c.4873C>T", hgvsp: "ENSCAFP00805016138:p.Arg1625*",   protein_position: 1625, tumor_vaf: 0.411, in_cancer_gene: true },
+  { chromosome: "5",  position: 32_770_455, ref: "G", alt: "A", gene_symbol: "TP53",   transcript_id: "ENSCAFT00805002691", consequence: "missense_variant",  consequence_label: "Amino-acid change",  impact: "HIGH",     hgvsc: "c.844C>T", hgvsp: "ENSCAFP00805002691:p.Arg282Trp", protein_position: 282, tumor_vaf: 0.331, in_cancer_gene: true },
+  { chromosome: "34", position: 12_832_861, ref: "A", alt: "G", gene_symbol: "PIK3CA", transcript_id: "ENSCAFT00805042493", consequence: "missense_variant",  consequence_label: "Amino-acid change",  impact: "MODERATE", hgvsc: "c.3140A>G", hgvsp: "ENSCAFP00805042493:p.His1047Arg", protein_position: 1047, tumor_vaf: 0.374, in_cancer_gene: true },
+  { chromosome: "15", position: 50_552_597, ref: "C", alt: "T", gene_symbol: "FBXW7",  transcript_id: "ENSCAFT00805035248", consequence: "missense_variant",  consequence_label: "Amino-acid change",  impact: "MODERATE", hgvsc: "c.1393C>T", hgvsp: "ENSCAFP00805035248:p.Arg465Cys", protein_position: 465, tumor_vaf: 0.258, in_cancer_gene: true },
+  { chromosome: "5",  position: 32_771_092, ref: "C", alt: "T", gene_symbol: "TP53",   transcript_id: "ENSCAFT00805002691", consequence: "missense_variant",  consequence_label: "Amino-acid change",  impact: "MODERATE", hgvsc: "c.743G>A", hgvsp: "ENSCAFP00805002691:p.Arg248Gln", protein_position: 248, tumor_vaf: 0.389, in_cancer_gene: true },
+  { chromosome: "25", position: 7_810_930,  ref: "T", alt: "A", gene_symbol: "BRCA2",  transcript_id: "ENSCAFT00805048660", consequence: "missense_variant",  consequence_label: "Amino-acid change",  impact: "MODERATE", hgvsc: "c.7769A>T", hgvsp: "ENSCAFP00805048660:p.Glu2590Val", protein_position: 2590, tumor_vaf: 0.183, in_cancer_gene: true },
+  { chromosome: "25", position: 7_812_448,  ref: "G", alt: "A", gene_symbol: "BRCA2",  transcript_id: "ENSCAFT00805048660", consequence: "splice_region_variant", consequence_label: "Near a splice site", impact: "LOW",      hgvsc: "c.6869-3G>A", hgvsp: null, protein_position: null, tumor_vaf: 0.162, in_cancer_gene: true },
+  { chromosome: "9",  position: 62_104_502, ref: "C", alt: "T", gene_symbol: "NOTCH1", transcript_id: "ENSCAFT00805015488", consequence: "missense_variant",  consequence_label: "Amino-acid change",  impact: "MODERATE", hgvsc: "c.4841C>T", hgvsp: "ENSCAFP00805015488:p.Pro1614Leu", protein_position: 1614, tumor_vaf: 0.221, in_cancer_gene: true },
+  { chromosome: "18", position: 22_330_018, ref: "A", alt: "G", gene_symbol: "MYC",    transcript_id: "ENSCAFT00805007441", consequence: "missense_variant",  consequence_label: "Amino-acid change",  impact: "MODERATE", hgvsc: "c.172A>G", hgvsp: "ENSCAFP00805007441:p.Thr58Ala", protein_position: 58, tumor_vaf: 0.306, in_cancer_gene: true },
+  { chromosome: "7",  position: 31_884_229, ref: "G", alt: "T", gene_symbol: "APC",    transcript_id: "ENSCAFT00805020012", consequence: "synonymous_variant", consequence_label: "Silent change",     impact: "LOW",      hgvsc: "c.4200C>A", hgvsp: "ENSCAFP00805020012:p.Ser1400=", protein_position: 1400, tumor_vaf: 0.128, in_cancer_gene: true },
+];
+
+const ANNOTATION_BY_CONSEQUENCE = [
+  { term: "missense_variant",       label: "Amino-acid change",   count: 68 },
+  { term: "synonymous_variant",     label: "Silent change",        count: 42 },
+  { term: "intron_variant",         label: "Inside an intron",     count: 31 },
+  { term: "3_prime_UTR_variant",    label: "3' UTR change",        count: 14 },
+  { term: "5_prime_UTR_variant",    label: "5' UTR change",        count: 9 },
+  { term: "splice_region_variant",  label: "Near a splice site",   count: 6 },
+  { term: "stop_gained",            label: "Protein cut short",    count: 3 },
+  { term: "frameshift_variant",     label: "Reading-frame shift",  count: 2 },
+  { term: "inframe_deletion",       label: "In-frame deletion",    count: 1 },
+  { term: "upstream_gene_variant",  label: "Near a gene (upstream)", count: 12 },
+  { term: "intergenic_variant",     label: "Between genes",        count: 21 },
+];
+
+function annotationSummaryCompleted(workspace) {
+  const metrics = {
+    total_variants: 219,
+    annotated_variants: 209,
+    by_impact: { HIGH: 6, MODERATE: 74, LOW: 47, MODIFIER: 82 },
+    by_consequence: ANNOTATION_BY_CONSEQUENCE,
+    cancer_gene_hits: ANNOTATION_CANCER_HITS,
+    cancer_gene_variant_count: ANNOTATION_CANCER_HITS.reduce((n, h) => n + h.variant_count, 0),
+    top_gene_focus: ANNOTATION_TOP_GENE_FOCUS,
+    top_variants: ANNOTATION_TOP_VARIANTS,
+    reference_label: "CanFam4 (UU_Cfam_GSD_1.0)",
+    species_label: "Dog (UU_Cfam_GSD_1.0)",
+    vep_release: "111",
+  };
+  const artifacts = [
+    {
+      id: "ann-vcf",
+      artifact_kind: "annotated_vcf",
+      filename: "rosie.annotated.vcf.gz",
+      size_bytes: 162_480_000,
+      download_path: "/api/workspaces/ws-rosie/annotation/artifacts/ann-vcf/download",
+      local_path: "/Users/danny/cancerstudio/data/app-data/workspaces/ws-rosie/annotation/run-01/rosie.annotated.vcf.gz",
+    },
+    {
+      id: "ann-tbi",
+      artifact_kind: "annotated_vcf_index",
+      filename: "rosie.annotated.vcf.gz.tbi",
+      size_bytes: 2_980_000,
+      download_path: "/api/workspaces/ws-rosie/annotation/artifacts/ann-tbi/download",
+      local_path: "/Users/danny/cancerstudio/data/app-data/workspaces/ws-rosie/annotation/run-01/rosie.annotated.vcf.gz.tbi",
+    },
+    {
+      id: "ann-html",
+      artifact_kind: "vep_summary",
+      filename: "vep_summary.html",
+      size_bytes: 84_220,
+      download_path: "/api/workspaces/ws-rosie/annotation/artifacts/ann-html/download",
+      local_path: "/Users/danny/cancerstudio/data/app-data/workspaces/ws-rosie/annotation/run-01/vep_summary.html",
+    },
+  ];
+  return {
+    workspace_id: workspace.id,
+    status: "completed",
+    blocking_reason: null,
+    ready_for_neoantigen: true,
+    latest_run: {
+      id: "ann-run-01",
+      status: "completed",
+      progress: 1,
+      runtime_phase: null,
+      created_at: NOW,
+      updated_at: NOW,
+      started_at: NOW,
+      completed_at: NOW,
+      blocking_reason: null,
+      error: null,
+      command_log: [
+        "vep_install --AUTO cf --SPECIES canis_lupus_familiarisgsd --ASSEMBLY UU_Cfam_GSD_1.0 --CACHEDIR /vep-cache --CACHE_VERSION 111",
+        "vep --input_file rosie.mutect2.filtered.vcf.gz --output_file rosie.annotated.vcf.gz --format vcf --vcf --compress_output bgzip --offline --cache --dir_cache /vep-cache --species canis_lupus_familiarisgsd --assembly UU_Cfam_GSD_1.0 --cache_version 111 --fasta CanFam4.fa --symbol --terms SO --canonical --biotype --hgvs --numbers --protein --pick_allele --dir_plugins /opt/vep-plugins --plugin Frameshift --plugin Wildtype --plugin Downstream --fork 4",
+        "tabix -p vcf rosie.annotated.vcf.gz",
+      ],
+      metrics,
+      artifacts,
+      cache_pending: false,
+      cache_species_label: "Dog (UU_Cfam_GSD_1.0)",
+      cache_expected_megabytes: null,
+    },
+    artifacts,
+  };
+}
+
+function annotationSummaryBlocked(workspace, reason) {
+  return {
+    workspace_id: workspace.id,
+    status: "blocked",
+    blocking_reason: reason,
+    ready_for_neoantigen: false,
+    latest_run: null,
+    artifacts: [],
+  };
+}
+
+function annotationSummaryFor(workspace) {
+  if (workspace.id === ROSIE.id) return annotationSummaryCompleted(workspace);
+  return annotationSummaryBlocked(
+    workspace,
+    "Finish variant calling before annotation."
+  );
+}
+
 function variantCallingSummaryBlocked(workspace, reason) {
   return {
     workspace_id: workspace.id,
@@ -596,6 +739,13 @@ function startStub() {
       }
       if (
         req.method === "GET" &&
+        parts[4] === "annotation" &&
+        parts.length === 5
+      ) {
+        return send(res, 200, annotationSummaryFor(workspace));
+      }
+      if (
+        req.method === "GET" &&
         parts[4] === "ingestion" &&
         parts[5] === "preview" &&
         parts[6]
@@ -681,6 +831,12 @@ const SHOTS = [
     name: "variant-calling",
     path: `/workspaces/${ROSIE.id}/variant-calling`,
     height: 2100,
+    wait: 1500,
+  },
+  {
+    name: "annotation",
+    path: `/workspaces/${ROSIE.id}/annotation`,
+    height: 2400,
     wait: 1500,
   },
 ];

@@ -1,5 +1,6 @@
 import type {
   AlignmentStageSummary,
+  AnnotationStageSummary,
   PipelineStage,
   PipelineStageId,
   VariantCallingStageSummary,
@@ -35,7 +36,8 @@ function variantBlockedReason(
 export function getPipelinePolicy(
   workspace: Workspace,
   alignmentSummary: AlignmentStageSummary,
-  variantCallingSummary: VariantCallingStageSummary
+  variantCallingSummary: VariantCallingStageSummary,
+  annotationSummary?: AnnotationStageSummary | null
 ): PipelinePolicyMap {
   const latestActionableStage =
     workspace.ingestion.readyForAlignment && alignmentSummary.status !== "blocked"
@@ -114,14 +116,46 @@ export function getPipelinePolicy(
             ? "Finish alignment cleanly first."
             : "Complete ingestion first."
           : isRunning
-            ? "Mutect2 is running on your local machine."
+            ? "We're searching the cancer sample for mutations."
             : isPaused
               ? "The search is paused. Resume when you’re ready."
               : isFailed
                 ? "Review the error, then rerun variant calling."
                 : isCompleted
-                  ? "The mutations are in. Annotation is the next step on the roadmap."
+                  ? "The mutations are in. Read what they mean next."
                   : "Find the mutations that are only in the cancer.",
+      };
+      continue;
+    }
+
+    if (stage.id === "annotation") {
+      const variantReady = variantCallingSummary.readyForAnnotation;
+      const status = annotationSummary?.status ?? (variantReady ? "scaffolded" : "blocked");
+      const isBlocked = !variantReady;
+      const isRunning = status === "running";
+      const isPaused = status === "paused";
+      const isCompleted = status === "completed";
+      const isFailed = status === "failed";
+
+      policies[stage.id] = {
+        stage,
+        visible: true,
+        enterable: true,
+        actionable: !isBlocked,
+        blockedReason: isBlocked
+          ? "Finish variant calling before we can annotate the mutations."
+          : annotationSummary?.blockingReason ?? null,
+        nextStep: isBlocked
+          ? "Finish the variant search first."
+          : isRunning
+            ? "Matching each mutation to what's known about that gene."
+            : isPaused
+              ? "Annotation is paused. Resume when you're ready."
+              : isFailed
+                ? "Review the error, then run annotation again."
+                : isCompleted
+                  ? "The annotations are ready to explore."
+                  : "Read what the mutations mean.",
       };
       continue;
     }

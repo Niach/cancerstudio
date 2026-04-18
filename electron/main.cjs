@@ -172,6 +172,9 @@ function stopExistingContainer() {
 function startBackendContainer(dataRoot) {
   stopExistingContainer();
 
+  const vepCacheRoot = path.join(dataRoot, "vep-cache");
+  fs.mkdirSync(vepCacheRoot, { recursive: true });
+
   const dockerArgs = [
     "run",
     "-d",
@@ -184,10 +187,14 @@ function startBackendContainer(dataRoot) {
     `${dataRoot}:/app-data`,
     "-v",
     `${path.join(dataRoot, "inbox")}:/inbox`,
+    "-v",
+    `${vepCacheRoot}:/vep-cache`,
     "-e",
     "CANCERSTUDIO_APP_DATA_DIR=/app-data",
     "-e",
     "CANCERSTUDIO_INBOX_DIR=/inbox",
+    "-e",
+    "CANCERSTUDIO_VEP_CACHE_DIR=/vep-cache",
   ];
 
   if (process.platform === "linux" && nvidiaRuntimeAvailable()) {

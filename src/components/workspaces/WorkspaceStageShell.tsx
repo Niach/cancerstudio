@@ -6,6 +6,7 @@ import { ChevronDown, Dna, LockKeyhole, Plus } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 
 import AlignmentStagePanel from "@/components/workspaces/AlignmentStagePanel";
+import AnnotationStagePanel from "@/components/workspaces/AnnotationStagePanel";
 import IngestionStagePanel from "@/components/workspaces/IngestionStagePanel";
 import VariantCallingStagePanel from "@/components/workspaces/VariantCallingStagePanel";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +20,7 @@ import {
 } from "@/lib/pipeline-policy";
 import type {
   AlignmentStageSummary,
+  AnnotationStageSummary,
   PipelineStageId,
   VariantCallingStageSummary,
   Workspace,
@@ -108,6 +110,7 @@ interface WorkspaceStageShellProps {
   currentStageId: PipelineStageId;
   initialAlignmentSummary: AlignmentStageSummary;
   initialVariantCallingSummary: VariantCallingStageSummary;
+  initialAnnotationSummary: AnnotationStageSummary;
   redirectedFromStageId: PipelineStageId | null;
 }
 
@@ -117,6 +120,7 @@ export default function WorkspaceStageShell({
   currentStageId,
   initialAlignmentSummary,
   initialVariantCallingSummary,
+  initialAnnotationSummary,
   redirectedFromStageId,
 }: WorkspaceStageShellProps) {
   const router = useRouter();
@@ -131,11 +135,15 @@ export default function WorkspaceStageShell({
   const [variantCallingSummary, setVariantCallingSummary] = useState(
     initialVariantCallingSummary
   );
+  const [annotationSummary, setAnnotationSummary] = useState(
+    initialAnnotationSummary
+  );
 
   const stagePolicy = getPipelinePolicy(
     workspace,
     alignmentSummary,
-    variantCallingSummary
+    variantCallingSummary,
+    annotationSummary
   );
   const currentStagePolicy = stagePolicy[currentStageId];
   const primaryStages = getVisiblePrimaryStages(stagePolicy);
@@ -181,6 +189,10 @@ export default function WorkspaceStageShell({
         void api
           .getVariantCallingStageSummary(updatedWorkspace.id)
           .then(setVariantCallingSummary)
+          .catch(() => {});
+        void api
+          .getAnnotationStageSummary(updatedWorkspace.id)
+          .then(setAnnotationSummary)
           .catch(() => {});
       })
       .catch(() => {});
@@ -331,6 +343,12 @@ export default function WorkspaceStageShell({
                 key={workspace.id}
                 workspace={workspace}
                 initialSummary={variantCallingSummary}
+              />
+            ) : currentStageId === "annotation" ? (
+              <AnnotationStagePanel
+                key={workspace.id}
+                workspace={workspace}
+                initialSummary={annotationSummary}
               />
             ) : null}
           </main>

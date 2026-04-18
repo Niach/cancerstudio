@@ -1,14 +1,14 @@
 # cancerstudio
 
-cancerstudio is a desktop-first studio for the first guided steps of a personalized cancer vaccine workflow. Today it helps a non-technical operator bring in local tumor and matched-normal sequencing files, prepare alignment-ready inputs on disk, run alignment against a species reference, and search for the cancer-specific mutations with an interactive karyogram and filter view. Downstream vaccine-design stages stay visible as roadmap items, not runnable promises.
+cancerstudio is a desktop-first studio for the first guided steps of a personalized cancer vaccine workflow. Today it helps a non-technical operator bring in local tumor and matched-normal sequencing files, prepare alignment-ready inputs on disk, run alignment against a species reference, find the cancer-specific mutations with an interactive karyogram, and read what those mutations mean with a plain-English gene-centric annotation panel. Downstream vaccine-design stages stay visible as roadmap items, not runnable promises.
 
 Project site: <https://niach.github.io/cancerstudio/>
 
 ## Screenshots
 
-| Pick a species | Stage the samples | Run alignment | Find the mutations |
-| --- | --- | --- | --- |
-| ![landing](docs/screenshots/landing.png) | ![ingestion](docs/screenshots/ingestion.png) | ![alignment](docs/screenshots/alignment.png) | ![variant calling](docs/screenshots/variant-calling.png) |
+| Pick a species | Stage the samples | Run alignment | Find the mutations | Read what they mean |
+| --- | --- | --- | --- | --- |
+| ![landing](docs/screenshots/landing.png) | ![ingestion](docs/screenshots/ingestion.png) | ![alignment](docs/screenshots/alignment.png) | ![variant calling](docs/screenshots/variant-calling.png) | ![annotation](docs/screenshots/annotation.png) |
 
 ## Pipeline
 
@@ -19,7 +19,7 @@ Project site: <https://niach.github.io/cancerstudio/>
 | 1 | Ingestion | **Live** | samtools, pigz, fastp |
 | 2 | Alignment | **Live** | strobealign, samtools |
 | 3 | Variant Calling | **Live** — GATK Mutect2 + FilterMutectCalls, rendered as karyogram, plain-language filter buckets, VAF histogram, and a top-variants table | GATK Mutect2 |
-| 4 | Annotation | Planned | Ensembl VEP |
+| 4 | Annotation | **Live** — Ensembl VEP release 111 + pVACseq-ready Frameshift/Wildtype/Downstream plugins, rendered as cancer-gene cards, a lollipop plot of the top gene, impact tiles in plain English, and a filterable annotated-variants table | Ensembl VEP |
 | 5 | Neoantigen Prediction | Planned | pVACseq, NetMHCpan |
 | 6 | Epitope Selection | Planned | pVACview |
 | 7 | mRNA Construct Design | Planned | LinearDesign, DNAchisel |
@@ -48,9 +48,26 @@ Stage 3 runs GATK Mutect2 + FilterMutectCalls on the aligned tumor/normal BAMs a
 
 Tool names live in the Technical details drawer. The primary CTA is *Find mutations*, not *Run Mutect2*; the ready callout says "This runs on your computer using the reference genome for your pet's species" instead of "a filtered somatic VCF with its Tabix index and Mutect2 stats file".
 
+### Stage 4: reading what the mutations mean
+
+Stage 4 turns the filtered somatic VCF from stage 3 into something a pet owner can actually read. Ensembl VEP release 111 annotates every variant with gene, transcript, consequence, and impact against a species-specific offline cache (human `GRCh38`, dog `UU_Cfam_GSD_1.0`, cat `Felis_catus_9.0`). The pVACseq-ready plugins Frameshift, Wildtype, and Downstream are baked into the VEP command line, so the annotated VCF is a drop-in consumer for stage 5 without rerunning.
+
+The panel is built around the same "one fancy viz + plain-English surfaces" pattern as stage 3:
+
+- **Completion headline**: *"We read 209 mutations in your pet's tumor. 12 fell in 8 genes linked to cancer before."* — the emotional payoff line, not a consequence-term histogram.
+- **Impact tiles** in plain English — *Likely to break the protein* (HIGH), *Likely to change the protein* (MODERATE), *Minor protein changes* (LOW), *Outside the protein-coding region* (MODIFIER) — with counts and proportion bars.
+- **Cancer-gene cards** — every unique gene symbol hit that appears in the bundled cancer gene list, with its role (tumor suppressor / oncogene / DNA repair / fusion / dual role), mutation count, impact stripe, and top protein change. Clicking a card focuses the lollipop plot on that gene.
+- **Lollipop plot** — the fancy viz — maps the focused gene's protein with each mutation as a lollipop, stick height keyed to impact and head color keyed to consequence category. Hover reveals position, HGVSp, and VAF.
+- **Consequence mix donut** using plain-English labels (*Amino-acid change*, *Reading-frame shift*, *Silent change*, *Near a splice site*, …); the raw SO terms sit behind a toggle in the Advanced drawer.
+- **Annotated variants table** with filter chips (Cancer genes · High impact · All), showing gene, plain-English change, impact pill, consequence, VAF.
+
+The bundled cancer-gene list ships as `backend/app/data/cancer_genes.csv` — ~230 gene symbols with role/tier annotation, redistributable (symbols only, drawn from published driver lists). Dog and cat hits are matched by HGNC symbol since Ensembl uses aligned gene symbols across the three species. First-run cache install downloads the offline VEP cache for the workspace's species (~80 MB dog, ~552 MB cat, ~27 GB human) into a shared `/vep-cache` volume and persists it so later runs skip the download.
+
+Verified end-to-end on a canine DLBCL workspace (PRJNA805123, SRR15540953 tumor + SRR15540951 skin-punch normal): ingestion → alignment (99.94% tumor / 98.69% normal mapped) → Parabricks GPU variant calling → VEP annotation emitted a pVACseq-ready CSQ with `FrameshiftSequence|WildtypeProtein|DownstreamProtein|ProteinLengthChange` from the plugins. Fetch script: `python3 scripts/fetch_canine_dlbcl_sample_data.py`.
+
 ## How it works
 
-- Desktop-first runtime: Electron shell + local Next.js renderer + a single all-in-one Docker container that bundles the FastAPI engine and every bioinformatics tool (samtools, pigz, strobealign, GATK, NVIDIA Parabricks). No cloud, no object storage.
+- Desktop-first runtime: Electron shell + local Next.js renderer + a single all-in-one Docker container that bundles the FastAPI engine and every bioinformatics tool (samtools, pigz, strobealign, GATK, NVIDIA Parabricks, Ensembl VEP + plugins). No cloud, no object storage.
 - Inbox intake: drop FASTQ/BAM/CRAM files into `<data-root>/inbox/` (the path you pick on first launch) and the app lists them for registration into a workspace — no OS file-picker, no host-path plumbing.
 - Species presets: human `GRCh38`, dog `CanFam4`, cat `felCat9`. Missing references are downloaded and indexed on first alignment.
 - Paired-lane model: tumor and normal are separate lanes. Alignment unlocks only when both lanes are ready; a QC pass unlocks variant calling, while `warn` or `fail` keeps the workflow blocked in plain language.
@@ -60,7 +77,7 @@ Tool names live in the Technical details drawer. The primary CTA is *Find mutati
 
 - Frontend: Next.js 15.5, React 19, TypeScript, Tailwind CSS
 - Desktop shell: Electron
-- Backend: FastAPI + SQLAlchemy + samtools, pigz, strobealign, GATK Mutect2, NVIDIA Parabricks (all shipped in one container image)
+- Backend: FastAPI + SQLAlchemy + samtools, pigz, strobealign, GATK Mutect2, NVIDIA Parabricks, Ensembl VEP 111 with Frameshift/Wildtype/Downstream plugins (all shipped in one container image)
 - Storage: local filesystem + SQLite under a user-chosen data root
 
 ## Local development
@@ -190,6 +207,7 @@ The live real-data path uses the COLO829 matched tumor/normal WGS smoke pair by 
 The repo includes helpers for public smoke fixtures:
 
 - COLO829/COLO829BL matched melanoma pair (ENA PRJEB27698) — smoke subset plus the full 100× tumor + 38× normal WGS for validating the chunked alignment pipeline at production scale
+- Canine DLBCL matched tumor / skin-punch normal (SRA PRJNA805123) — the DLBCL1 pair (SRR15540953 + SRR15540951, same BioSample SAMN08874634) for verifying the canine pipeline and the stage-4 cancer-gene hits against genes like TP53, SETD2, and FBXW7
 - a tiny BAM/CRAM smoke dataset for local normalization checks only
 
 The COLO829 full fetch is ~174 GB compressed. Per-file md5s are checked against ENA-published values on download so silent corruption fails loudly.
@@ -197,7 +215,9 @@ The COLO829 full fetch is ~174 GB compressed. Per-file md5s are checked against 
 Download with:
 
 ```bash
-npm run sample-data:smoke         # COLO829 smoke (~50k read pairs per lane)
-npm run sample-data:full          # COLO829 full 100x WGS (~174 GB)
-npm run sample-data:alignment     # BAM/CRAM normalization fixture
+npm run sample-data:smoke                                 # COLO829 smoke (~50k read pairs per lane)
+npm run sample-data:full                                  # COLO829 full 100x WGS (~174 GB)
+npm run sample-data:alignment                             # BAM/CRAM normalization fixture
+python3 scripts/fetch_canine_dlbcl_sample_data.py         # canine DLBCL smoke subset (~2.5 MB)
+python3 scripts/fetch_canine_dlbcl_sample_data.py --mode full  # full DLBCL1 pair (~45 GB)
 ```

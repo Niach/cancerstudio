@@ -1,0 +1,254 @@
+# cancerstudio cancer-gene reference list
+#
+# A curated list of gene symbols with strong, well-documented roles in human
+# cancer. Symbols only — annotated feature sets (COSMIC CGC, OncoKB) are
+# licensed datasets and are not redistributed here. Gene symbols and their
+# canonical "oncogene / tumor suppressor / dual role" classification are
+# drawn from public literature reviews (Vogelstein et al. 2013; Bailey et al.
+# 2018; Sondka et al. 2018). Commercial redistribution of the annotated
+# upstream datasets requires a license from the owners.
+#
+# For dog (CanFam4) and cat (felCat9) workspaces we match by HGNC symbol;
+# Ensembl uses aligned gene symbols across these species for orthologs.
+#
+# Columns: symbol,role,tier
+#   role: "oncogene" | "tumor suppressor" | "dual role" | "DNA repair" | "fusion"
+#   tier: 1 (well-established driver) | 2 (frequently mutated / context-specific)
+symbol,role,tier
+TP53,tumor suppressor,1
+KRAS,oncogene,1
+EGFR,oncogene,1
+BRAF,oncogene,1
+PIK3CA,oncogene,1
+PTEN,tumor suppressor,1
+APC,tumor suppressor,1
+BRCA1,DNA repair,1
+BRCA2,DNA repair,1
+RB1,tumor suppressor,1
+MYC,oncogene,1
+MYCN,oncogene,1
+CDKN2A,tumor suppressor,1
+CDKN2B,tumor suppressor,1
+NF1,tumor suppressor,1
+NF2,tumor suppressor,1
+VHL,tumor suppressor,1
+WT1,tumor suppressor,1
+ATM,DNA repair,1
+ATR,DNA repair,1
+CHEK1,DNA repair,1
+CHEK2,DNA repair,1
+PALB2,DNA repair,1
+RAD51,DNA repair,1
+RAD51B,DNA repair,2
+RAD51C,DNA repair,1
+RAD51D,DNA repair,1
+RAD52,DNA repair,2
+RAD54L,DNA repair,2
+BARD1,DNA repair,1
+BRIP1,DNA repair,1
+MLH1,DNA repair,1
+MLH3,DNA repair,2
+MSH2,DNA repair,1
+MSH3,DNA repair,2
+MSH6,DNA repair,1
+PMS1,DNA repair,2
+PMS2,DNA repair,1
+POLE,DNA repair,1
+POLD1,DNA repair,1
+NRAS,oncogene,1
+HRAS,oncogene,1
+ALK,oncogene,1
+RET,oncogene,1
+MET,oncogene,1
+ERBB2,oncogene,1
+ERBB3,oncogene,1
+ERBB4,oncogene,2
+KIT,oncogene,1
+PDGFRA,oncogene,1
+PDGFRB,oncogene,2
+FGFR1,oncogene,1
+FGFR2,oncogene,1
+FGFR3,oncogene,1
+FGFR4,oncogene,2
+IDH1,oncogene,1
+IDH2,oncogene,1
+JAK1,oncogene,1
+JAK2,oncogene,1
+JAK3,oncogene,1
+STAT3,oncogene,2
+STAT5A,oncogene,2
+STAT5B,oncogene,2
+NOTCH1,dual role,1
+NOTCH2,dual role,2
+NOTCH3,dual role,2
+FBXW7,tumor suppressor,1
+ARID1A,tumor suppressor,1
+ARID1B,tumor suppressor,2
+ARID2,tumor suppressor,2
+SMARCA4,tumor suppressor,1
+SMARCB1,tumor suppressor,1
+SMARCE1,tumor suppressor,2
+PBRM1,tumor suppressor,1
+SETD2,tumor suppressor,1
+KMT2A,dual role,1
+KMT2C,tumor suppressor,1
+KMT2D,tumor suppressor,1
+KDM5C,tumor suppressor,2
+KDM6A,tumor suppressor,1
+EZH2,dual role,1
+EZH1,dual role,2
+DNMT3A,dual role,1
+TET1,tumor suppressor,2
+TET2,tumor suppressor,1
+IDH3A,oncogene,2
+CTNNB1,oncogene,1
+AXIN1,tumor suppressor,1
+AXIN2,tumor suppressor,2
+GSK3B,tumor suppressor,2
+CDK4,oncogene,1
+CDK6,oncogene,1
+CDK12,DNA repair,1
+CCND1,oncogene,1
+CCND2,oncogene,2
+CCND3,oncogene,2
+CCNE1,oncogene,1
+MDM2,oncogene,1
+MDM4,oncogene,1
+BCL2,oncogene,1
+BCL6,oncogene,1
+BCL10,oncogene,2
+MCL1,oncogene,2
+PIK3R1,tumor suppressor,1
+PIK3R2,oncogene,2
+AKT1,oncogene,1
+AKT2,oncogene,2
+AKT3,oncogene,2
+MTOR,oncogene,1
+TSC1,tumor suppressor,1
+TSC2,tumor suppressor,1
+STK11,tumor suppressor,1
+KEAP1,tumor suppressor,1
+NFE2L2,oncogene,1
+TERT,oncogene,1
+TERC,oncogene,2
+RUNX1,dual role,1
+RUNX1T1,fusion,1
+CBFB,fusion,1
+ETV6,fusion,1
+ETV1,fusion,2
+ETV4,fusion,2
+EWSR1,fusion,1
+FLI1,fusion,1
+SS18,fusion,1
+PAX3,fusion,1
+PAX7,fusion,1
+FOXO1,fusion,1
+ABL1,oncogene,1
+BCR,fusion,1
+BCL2L1,oncogene,2
+SF3B1,oncogene,1
+SRSF2,oncogene,1
+U2AF1,oncogene,1
+ZRSR2,oncogene,2
+ASXL1,tumor suppressor,1
+ASXL2,tumor suppressor,2
+EP300,dual role,1
+CREBBP,dual role,1
+TCF3,oncogene,2
+TCF7L2,oncogene,2
+NPM1,oncogene,1
+NRG1,fusion,2
+NTRK1,oncogene,1
+NTRK2,oncogene,1
+NTRK3,oncogene,1
+ROS1,oncogene,1
+RSPO2,oncogene,2
+RSPO3,oncogene,2
+RNF43,tumor suppressor,1
+ZNRF3,tumor suppressor,2
+CDH1,tumor suppressor,1
+VIM,oncogene,2
+SMAD2,tumor suppressor,1
+SMAD3,tumor suppressor,1
+SMAD4,tumor suppressor,1
+TGFBR1,tumor suppressor,2
+TGFBR2,tumor suppressor,1
+ACVR1,oncogene,2
+ACVR1B,tumor suppressor,2
+ACVR2A,tumor suppressor,2
+BMPR1A,tumor suppressor,2
+BMPR2,tumor suppressor,2
+FOXA1,oncogene,2
+GATA3,tumor suppressor,1
+GATA1,dual role,2
+GATA2,dual role,2
+SPOP,tumor suppressor,1
+SPEN,tumor suppressor,2
+BAP1,tumor suppressor,1
+MEN1,tumor suppressor,1
+CDC73,tumor suppressor,2
+CREB3L1,tumor suppressor,2
+CREB3L2,fusion,2
+ERG,fusion,1
+TMPRSS2,fusion,1
+BCOR,tumor suppressor,1
+BCORL1,tumor suppressor,2
+FANCA,DNA repair,1
+FANCB,DNA repair,2
+FANCC,DNA repair,1
+FANCD2,DNA repair,1
+FANCE,DNA repair,2
+FANCF,DNA repair,2
+FANCG,DNA repair,1
+FANCI,DNA repair,2
+FANCL,DNA repair,2
+FANCM,DNA repair,2
+ERCC1,DNA repair,2
+ERCC2,DNA repair,1
+ERCC3,DNA repair,2
+ERCC4,DNA repair,1
+ERCC5,DNA repair,2
+XPA,DNA repair,2
+XPC,DNA repair,2
+XRCC2,DNA repair,2
+XRCC3,DNA repair,2
+MRE11,DNA repair,2
+NBN,DNA repair,1
+RAD50,DNA repair,2
+LIG4,DNA repair,2
+KDR,oncogene,2
+CDKN1A,tumor suppressor,2
+CDKN1B,tumor suppressor,1
+CDKN1C,tumor suppressor,2
+CDKN2C,tumor suppressor,2
+MAP2K1,oncogene,1
+MAP2K2,oncogene,2
+MAP2K4,tumor suppressor,1
+MAP3K1,tumor suppressor,1
+MAP3K13,tumor suppressor,2
+DDX3X,tumor suppressor,2
+U2AF2,oncogene,2
+B2M,tumor suppressor,1
+HLA-A,tumor suppressor,2
+HLA-B,tumor suppressor,2
+TNFAIP3,tumor suppressor,2
+CARD11,oncogene,2
+MYD88,oncogene,1
+CD79A,oncogene,2
+CD79B,oncogene,1
+CIC,tumor suppressor,1
+FUBP1,tumor suppressor,1
+H3F3A,oncogene,1
+H3F3B,oncogene,2
+HIST1H3B,oncogene,2
+HIST1H3C,oncogene,2
+DAXX,tumor suppressor,1
+ATRX,tumor suppressor,1
+TERT,oncogene,1
+PTPN11,oncogene,1
+GNAS,oncogene,1
+GNAQ,oncogene,1
+GNA11,oncogene,1
+PPP2R1A,oncogene,1
+PPP6C,oncogene,2
+SPTAN1,tumor suppressor,2

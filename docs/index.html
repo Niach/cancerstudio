@@ -6,7 +6,7 @@
     <title>cancerstudio</title>
     <meta
       name="description"
-      content="A desktop studio for the guided first steps of a personalized cancer vaccine workflow: local intake, alignment, and finding the cancer-specific mutations with an interactive karyogram."
+      content="A desktop studio for the guided first steps of a personalized cancer vaccine workflow: local intake, alignment, finding the cancer-specific mutations with an interactive karyogram, and annotating them with gene, consequence, and cancer-gene impact in plain English."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -24,10 +24,11 @@
         <p class="lede">
           A desktop studio for the first guided steps of a personalized mRNA
           cancer vaccine workflow. Give it tumor DNA and matched-normal DNA.
-          Today it helps you prepare the files, run local alignment, and find
+          Today it helps you prepare the files, run local alignment, find
           the cancer-specific mutations — rendered as a karyogram, plain-language
-          filter buckets, and a top-variants table. For humans, dogs, and cats,
-          all on your local machine.
+          filter buckets, and a top-variants table — and read what those
+          mutations mean, with cancer-gene cards and a lollipop plot of the
+          top gene. For humans, dogs, and cats, all on your local machine.
         </p>
         <div class="hero-actions">
           <a href="#pipeline" class="button button-primary">See the pipeline</a>
@@ -139,14 +140,53 @@
           </figure>
         </section>
 
+        <section class="section">
+          <div class="section-heading">
+            <p class="eyebrow">Read what they mean</p>
+            <h2>Which gene. What changed. Whether it matters.</h2>
+            <p class="section-sub">
+              Stage 4 annotates every somatic call with Ensembl VEP against a
+              species-specific offline cache, then translates the result into
+              plain English. Impact tiers read as
+              <em>Likely to break the protein</em>,
+              <em>Likely to change the protein</em>,
+              <em>Minor protein changes</em>, and
+              <em>Outside the protein-coding region</em> — not HIGH, MODERATE,
+              LOW, MODIFIER.
+            </p>
+            <p class="section-sub">
+              Genes that have been linked to cancer before show up as their
+              own cards with role (tumor suppressor, oncogene, DNA repair),
+              mutation count, and top protein change. Click a card and the
+              lollipop plot re-focuses on that gene's protein, showing every
+              mutation along the length. Raw SO terms, VEP command log, and
+              plugin flags live in the Technical details drawer — the primary
+              surface stays readable for a pet owner sharing results with a
+              vet.
+            </p>
+            <p class="section-sub">
+              The annotated VCF is pVACseq-ready out of the box: the Ensembl
+              Frameshift, Wildtype, and Downstream plugins are baked into every
+              run, so stage 5 will read this file directly when it goes live.
+            </p>
+          </div>
+          <figure class="shot">
+            <img
+              src="./screenshots/annotation.png"
+              alt="annotation stage showing a completion headline, impact tiles in plain English, cancer-gene cards, a lollipop plot of the top gene, a consequence mix donut, and an annotated variants table"
+              loading="lazy"
+            />
+          </figure>
+        </section>
+
         <section class="section" id="pipeline">
           <div class="section-heading">
             <p class="eyebrow">The pipeline</p>
-            <h2>Three guided core steps, then the roadmap.</h2>
+            <h2>Four guided core steps, then the roadmap.</h2>
             <p class="section-sub">
-              Ingestion, alignment, and variant calling are live today. The rest
-              of the stages stay visible as disabled roadmap items so the
-              workflow stays honest.
+              Ingestion, alignment, variant calling, and annotation are live
+              today. The rest of the stages stay visible as disabled roadmap
+              items so the workflow stays honest.
             </p>
           </div>
 
@@ -175,13 +215,13 @@
               </div>
               <span class="chip chip-live">Live</span>
             </li>
-            <li class="stage">
+            <li class="stage stage-live">
               <span class="stage-num">4</span>
               <div class="stage-body">
                 <strong>Annotation</strong>
-                <p>Functional consequences via Ensembl VEP.</p>
+                <p>Ensembl VEP release 111 + pVACseq-ready Frameshift / Wildtype / Downstream plugins. Rendered as cancer-gene cards, a lollipop plot of the top gene, plain-English impact tiles, and a filterable annotated-variants table.</p>
               </div>
-              <span class="chip chip-planned">Planned</span>
+              <span class="chip chip-live">Live</span>
             </li>
             <li class="stage">
               <span class="stage-num">5</span>

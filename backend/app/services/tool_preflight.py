@@ -109,6 +109,25 @@ VARIANT_CALLING_TOOLS: tuple[ToolRequirement, ...] = (
 )
 
 
+VEP_REQUIREMENT = ToolRequirement(
+    name="vep",
+    env_var="VEP_BINARY",
+    default_binary="vep",
+    install_hint=(
+        "Install Ensembl VEP: git clone https://github.com/Ensembl/ensembl-vep "
+        "&& cd ensembl-vep && perl INSTALL.pl --AUTO a  "
+        "(requires Perl + Bio::DB::HTS). The cancerstudio backend image installs "
+        "VEP release 111 automatically — if you see this message you are running "
+        "the backend natively outside the container."
+    ),
+)
+
+
+ANNOTATION_TOOLS: tuple[ToolRequirement, ...] = (
+    VEP_REQUIREMENT,
+)
+
+
 def ingestion_tools_for_paths(paths: Iterable[str]) -> tuple[ToolRequirement, ...]:
     """Return only the tools the actual ingestion path will exercise.
 

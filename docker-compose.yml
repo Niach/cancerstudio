@@ -32,12 +32,14 @@ services:
     environment:
       CANCERSTUDIO_APP_DATA_DIR: /app-data
       CANCERSTUDIO_INBOX_DIR: /inbox
+      CANCERSTUDIO_VEP_CACHE_DIR: /vep-cache
       CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
     ports:
       - "127.0.0.1:8000:8000"
     volumes:
       - ${CANCERSTUDIO_DATA_ROOT:-~/cancerstudio-data}:/app-data
       - ${CANCERSTUDIO_DATA_ROOT:-~/cancerstudio-data}/inbox:/inbox
+      - ${CANCERSTUDIO_DATA_ROOT:-~/cancerstudio-data}/vep-cache:/vep-cache
       # Source bind mounts for hot reload during dev. In production builds
       # the COPYd /app/app layer is authoritative; these just shadow it.
       - ./backend/app:/app/app

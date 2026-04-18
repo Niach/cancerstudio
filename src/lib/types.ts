@@ -401,6 +401,135 @@ export interface VariantCallingStageSummary {
   artifacts: VariantCallingArtifact[];
 }
 
+export type AnnotationRunStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "failed"
+  | "cancelled"
+  | "paused";
+export type AnnotationStageStatus =
+  | "blocked"
+  | "scaffolded"
+  | "running"
+  | "completed"
+  | "failed"
+  | "paused";
+export type AnnotationRuntimePhase =
+  | "installing_cache"
+  | "annotating"
+  | "summarizing"
+  | "finalizing";
+export type AnnotationArtifactKind =
+  | "annotated_vcf"
+  | "annotated_vcf_index"
+  | "vep_summary"
+  | "vep_warnings";
+
+export type AnnotationImpactTier = "HIGH" | "MODERATE" | "LOW" | "MODIFIER";
+
+export interface AnnotationConsequenceEntry {
+  term: string;
+  label: string;
+  count: number;
+}
+
+export interface CancerGeneHit {
+  symbol: string;
+  role: string;
+  variantCount: number;
+  highestImpact: AnnotationImpactTier;
+  topHgvsp?: string | null;
+  topConsequence?: string | null;
+}
+
+export interface GeneFocusVariant {
+  chromosome: string;
+  position: number;
+  proteinPosition?: number | null;
+  hgvsp?: string | null;
+  hgvsc?: string | null;
+  consequence: string;
+  impact: AnnotationImpactTier;
+  tumorVaf?: number | null;
+}
+
+export interface GeneFocus {
+  symbol: string;
+  role?: string | null;
+  transcriptId?: string | null;
+  proteinLength?: number | null;
+  variants: GeneFocusVariant[];
+}
+
+export interface AnnotatedVariantEntry {
+  chromosome: string;
+  position: number;
+  ref: string;
+  alt: string;
+  geneSymbol?: string | null;
+  transcriptId?: string | null;
+  consequence: string;
+  consequenceLabel: string;
+  impact: AnnotationImpactTier;
+  hgvsc?: string | null;
+  hgvsp?: string | null;
+  proteinPosition?: number | null;
+  tumorVaf?: number | null;
+  inCancerGene: boolean;
+}
+
+export interface AnnotationMetrics {
+  totalVariants: number;
+  annotatedVariants: number;
+  byImpact: Record<AnnotationImpactTier, number>;
+  byConsequence: AnnotationConsequenceEntry[];
+  cancerGeneHits: CancerGeneHit[];
+  cancerGeneVariantCount: number;
+  topGeneFocus?: GeneFocus | null;
+  topVariants: AnnotatedVariantEntry[];
+  referenceLabel?: string | null;
+  speciesLabel?: string | null;
+  vepRelease?: string | null;
+}
+
+export interface AnnotationArtifact {
+  id: string;
+  artifactKind: AnnotationArtifactKind;
+  filename: string;
+  sizeBytes: number;
+  downloadPath: string;
+  localPath?: string | null;
+}
+
+export interface AnnotationRun {
+  id: string;
+  status: AnnotationRunStatus;
+  progress: number;
+  runtimePhase?: AnnotationRuntimePhase | null;
+  createdAt: string;
+  updatedAt: string;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  blockingReason?: string | null;
+  error?: string | null;
+  commandLog: string[];
+  metrics?: AnnotationMetrics | null;
+  artifacts: AnnotationArtifact[];
+  cachePending: boolean;
+  cacheSpeciesLabel?: string | null;
+  cacheExpectedMegabytes?: number | null;
+}
+
+export interface AnnotationStageSummary {
+  workspaceId: string;
+  status: AnnotationStageStatus;
+  blockingReason?: string | null;
+  readyForNeoantigen: boolean;
+  latestRun?: AnnotationRun | null;
+  artifacts: AnnotationArtifact[];
+}
+
 export interface DLAAllele {
   name: string;
   locus: "DLA-88" | "DLA-DRB1" | "DLA-DQA1" | "DLA-DQB1";
@@ -469,7 +598,7 @@ export const PIPELINE_STAGES: PipelineStage[] = [
     description: "Annotate variants with functional consequences",
     icon: "Tag",
     tools: ["Ensembl VEP"],
-    implementationState: "planned",
+    implementationState: "live",
     group: "primary",
   },
   {

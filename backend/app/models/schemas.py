@@ -447,6 +447,143 @@ class VariantCallingStageSummaryResponse(BaseModel):
     artifacts: List[VariantCallingArtifactResponse] = Field(default_factory=list)
 
 
+class AnnotationRunStatus(str, Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+    PAUSED = "paused"
+
+
+class AnnotationStageStatus(str, Enum):
+    BLOCKED = "blocked"
+    SCAFFOLDED = "scaffolded"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    PAUSED = "paused"
+
+
+class AnnotationRuntimePhase(str, Enum):
+    INSTALLING_CACHE = "installing_cache"
+    ANNOTATING = "annotating"
+    SUMMARIZING = "summarizing"
+    FINALIZING = "finalizing"
+
+
+class AnnotationArtifactKind(str, Enum):
+    ANNOTATED_VCF = "annotated_vcf"
+    ANNOTATED_VCF_INDEX = "annotated_vcf_index"
+    VEP_SUMMARY = "vep_summary"
+    VEP_WARNINGS = "vep_warnings"
+
+
+AnnotationImpactTier = Literal["HIGH", "MODERATE", "LOW", "MODIFIER"]
+
+
+class AnnotationConsequenceEntry(BaseModel):
+    term: str
+    label: str
+    count: int
+
+
+class CancerGeneHit(BaseModel):
+    symbol: str
+    role: str
+    variant_count: int
+    highest_impact: AnnotationImpactTier
+    top_hgvsp: Optional[str] = None
+    top_consequence: Optional[str] = None
+
+
+class GeneFocusVariant(BaseModel):
+    chromosome: str
+    position: int
+    protein_position: Optional[int] = None
+    hgvsp: Optional[str] = None
+    hgvsc: Optional[str] = None
+    consequence: str
+    impact: AnnotationImpactTier
+    tumor_vaf: Optional[float] = None
+
+
+class GeneFocus(BaseModel):
+    symbol: str
+    role: Optional[str] = None
+    transcript_id: Optional[str] = None
+    protein_length: Optional[int] = None
+    variants: List[GeneFocusVariant] = Field(default_factory=list)
+
+
+class AnnotatedVariantEntry(BaseModel):
+    chromosome: str
+    position: int
+    ref: str
+    alt: str
+    gene_symbol: Optional[str] = None
+    transcript_id: Optional[str] = None
+    consequence: str
+    consequence_label: str
+    impact: AnnotationImpactTier
+    hgvsc: Optional[str] = None
+    hgvsp: Optional[str] = None
+    protein_position: Optional[int] = None
+    tumor_vaf: Optional[float] = None
+    in_cancer_gene: bool = False
+
+
+class AnnotationMetricsResponse(BaseModel):
+    total_variants: int = 0
+    annotated_variants: int = 0
+    by_impact: Dict[str, int] = Field(default_factory=dict)
+    by_consequence: List[AnnotationConsequenceEntry] = Field(default_factory=list)
+    cancer_gene_hits: List[CancerGeneHit] = Field(default_factory=list)
+    cancer_gene_variant_count: int = 0
+    top_gene_focus: Optional[GeneFocus] = None
+    top_variants: List[AnnotatedVariantEntry] = Field(default_factory=list)
+    reference_label: Optional[str] = None
+    species_label: Optional[str] = None
+    vep_release: Optional[str] = None
+
+
+class AnnotationArtifactResponse(BaseModel):
+    id: str
+    artifact_kind: AnnotationArtifactKind
+    filename: str
+    size_bytes: int
+    download_path: str
+    local_path: Optional[str] = None
+
+
+class AnnotationRunResponse(BaseModel):
+    id: str
+    status: AnnotationRunStatus
+    progress: float = 0.0
+    runtime_phase: Optional[AnnotationRuntimePhase] = None
+    created_at: str
+    updated_at: str
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    blocking_reason: Optional[str] = None
+    error: Optional[str] = None
+    command_log: List[str] = Field(default_factory=list)
+    metrics: Optional[AnnotationMetricsResponse] = None
+    artifacts: List[AnnotationArtifactResponse] = Field(default_factory=list)
+    cache_pending: bool = False
+    cache_species_label: Optional[str] = None
+    cache_expected_megabytes: Optional[int] = None
+
+
+class AnnotationStageSummaryResponse(BaseModel):
+    workspace_id: str
+    status: AnnotationStageStatus
+    blocking_reason: Optional[str] = None
+    ready_for_neoantigen: bool = False
+    latest_run: Optional[AnnotationRunResponse] = None
+    artifacts: List[AnnotationArtifactResponse] = Field(default_factory=list)
+
+
 class DLAAllele(BaseModel):
     name: str
     locus: str
