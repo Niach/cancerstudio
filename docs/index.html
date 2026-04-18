@@ -6,7 +6,7 @@
     <title>cancerstudio</title>
     <meta
       name="description"
-      content="A desktop studio for the guided first steps of a personalized cancer vaccine workflow: local intake, alignment, finding the cancer-specific mutations with an interactive karyogram, and annotating them with gene, consequence, and cancer-gene impact in plain English."
+      content="A desktop studio for the guided first steps of a personalized cancer vaccine workflow: local intake, alignment, somatic variant calling on a karyogram, VEP annotation in plain English, pVACseq + NetMHCpan neoantigen scoring, and manual curation of the mRNA vaccine cassette."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -26,9 +26,11 @@
           cancer vaccine workflow. Give it tumor DNA and matched-normal DNA.
           Today it helps you prepare the files, run local alignment, find
           the cancer-specific mutations — rendered as a karyogram, plain-language
-          filter buckets, and a top-variants table — and read what those
-          mutations mean, with cancer-gene cards and a lollipop plot of the
-          top gene. For humans, dogs, and cats, all on your local machine.
+          filter buckets, and a top-variants table — read what those mutations
+          mean with cancer-gene cards and a lollipop plot of the top gene,
+          predict which mutant fragments the immune system can see with pVACseq
+          + NetMHCpan, and curate the final vaccine cassette from those
+          candidates. For humans, dogs, and cats, all on your local machine.
         </p>
         <div class="hero-actions">
           <a href="#pipeline" class="button button-primary">See the pipeline</a>
@@ -179,14 +181,80 @@
           </figure>
         </section>
 
+        <section class="section">
+          <div class="section-heading">
+            <p class="eyebrow">Score the neoantigens</p>
+            <h2>pVACseq + NetMHCpan, made readable.</h2>
+            <p class="section-sub">
+              Stage 5 runs pVACseq against the annotated VCF twice — class I
+              against NetMHCpan 4.1, class II against NetMHCIIpan 4.3 — so a
+              paused run can resume with class II alone without rerunning
+              class I. The patient's DLA or HLA alleles are editable right on
+              the panel; non-expert users get the species default.
+            </p>
+            <p class="section-sub">
+              The output is summarized as five visual surfaces: binding
+              buckets with plain-language thresholds instead of raw IC50
+              cutoffs, a peptide × allele heatmap on a log scale, a
+              VAF-versus-binding scatter that tells you which peptides are
+              both well-presented and actually clonal, an antigen funnel from
+              annotated variants down to visible candidates, and a
+              top-candidates table. The pVACseq command log and NetMHCpan
+              version stay in the expert drawer.
+            </p>
+          </div>
+          <figure class="shot">
+            <img
+              src="./screenshots/neoantigen.png"
+              alt="neoantigen prediction stage with binding buckets, a peptide × allele heatmap, a VAF/binding scatter, an antigen funnel, and a top candidates table"
+              loading="lazy"
+            />
+          </figure>
+        </section>
+
+        <section class="section">
+          <div class="section-heading">
+            <p class="eyebrow">Curate the cassette</p>
+            <h2>Seven slots. Click to add. Watch the coverage.</h2>
+            <p class="section-sub">
+              Stage 6 is a curation surface on top of stage 5's candidates.
+              Roughly 43 peptides land from the previous step; a realistic
+              mRNA vaccine cassette fits about seven. The cassette is the
+              hero: eight slots across the top, with AAY and GPGPG linker
+              dots between them and 5&prime; cap / 3&prime; poly-A blocks at
+              the ends. Clicking a peptide in the deck adds or removes it
+              from a slot. Auto-pick seeds a reasonable starting shortlist;
+              picks persist per workspace.
+            </p>
+            <p class="section-sub">
+              A radial coverage wheel plots one spoke per patient allele,
+              with dots placed outward by binding strength — allele gaps
+              become obvious at a glance. A six-item goals checklist ticks
+              live as picks change: class balance, driver-gene diversity,
+              allele coverage, no passenger mutations, no self-similarity,
+              and size. The plain-English selection summary at the bottom
+              spells out what the resulting cassette actually teaches the
+              immune system.
+            </p>
+          </div>
+          <figure class="shot">
+            <img
+              src="./screenshots/epitope-selection.png"
+              alt="epitope selection stage with the eight-slot cassette, radial allele-coverage wheel, six-goal checklist, candidate deck, and plain-English selection summary"
+              loading="lazy"
+            />
+          </figure>
+        </section>
+
         <section class="section" id="pipeline">
           <div class="section-heading">
             <p class="eyebrow">The pipeline</p>
-            <h2>Four guided core steps, then the roadmap.</h2>
+            <h2>Six guided core steps, then the roadmap.</h2>
             <p class="section-sub">
-              Ingestion, alignment, variant calling, and annotation are live
-              today. The rest of the stages stay visible as disabled roadmap
-              items so the workflow stays honest.
+              Ingestion, alignment, variant calling, annotation, neoantigen
+              prediction, and epitope selection are live today. The rest of
+              the stages stay visible as disabled roadmap items so the
+              workflow stays honest.
             </p>
           </div>
 
@@ -223,21 +291,21 @@
               </div>
               <span class="chip chip-live">Live</span>
             </li>
-            <li class="stage">
+            <li class="stage stage-live">
               <span class="stage-num">5</span>
               <div class="stage-body">
                 <strong>Neoantigen prediction</strong>
-                <p>MHC binding for mutant peptides with pVACseq + NetMHCpan.</p>
+                <p>pVACseq against class I (NetMHCpan 4.1) and class II (NetMHCIIpan 4.3). Rendered as binding buckets, peptide × allele heatmap, VAF/binding scatter, antigen funnel, and a top-candidates table.</p>
               </div>
-              <span class="chip chip-planned">Planned</span>
+              <span class="chip chip-live">Live</span>
             </li>
-            <li class="stage">
+            <li class="stage stage-live">
               <span class="stage-num">6</span>
               <div class="stage-body">
                 <strong>Epitope selection</strong>
-                <p>Rank and pick the best targets.</p>
+                <p>Curation on top of stage 5: 8-slot cassette, radial allele-coverage wheel, goals checklist, candidate deck, and plain-English selection summary. Picks persist per workspace.</p>
               </div>
-              <span class="chip chip-planned">Planned</span>
+              <span class="chip chip-live">Live</span>
             </li>
             <li class="stage">
               <span class="stage-num">7</span>

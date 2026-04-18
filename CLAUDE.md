@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A desktop-first pipeline for designing personalized mRNA cancer vaccines. You provide two DNA samples (tumor + normal) by pointing the app at local sequencing files, and the product guides you through intake, alignment, and somatic variant calling today, with the downstream annotation, neoantigen, and construct work kept as roadmap stages.
+A desktop-first pipeline for designing personalized mRNA cancer vaccines. You provide two DNA samples (tumor + normal) by pointing the app at local sequencing files, and the product guides you through intake, alignment, variant calling, annotation, neoantigen prediction, and epitope curation today, with the downstream mRNA-construct and construct-output work kept as roadmap stages.
 
 Supports multiple species: human, dog, and cat. The canine case came first, but the architecture is species-flexible.
 
@@ -19,9 +19,9 @@ Inspired by Paul Conyngham's work creating a personalized mRNA vaccine for his d
 | 1 | Ingestion | **Live** | samtools, fastp | Choose local FASTQ/BAM/CRAM files, normalize to canonical paired FASTQ |
 | 2 | Alignment | **Live** | strobealign, samtools | Chunked pipeline with stop-and-resume; aligns canonical tumor/normal FASTQ pairs, persists BAMs, and scores QC |
 | 3 | Variant Calling | **Live** | GATK Mutect2 | Runs Mutect2 + FilterMutectCalls on the aligned tumor/normal BAMs; parses the filtered VCF into per-chromosome counts, filter breakdown, VAF histogram, and top variants; renders a karyogram and metrics console |
-| 4 | Annotation | Planned | Ensembl VEP | Annotate variants with functional consequences |
-| 5 | Neoantigen Prediction | Planned | pVACseq, NetMHCpan-4.1 | Predict MHC binding for mutant peptides |
-| 6 | Epitope Selection | Planned | pVACview, custom scoring | Rank and select optimal vaccine targets |
+| 4 | Annotation | **Live** | Ensembl VEP 111 | Runs VEP against a species-specific offline cache with the pVACseq-ready Frameshift/Wildtype/Downstream plugins; renders cancer-gene cards, a lollipop plot of the top gene, plain-English impact tiles, a consequence donut, and a filterable annotated-variants table |
+| 5 | Neoantigen Prediction | **Live** | pVACseq, NetMHCpan-4.1 | Runs pVACseq against the annotated VCF from stage 4 (class I on NetMHCpan 4.1, class II on NetMHCIIpan 4.3) and parses the output into binding buckets, a peptide × allele heatmap, a VAF/binding scatter, an antigen funnel, and a top-candidates table |
+| 6 | Epitope Selection | **Live** | pVACview curation, custom scoring | Curation UI on top of stage 5's candidates: 8-slot cassette, radial allele-coverage wheel, six plain-English goals checklist, filterable/sortable deck of peptides, selection summary; picks persist per workspace |
 | 7 | mRNA Construct Design | Planned | LinearDesign, DNAchisel, ViennaRNA | Optimize codons, UTRs, and secondary structure |
 | 8 | Construct Output | Planned | pVACvector, Biopython | Generate final annotated mRNA sequence |
 | 9 | Structure Prediction | Later | Boltz-2, ESMFold, Mol* | Research-only structural follow-up, outside the Paul-core v1 path |

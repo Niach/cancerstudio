@@ -1,6 +1,6 @@
 # cancerstudio
 
-cancerstudio is a desktop-first studio for the first guided steps of a personalized cancer vaccine workflow. Today it helps a non-technical operator bring in local tumor and matched-normal sequencing files, prepare alignment-ready inputs on disk, run alignment against a species reference, find the cancer-specific mutations with an interactive karyogram, and read what those mutations mean with a plain-English gene-centric annotation panel. Downstream vaccine-design stages stay visible as roadmap items, not runnable promises.
+cancerstudio is a desktop-first studio for the first guided steps of a personalized cancer vaccine workflow. Today it helps a non-technical operator bring in local tumor and matched-normal sequencing files, prepare alignment-ready inputs on disk, run alignment against a species reference, find the cancer-specific mutations with an interactive karyogram, read what those mutations mean with a plain-English gene-centric annotation panel, predict which mutant fragments the immune system can see with pVACseq + NetMHCpan, and curate the final cassette from those candidates. Downstream vaccine-design stages stay visible as roadmap items, not runnable promises.
 
 Project site: <https://niach.github.io/cancerstudio/>
 
@@ -9,6 +9,10 @@ Project site: <https://niach.github.io/cancerstudio/>
 | Pick a species | Stage the samples | Run alignment | Find the mutations | Read what they mean |
 | --- | --- | --- | --- | --- |
 | ![landing](docs/screenshots/landing.png) | ![ingestion](docs/screenshots/ingestion.png) | ![alignment](docs/screenshots/alignment.png) | ![variant calling](docs/screenshots/variant-calling.png) | ![annotation](docs/screenshots/annotation.png) |
+
+| Score the neoantigens | Curate the cassette | | | |
+| --- | --- | --- | --- | --- |
+| ![neoantigen prediction](docs/screenshots/neoantigen.png) | ![epitope selection](docs/screenshots/epitope-selection.png) | | | |
 
 ## Pipeline
 
@@ -20,8 +24,8 @@ Project site: <https://niach.github.io/cancerstudio/>
 | 2 | Alignment | **Live** | strobealign, samtools |
 | 3 | Variant Calling | **Live** — GATK Mutect2 + FilterMutectCalls, rendered as karyogram, plain-language filter buckets, VAF histogram, and a top-variants table | GATK Mutect2 |
 | 4 | Annotation | **Live** — Ensembl VEP release 111 + pVACseq-ready Frameshift/Wildtype/Downstream plugins, rendered as cancer-gene cards, a lollipop plot of the top gene, impact tiles in plain English, and a filterable annotated-variants table | Ensembl VEP |
-| 5 | Neoantigen Prediction | Planned | pVACseq, NetMHCpan |
-| 6 | Epitope Selection | Planned | pVACview |
+| 5 | Neoantigen Prediction | **Live** — pVACseq against class I (NetMHCpan 4.1) and class II (NetMHCIIpan 4.3), rendered as binding buckets, a peptide × allele heatmap, a VAF/binding scatter, an antigen funnel, and a top-candidates table | pVACseq, NetMHCpan |
+| 6 | Epitope Selection | **Live** — curation UI on top of stage 5: 8-slot cassette, radial allele-coverage wheel, six plain-English goals checklist, filterable candidate deck, selection summary; picks persist per workspace | pVACview, custom scoring |
 | 7 | mRNA Construct Design | Planned | LinearDesign, DNAchisel |
 | 8 | Construct Output | Planned | pVACvector, Biopython |
 
@@ -64,6 +68,16 @@ The panel is built around the same "one fancy viz + plain-English surfaces" patt
 The bundled cancer-gene list ships as `backend/app/data/cancer_genes.csv` — ~230 gene symbols with role/tier annotation, redistributable (symbols only, drawn from published driver lists). Dog and cat hits are matched by HGNC symbol since Ensembl uses aligned gene symbols across the three species. First-run cache install downloads the offline VEP cache for the workspace's species (~80 MB dog, ~552 MB cat, ~27 GB human) into a shared `/vep-cache` volume and persists it so later runs skip the download.
 
 Verified end-to-end on a canine DLBCL workspace (PRJNA805123, SRR15540953 tumor + SRR15540951 skin-punch normal): ingestion → alignment (99.94% tumor / 98.69% normal mapped) → Parabricks GPU variant calling → VEP annotation emitted a pVACseq-ready CSQ with `FrameshiftSequence|WildtypeProtein|DownstreamProtein|ProteinLengthChange` from the plugins. Fetch script: `python3 scripts/fetch_canine_dlbcl_sample_data.py`.
+
+### Stage 5: which fragments can the immune system actually see?
+
+Stage 5 turns the annotated VCF from stage 4 into ranked peptide candidates. pVACseq runs twice against the workspace's patient-specific DLA/HLA alleles — class I against NetMHCpan 4.1, class II against NetMHCIIpan 4.3 — so a paused run can resume with class II alone without rerunning class I. The panel reads the `all_epitopes.tsv` / `filtered.tsv` output and renders five surfaces: binding buckets (strong / moderate / weak / none) with plain-language thresholds, a peptide × allele IC50 heatmap on a log scale, a VAF-versus-binding scatter, an antigen funnel (annotated variants → protein-changing → peptides → visible candidates), and a top-candidates table. The DLA allele panel is editable — expert users can type in clinically-relevant alleles, everyone else gets the species default.
+
+Runtime phases are surfaced honestly: `generating_fasta → running_class_i → running_class_ii → parsing → finalizing`, with a pause-and-resume that skips already-scored peptides.
+
+### Stage 6: picking the seven for the vaccine
+
+Stage 6 is a curation surface on top of stage 5's output. Roughly 43 candidates land from the previous step; a realistic mRNA vaccine cassette fits about seven. The panel is organized around a single metaphor — an 8-slot cassette at the top, each slot a peptide, with AAY (class I) / GPGPG (class II) linker dots between slots and 5′ cap / 3′ poly-A blocks at the ends. Below that, a radial coverage wheel plots one spoke per patient allele with dots at their binding strength so allele gaps become obvious, a six-item goals checklist (class balance, driver-gene diversity, allele coverage, no passenger mutations, no self-similarity, size) ticks live as picks change, a filterable candidate deck lists all 43 peptides with a score bar + safety chip, and a plain-English selection summary describes what the resulting cassette actually does. Picks are persisted per workspace via a debounced PUT so closing the tab doesn't lose the shortlist. Expert mode surfaces the pVACview export commands. The handoff callout points forward at stage 7 (mRNA construct design) which stays on the roadmap.
 
 ## How it works
 

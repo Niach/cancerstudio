@@ -640,6 +640,235 @@ function annotationSummaryFor(workspace) {
   );
 }
 
+// ---- neoantigen metrics for Rosie ----
+
+const DLA_ALLELES = [
+  { allele: "DLA-88*034:01",   class: "I",  typing: "inferred", frequency: null, source: "IPD-MHC default" },
+  { allele: "DLA-88*508:01",   class: "I",  typing: "inferred", frequency: null, source: "IPD-MHC default" },
+  { allele: "DLA-12*01:01",    class: "I",  typing: "inferred", frequency: null, source: "IPD-MHC default" },
+  { allele: "DLA-64*01:01",    class: "I",  typing: "inferred", frequency: null, source: "IPD-MHC default" },
+  { allele: "DLA-DRB1*015:01", class: "II", typing: "inferred", frequency: null, source: "IPD-MHC default" },
+  { allele: "DLA-DQB1*008:01", class: "II", typing: "inferred", frequency: null, source: "IPD-MHC default" },
+];
+
+const NEO_TOP = [
+  { seq: "NIIQLLFMGH", gene: "KIT",    mut: "p.Asn816Ile", length: 10, class: "I",  allele: "DLA-88*034:01",  ic50: 14,  wt_ic50: 1240, agretopicity: 88.6,  vaf: 0.47, tpm: 142.3, cancer_gene: true, strong: true },
+  { seq: "HFSQAIRRL", gene: "TP53",   mut: "p.Arg175His", length: 9,  class: "I",  allele: "DLA-88*034:01",  ic50: 39,  wt_ic50: 2100, agretopicity: 53.8,  vaf: 0.41, tpm: 98.7,  cancer_gene: true, strong: true },
+  { seq: "LPNSVLGAK", gene: "BRAF",   mut: "p.Val600Glu", length: 9,  class: "I",  allele: "DLA-12*01:01",   ic50: 12,  wt_ic50: 1150, agretopicity: 96.1,  vaf: 0.38, tpm: 52.0,  cancer_gene: true, strong: true },
+  { seq: "APLDEYFRV", gene: "NRAS",   mut: "p.Gln61Arg",  length: 9,  class: "I",  allele: "DLA-12*01:01",   ic50: 18,  wt_ic50: 756,  agretopicity: 42.0,  vaf: 0.29, tpm: 71.4,  cancer_gene: true, strong: true },
+  { seq: "KFEDCLPNY", gene: "MYC",    mut: "p.Thr58Ala",  length: 9,  class: "I",  allele: "DLA-88*034:01",  ic50: 19,  wt_ic50: 840,  agretopicity: 44.2,  vaf: 0.34, tpm: 118.5, cancer_gene: true, strong: true },
+  { seq: "LNTIHRASV", gene: "TP53",   mut: "p.Arg248Gln", length: 9,  class: "I",  allele: "DLA-88*508:01",  ic50: 21,  wt_ic50: 2800, agretopicity: 133.3, vaf: 0.22, tpm: 98.7,  cancer_gene: true, strong: true },
+  { seq: "IYQADRFTL", gene: "PTEN",   mut: "p.Arg130Gln", length: 9,  class: "I",  allele: "DLA-12*01:01",   ic50: 36,  wt_ic50: 1400, agretopicity: 61.5,  vaf: 0.26, tpm: 43.8,  cancer_gene: true, strong: true },
+  { seq: "RSLNELWKV", gene: "NOTCH1", mut: "p.Leu1574Pro", length: 9, class: "I",  allele: "DLA-64*01:01",   ic50: 42,  wt_ic50: 1300, agretopicity: 30.9,  vaf: 0.37, tpm: 61.2,  cancer_gene: true, strong: true },
+  { seq: "AKVLDERTLHCTAM", gene: "TP53", mut: "p.Arg175His", length: 14, class: "II", allele: "DLA-DRB1*015:01", ic50: 64, wt_ic50: 2400, agretopicity: 15.3, vaf: 0.41, tpm: 98.7, cancer_gene: true, strong: false },
+  { seq: "FNIIQLLFMGHLKE", gene: "KIT",  mut: "p.Asn816Ile", length: 14, class: "II", allele: "DLA-DQB1*008:01", ic50: 72, wt_ic50: 2800, agretopicity: 22.2, vaf: 0.47, tpm: 142.3, cancer_gene: true, strong: false },
+];
+
+const NEO_HEATMAP_ALLELES = DLA_ALLELES.map((a) => a.allele);
+
+// Per-peptide IC50 row across all 6 alleles (strong on their home allele, weaker
+// elsewhere). Log-scale heatmap — the home-allele binder shows up as the dark
+// cell in each row.
+function heatmapRow(peptide, homeAllele, homeIc50, otherSpread) {
+  return {
+    seq: peptide.seq,
+    gene: peptide.gene,
+    mut: peptide.mut,
+    length: peptide.length,
+    class: peptide.class,
+    vaf: peptide.vaf,
+    mut_pos: 5,
+    ic50: NEO_HEATMAP_ALLELES.map((allele) =>
+      allele === homeAllele ? homeIc50 : otherSpread[allele] ?? 9500
+    ),
+  };
+}
+
+const NEO_HEATMAP_ROWS = NEO_TOP.slice(0, 10).map((p) =>
+  heatmapRow(p, p.allele, p.ic50, {
+    [NEO_HEATMAP_ALLELES[0]]: 4200,
+    [NEO_HEATMAP_ALLELES[1]]: 3800,
+    [NEO_HEATMAP_ALLELES[2]]: 5100,
+    [NEO_HEATMAP_ALLELES[3]]: 6300,
+    [NEO_HEATMAP_ALLELES[4]]: 7200,
+    [NEO_HEATMAP_ALLELES[5]]: 8100,
+  })
+);
+
+function neoantigenSummaryCompleted(workspace) {
+  const metrics = {
+    pvacseq_version: "5.4.0",
+    netmhcpan_version: "4.1",
+    netmhciipan_version: "4.3",
+    species_label: "Dog (UU_Cfam_GSD_1.0)",
+    assembly: "UU_Cfam_GSD_1.0",
+    alleles: DLA_ALLELES,
+    annotated_variants: 209,
+    protein_changing_variants: 74,
+    peptides_generated: 1482,
+    visible_candidates: 43,
+    class_i_count: 31,
+    class_ii_count: 12,
+    buckets: [
+      { key: "strong",   label: "Strong",   threshold: "< 50 nM",   plain: "High-confidence binders", count: 17 },
+      { key: "moderate", label: "Moderate", threshold: "50–500 nM", plain: "Likely binders",           count: 26 },
+      { key: "weak",     label: "Weak",     threshold: "500–5000 nM", plain: "Low-affinity",           count: 84 },
+      { key: "none",     label: "None",     threshold: "> 5000 nM", plain: "Filtered out",              count: 1355 },
+    ],
+    heatmap: { alleles: NEO_HEATMAP_ALLELES, peptides: NEO_HEATMAP_ROWS },
+    funnel: [
+      { label: "Annotated variants",        count: 209,  hint: "from VEP" },
+      { label: "Protein-changing variants", count: 74,   hint: "missense + frameshift + stop-gained" },
+      { label: "Peptides generated",        count: 1482, hint: "8–11 aa class I · 12–18 aa class II" },
+      { label: "Visible candidates",        count: 43,   hint: "IC50 < 500 nM vs. healthy wild-type" },
+    ],
+    top: NEO_TOP,
+  };
+  return {
+    workspace_id: workspace.id,
+    status: "completed",
+    blocking_reason: null,
+    ready_for_epitope_selection: true,
+    alleles: DLA_ALLELES,
+    latest_run: {
+      id: "neo-run-01",
+      status: "completed",
+      progress: 1,
+      runtime_phase: null,
+      created_at: NOW,
+      updated_at: NOW,
+      started_at: EARLIER,
+      completed_at: NOW,
+      blocking_reason: null,
+      error: null,
+      command_log: [
+        "pvacseq run rosie.annotated.vcf.gz sample 'DLA-88*034:01,DLA-88*508:01,DLA-12*01:01,DLA-64*01:01' NetMHCpan 8,9,10,11 class_i/",
+        "pvacseq run rosie.annotated.vcf.gz sample 'DLA-DRB1*015:01,DLA-DQB1*008:01' NetMHCIIpan 12,13,14,15,16,17,18 class_ii/",
+      ],
+      metrics,
+      artifacts: [],
+    },
+    artifacts: [],
+  };
+}
+
+function neoantigenSummaryBlocked(workspace, reason) {
+  return {
+    workspace_id: workspace.id,
+    status: "blocked",
+    blocking_reason: reason,
+    ready_for_epitope_selection: false,
+    alleles: [],
+    latest_run: null,
+    artifacts: [],
+  };
+}
+
+function neoantigenSummaryFor(workspace) {
+  if (workspace.id === ROSIE.id) return neoantigenSummaryCompleted(workspace);
+  return neoantigenSummaryBlocked(workspace, "Finish annotation before predicting neoantigens.");
+}
+
+// ---- epitope selection fixture ----
+
+const EPITOPE_ALLELES = [
+  { id: "DLA-88*034:01",   class: "I",  color: "#0f766e" },
+  { id: "DLA-88*508:01",   class: "I",  color: "#0ea5e9" },
+  { id: "DLA-12*01:01",    class: "I",  color: "#6366f1" },
+  { id: "DLA-64*01:01",    class: "I",  color: "#8b5cf6" },
+  { id: "DLA-DRB1*015:01", class: "II", color: "#d97706" },
+  { id: "DLA-DQB1*008:01", class: "II", color: "#dc2626" },
+];
+
+// Same 43-peptide deck the backend fixture ships (abbreviated construction).
+const EPITOPE_DECK = (() => {
+  const rows = [
+    ["ep01","NIIQLLFMGH","KIT","p.Asn816Ile",10,"I","DLA-88*034:01",14,88.6,0.47,142.3,true,"canonical MCT driver","strong",[]],
+    ["ep02","LNTIHRASV","TP53","p.Arg248Gln",9,"I","DLA-88*508:01",21,133.3,0.22,98.7,true,"hotspot tumor suppressor","strong",[]],
+    ["ep03","FMGEHIMAKY","KIT","p.Val559Asp",10,"I","DLA-88*034:01",22,67.3,0.11,142.3,true,"subclonal KIT","strong",["subclonal"]],
+    ["ep04","QEVDPVGHM","ATM","p.Gln1162*",9,"I","DLA-88*034:01",29,7.6,0.19,24.1,true,"stop-gained","strong",["low-agretopicity"]],
+    ["ep05","HFSQAIRRL","TP53","p.Arg175His",9,"I","DLA-88*034:01",39,53.8,0.41,98.7,true,"hotspot tumor suppressor","strong",[]],
+    ["ep06","YEVKEHCKM","PIK3CA","p.Glu545Lys",9,"I","DLA-88*034:01",46,28.2,0.32,58.1,true,"activating hotspot","strong",[]],
+    ["ep07","APLDEYFRV","NRAS","p.Gln61Arg",9,"I","DLA-12*01:01",18,42.0,0.29,71.4,true,"activating hotspot","strong",[]],
+    ["ep08","IYQADRFTL","PTEN","p.Arg130Gln",9,"I","DLA-12*01:01",36,61.5,0.26,43.8,true,"tumor suppressor","strong",[]],
+    ["ep09","RSLNELWKV","NOTCH1","p.Leu1574Pro",9,"I","DLA-64*01:01",42,30.9,0.37,61.2,true,"signaling","strong",[]],
+    ["ep10","TFAEKLGAF","CDKN2A","p.Asp84Asn",9,"I","DLA-64*01:01",33,55.4,0.25,18.2,true,"cell-cycle inhibitor","strong",[]],
+    ["ep11","VLKDEHRAF","ARID1A","p.Ser2264fs",9,"I","DLA-88*034:01",27,112.7,0.18,29.6,true,"frameshift neoepitope","strong",[]],
+    ["ep12","GRDCFCRLY","FBXW7","p.Arg465Cys",9,"I","DLA-64*01:01",44,18.3,0.24,22.7,true,"E3 ligase","strong",[]],
+    ["ep13","SMAQDIQVL","SETD2","p.Pro1962Leu",9,"I","DLA-88*508:01",48,7.0,0.28,41.8,true,"chromatin modifier","strong",["low-agretopicity"]],
+    ["ep14","YTRLDKCVM","KMT2D","p.Arg4693His",9,"I","DLA-88*508:01",31,24.8,0.21,33.5,true,"chromatin modifier","strong",[]],
+    ["ep15","LPNSVLGAK","BRAF","p.Val600Glu",9,"I","DLA-12*01:01",12,96.1,0.38,52.0,true,"activating hotspot","strong",[]],
+    ["ep16","ETCDEYRAF","RB1","p.Gln702*",9,"I","DLA-64*01:01",38,15.8,0.20,16.3,true,"tumor suppressor","strong",[]],
+    ["ep17","KFEDCLPNY","MYC","p.Thr58Ala",9,"I","DLA-88*034:01",19,44.2,0.34,118.5,true,"oncogene","strong",[]],
+    ["ep18","RPLTIHDSF","KIT","p.Asp814Val",9,"I","DLA-88*508:01",180,9.2,0.16,142.3,true,"subclonal KIT","moderate",["subclonal"]],
+    ["ep19","AHIFECNAQ","SF3B1","p.Lys700Glu",9,"I","DLA-12*01:01",220,31.5,0.31,73.8,true,"splicing factor","moderate",[]],
+    ["ep20","EEYFRPLNQ","SMAD4","p.Arg361His",9,"I","DLA-88*034:01",280,62.4,0.23,22.0,true,"TGF-beta effector","moderate",[]],
+    ["ep21","DTLGAFRPV","EZH2","p.Tyr646Asn",9,"I","DLA-64*01:01",340,58.1,0.19,47.5,true,"chromatin modifier","moderate",[]],
+    ["ep22","GYIKLQSFA","CTNNB1","p.Ser45Phe",9,"I","DLA-88*508:01",410,74.6,0.27,89.1,true,"Wnt effector","moderate",[]],
+    ["ep23","NIPKLRMAG","APC","p.Arg1450*",9,"I","DLA-12*01:01",450,12.7,0.17,26.4,true,"tumor suppressor","moderate",[]],
+    ["ep24","VCEYADRPK","GNAS","p.Arg201Cys",9,"I","DLA-88*034:01",120,49.8,0.14,33.2,true,"G-protein","moderate",["subclonal"]],
+    ["ep25","SLWAGEDIR","MSH2","p.Glu749Lys",9,"I","DLA-88*508:01",160,26.0,0.22,19.7,true,"MMR","moderate",[]],
+    ["ep26","AIFQEDHKL","KRAS","p.Gly12Asp",9,"I","DLA-64*01:01",260,72.3,0.36,68.2,true,"activating hotspot","moderate",[]],
+    ["ep27","DLPEYRAFC","IDH1","p.Arg132His",9,"I","DLA-88*034:01",310,91.5,0.25,55.8,true,"metabolic hotspot","moderate",[]],
+    ["ep28","HRVPLSAFE","VHL","p.Tyr98His",9,"I","DLA-12*01:01",390,13.6,0.18,14.3,true,"tumor suppressor","moderate",["low-expression"]],
+    ["ep29","QTCMRLFYV","COL1A1","p.Gly1012Ala",9,"I","DLA-88*034:01",140,4.2,0.09,8.1,false,null,"moderate",["low-agretopicity","passenger"]],
+    ["ep30","EDFMAGQLR","TTN","p.Glu24782Lys",9,"I","DLA-88*508:01",260,2.1,0.12,12.5,false,null,"moderate",["passenger","low-agretopicity"]],
+    ["ep31","AAAAGLPQR","MUC16","p.Ser5102Pro",9,"I","DLA-12*01:01",480,1.8,0.08,4.2,false,null,"moderate",["low-complexity","passenger"]],
+    ["ep32","AKVLDERTLHCTAM","TP53","p.Arg175His",14,"II","DLA-DRB1*015:01",64,15.3,0.41,98.7,true,"hotspot + class-II coverage","strong",[]],
+    ["ep33","FNIIQLLFMGHLKE","KIT","p.Asn816Ile",14,"II","DLA-DQB1*008:01",72,22.2,0.47,142.3,true,"T-help for KIT","strong",[]],
+    ["ep34","SQEVDPVGHMVKEL","ATM","p.Gln1162*",14,"II","DLA-DQB1*008:01",96,4.8,0.19,24.1,true,"frameshift context","strong",["low-agretopicity"]],
+    ["ep35","MLPETDYRVPLGAK","NRAS","p.Gln61Arg",14,"II","DLA-DRB1*015:01",120,18.9,0.29,71.4,true,"activating hotspot","moderate",[]],
+    ["ep36","EYPLSAIRHCKMGV","NOTCH1","p.Leu1574Pro",14,"II","DLA-DQB1*008:01",160,11.4,0.37,61.2,true,"signaling","moderate",[]],
+    ["ep37","HFPSRVLDEYAKMT","PIK3CA","p.Glu545Lys",14,"II","DLA-DRB1*015:01",210,14.7,0.32,58.1,true,"activating hotspot","moderate",[]],
+    ["ep38","IYQADRFTLMAVPE","PTEN","p.Arg130Gln",14,"II","DLA-DQB1*008:01",280,9.1,0.26,43.8,true,"tumor suppressor","moderate",[]],
+    ["ep39","CTPLGMEAFDRQVK","ARID1A","p.Ser2264fs",14,"II","DLA-DRB1*015:01",340,31.2,0.18,29.6,true,"frameshift neoepitope","moderate",[]],
+    ["ep40","DLPEYRAFCMGTHN","IDH1","p.Arg132His",14,"II","DLA-DRB1*015:01",380,26.8,0.25,55.8,true,"metabolic hotspot","moderate",[]],
+    ["ep41","LPNSVLGAKDFHRQ","BRAF","p.Val600Glu",14,"II","DLA-DQB1*008:01",110,48.5,0.38,52.0,true,"activating hotspot","moderate",[]],
+    ["ep42","KFEDCLPNYIRHAM","MYC","p.Thr58Ala",14,"II","DLA-DQB1*008:01",140,22.0,0.34,118.5,true,"oncogene","moderate",[]],
+    ["ep43","AAAGGGPPPPQQLM","MUC16","p.Ser5102Pro",14,"II","DLA-DRB1*015:01",460,2.0,0.08,4.2,false,null,"moderate",["low-complexity","passenger"]],
+  ];
+  return rows.map(([id, seq, gene, mutation, length, cls, allele_id, ic50_nm, agretopicity, vaf, tpm, cancer_gene, driver_context, tier, flags]) => ({
+    id, seq, gene, mutation, length, class: cls, allele_id, ic50_nm, agretopicity, vaf, tpm, cancer_gene, driver_context, tier, flags,
+  }));
+})();
+
+const EPITOPE_SAFETY = {
+  ep30: { peptide_id: "ep30", self_hit: "TTN",              identity: 100, risk: "critical", note: "perfect 9-mer match in healthy TTN" },
+  ep31: { peptide_id: "ep31", self_hit: "MUC16",            identity: 100, risk: "critical", note: "repeat region" },
+  ep29: { peptide_id: "ep29", self_hit: "COL1A1",           identity: 89,  risk: "elevated", note: "7/9 identical · structural protein" },
+  ep43: { peptide_id: "ep43", self_hit: "MUC16",            identity: 100, risk: "critical", note: "homopolymer tract" },
+  ep18: { peptide_id: "ep18", self_hit: "KIT (wild-type)",  identity: 78,  risk: "mild",     note: "close to healthy KIT" },
+};
+
+const EPITOPE_DEFAULT_PICKS = ["ep01", "ep05", "ep07", "ep15", "ep17", "ep32", "ep33"];
+
+function epitopeSummaryFor(workspace) {
+  if (workspace.id !== ROSIE.id) {
+    return {
+      workspace_id: workspace.id,
+      status: "blocked",
+      blocking_reason: "Finish neoantigen prediction before curating the cassette.",
+      candidates: [],
+      safety: {},
+      alleles: [],
+      default_picks: [],
+      selection: [],
+      ready_for_construct_design: false,
+    };
+  }
+  return {
+    workspace_id: workspace.id,
+    status: "scaffolded",
+    blocking_reason: null,
+    candidates: EPITOPE_DECK,
+    safety: EPITOPE_SAFETY,
+    alleles: EPITOPE_ALLELES,
+    default_picks: EPITOPE_DEFAULT_PICKS,
+    selection: EPITOPE_DEFAULT_PICKS,
+    ready_for_construct_design: false,
+  };
+}
+
 function variantCallingSummaryBlocked(workspace, reason) {
   return {
     workspace_id: workspace.id,
@@ -746,6 +975,27 @@ function startStub() {
       }
       if (
         req.method === "GET" &&
+        parts[4] === "neoantigen" &&
+        parts.length === 5
+      ) {
+        return send(res, 200, neoantigenSummaryFor(workspace));
+      }
+      if (
+        req.method === "GET" &&
+        parts[4] === "epitope" &&
+        parts.length === 5
+      ) {
+        return send(res, 200, epitopeSummaryFor(workspace));
+      }
+      if (
+        req.method === "PUT" &&
+        parts[4] === "epitope" &&
+        parts[5] === "selection"
+      ) {
+        return send(res, 200, epitopeSummaryFor(workspace));
+      }
+      if (
+        req.method === "GET" &&
         parts[4] === "ingestion" &&
         parts[5] === "preview" &&
         parts[6]
@@ -837,6 +1087,18 @@ const SHOTS = [
     name: "annotation",
     path: `/workspaces/${ROSIE.id}/annotation`,
     height: 2400,
+    wait: 1500,
+  },
+  {
+    name: "neoantigen",
+    path: `/workspaces/${ROSIE.id}/neoantigen-prediction`,
+    height: 2600,
+    wait: 1500,
+  },
+  {
+    name: "epitope-selection",
+    path: `/workspaces/${ROSIE.id}/epitope-selection`,
+    height: 2800,
     wait: 1500,
   },
 ];
