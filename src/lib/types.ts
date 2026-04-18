@@ -837,7 +837,7 @@ export const PIPELINE_STAGES: PipelineStage[] = [
     description: "Rank and select optimal vaccine targets",
     icon: "ListChecks",
     tools: ["pVACview", "custom scoring"],
-    implementationState: "scaffolded",
+    implementationState: "live",
     group: "primary",
   },
   {
