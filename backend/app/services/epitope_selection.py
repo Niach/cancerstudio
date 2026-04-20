@@ -182,6 +182,10 @@ def _class_of(pid: str, candidates: list[EpitopeCandidateResponse]) -> Optional[
 
 def _goals_pass(selection: list[str], candidates: list[EpitopeCandidateResponse],
                 safety: dict[str, EpitopeSafetyFlagResponse]) -> bool:
+    # Goals are data-adaptive: requirements that are unreachable given what
+    # pVACseq surfaced for this workspace (e.g. canine class-II binders,
+    # or ≥3 usable DLA alleles) fall back to "whatever the pool offers"
+    # rather than hard-blocking the stage.
     if not selection:
         return False
     by_id = {c.id: c for c in candidates}
@@ -190,12 +194,20 @@ def _goals_pass(selection: list[str], candidates: list[EpitopeCandidateResponse]
         return False
     if len({p.gene for p in picks}) < 5:
         return False
-    if len({p.allele_id for p in picks}) < 3:
+
+    pool_alleles = {c.allele_id for c in candidates}
+    required_alleles = min(3, max(1, len(pool_alleles)))
+    if len({p.allele_id for p in picks}) < required_alleles:
         return False
-    if sum(1 for p in picks if p.mhc_class == "II") < 1:
+
+    pool_has_class_ii = any(c.mhc_class == "II" for c in candidates)
+    if pool_has_class_ii and sum(1 for p in picks if p.mhc_class == "II") < 1:
         return False
-    if not all(p.cancer_gene for p in picks):
+
+    pool_has_cancer_gene = any(c.cancer_gene for c in candidates)
+    if pool_has_cancer_gene and not all(p.cancer_gene for p in picks):
         return False
+
     if any(safety.get(p.id) and safety[p.id].risk == "critical" for p in picks):
         return False
     return True
