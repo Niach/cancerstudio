@@ -141,13 +141,14 @@ PVACSEQ_REQUIREMENT = ToolRequirement(
 
 
 NETMHCPAN_REQUIREMENT = ToolRequirement(
-    name="NetMHCpan 4.1",
+    name="NetMHCpan 4.2",
     env_var="CANCERSTUDIO_NETMHCPAN_BIN",
     default_binary="netMHCpan",
     install_hint=(
-        "NetMHCpan 4.1 requires a free academic license from DTU (https://services.healthtech.dtu.dk/). "
-        "Download the linux tarball, extract it under ${CANCERSTUDIO_DATA_ROOT}/netmhc/netMHCpan-4.1/, "
-        "and edit its top-level wrapper script so the binary is on PATH."
+        "NetMHCpan 4.2 requires a free academic license from DTU (https://services.healthtech.dtu.dk/). "
+        "Download the Linux tarball and extract it as shipped (no script edits needed) into "
+        "${CANCERSTUDIO_NETMHC_DIR} — the host dir is bind-mounted at /tools/src:ro inside the "
+        "container, which matches the wrapper's hardcoded NMHOME."
     ),
 )
 
@@ -157,8 +158,9 @@ NETMHCIIPAN_REQUIREMENT = ToolRequirement(
     env_var="CANCERSTUDIO_NETMHCIIPAN_BIN",
     default_binary="netMHCIIpan",
     install_hint=(
-        "NetMHCIIpan 4.3 requires a free academic license from DTU. Extract under "
-        "${CANCERSTUDIO_DATA_ROOT}/netmhc/netMHCIIpan-4.3/ (mounted read-only into the container)."
+        "NetMHCIIpan 4.3 requires a free academic license from DTU. Extract the Linux tarball "
+        "as shipped into ${CANCERSTUDIO_NETMHC_DIR} — the host dir lands at /tools/src:ro inside "
+        "the container, matching the wrapper's hardcoded NMHOME."
     ),
 )
 

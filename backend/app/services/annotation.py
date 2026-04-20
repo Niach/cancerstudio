@@ -1326,6 +1326,10 @@ def run_vep(
         "--terms", "SO",
         "--canonical",
         "--biotype",
+        # TSL (Transcript Support Level) only has real values for human; for
+        # dog/cat it emits empty "-" values. pVACseq still requires the column
+        # to be present in the CSQ format string, so always pass --tsl.
+        "--tsl",
         "--hgvs",
         "--numbers",
         "--protein",
@@ -1699,6 +1703,9 @@ def compute_annotation_metrics(
             highest_impact=acc.highest_impact,  # type: ignore[arg-type]
             top_hgvsp=acc.top_hgvsp,
             top_consequence=acc.top_consequence,
+            transcript_id=acc.transcript_id,
+            protein_length=acc.protein_length,
+            variants=list(acc.variants),
         )
         for acc in cancer_hits
     ]

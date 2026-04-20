@@ -40,7 +40,7 @@ interface NeoantigenPredictionStagePanelProps {
 
 const RUNTIME_PHASE_COPY: Record<string, string> = {
   generating_fasta: "Generating peptide fragments from the annotated mutations",
-  running_class_i: "Scoring class I peptides against NetMHCpan 4.1",
+  running_class_i: "Scoring class I peptides against NetMHCpan 4.2",
   running_class_ii: "Scoring class II peptides against NetMHCIIpan 4.3",
   parsing: "Reading pVACseq output",
   finalizing: "Finalizing candidates",
@@ -169,7 +169,7 @@ export default function NeoantigenPredictionStagePanel({
             whiteSpace: "nowrap",
           }}
         >
-          pVACseq · NetMHCpan 4.1
+          pVACseq · NetMHCpan 4.2
         </div>
       </div>
     </div>
@@ -477,6 +477,7 @@ export default function NeoantigenPredictionStagePanel({
         speciesLabel={metrics.speciesLabel ?? speciesLabel(workspace.species)}
         editable={!submitting}
         onChange={saveAlleles}
+        rejectedAlleles={metrics.rejectedAlleles}
       />
 
       <BucketTiles buckets={metrics.buckets} />

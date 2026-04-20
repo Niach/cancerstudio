@@ -1,5 +1,7 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
+
 interface HelixProps {
   size?: number;
   rungs?: number;
@@ -9,6 +11,15 @@ interface HelixProps {
   speed?: number;
 }
 
+// Canonical "am I on the client yet" check without setState-in-effect.
+const subscribe = () => () => {};
+const useIsClient = () =>
+  useSyncExternalStore(
+    subscribe,
+    () => true,
+    () => false,
+  );
+
 export default function Helix({
   size = 280,
   rungs = 24,
@@ -17,11 +28,21 @@ export default function Helix({
   showBases = true,
   speed = 22,
 }: HelixProps) {
+  // The dense inline-style tree below hits an SSR/client hydration mismatch
+  // in Next 15 (server serializes shorthands like `background` into longhand
+  // + truncates numeric precision; client React does not). Purely decorative
+  // component, so render an empty box server-side and only paint after mount.
+  const mounted = useIsClient();
+
   const width = size;
   const height = size * 1.2;
   const radius = size * 0.18;
   const spacing = (height * 0.78) / rungs;
   const offsetY = -((rungs - 1) * spacing) / 2;
+
+  if (!mounted) {
+    return <div className="cs-helix-wrap" style={{ width, height }} />;
+  }
 
   const rungsArr = Array.from({ length: rungs }, (_, i) => {
     const t = i / Math.max(1, rungs - 1);

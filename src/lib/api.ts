@@ -348,15 +348,6 @@ type VariantCallingStageSummaryDto = {
   artifacts: VariantCallingArtifactDto[];
 };
 
-type CancerGeneHitDto = {
-  symbol: string;
-  role: string;
-  variant_count: number;
-  highest_impact: AnnotationImpactTier;
-  top_hgvsp?: string | null;
-  top_consequence?: string | null;
-};
-
 type GeneFocusVariantDto = {
   chromosome: string;
   position: number;
@@ -366,6 +357,18 @@ type GeneFocusVariantDto = {
   consequence: string;
   impact: AnnotationImpactTier;
   tumor_vaf?: number | null;
+};
+
+type CancerGeneHitDto = {
+  symbol: string;
+  role: string;
+  variant_count: number;
+  highest_impact: AnnotationImpactTier;
+  top_hgvsp?: string | null;
+  top_consequence?: string | null;
+  transcript_id?: string | null;
+  protein_length?: number | null;
+  variants?: GeneFocusVariantDto[];
 };
 
 type ProteinDomainDto = {
@@ -794,6 +797,9 @@ function mapCancerGeneHit(dto: CancerGeneHitDto): CancerGeneHit {
     highestImpact: normalizeImpactTier(dto.highest_impact),
     topHgvsp: dto.top_hgvsp ?? null,
     topConsequence: dto.top_consequence ?? null,
+    transcriptId: dto.transcript_id ?? null,
+    proteinLength: dto.protein_length ?? null,
+    variants: (dto.variants ?? []).map(mapGeneFocusVariant),
   };
 }
 
@@ -932,6 +938,12 @@ type PatientAlleleDto = {
   source?: string | null;
 };
 
+type RejectedAlleleDto = {
+  allele: string;
+  class: MhcClass;
+  reason: string;
+};
+
 type BindingBucketDto = {
   key: BindingTier;
   label: string;
@@ -985,6 +997,7 @@ type NeoantigenMetricsDto = {
   species_label?: string | null;
   assembly?: string | null;
   alleles: PatientAlleleDto[];
+  rejected_alleles?: RejectedAlleleDto[] | null;
   annotated_variants: number;
   protein_changing_variants: number;
   peptides_generated: number;
@@ -1102,6 +1115,11 @@ function mapNeoantigenMetrics(dto: NeoantigenMetricsDto): NeoantigenMetrics {
     speciesLabel: dto.species_label ?? null,
     assembly: dto.assembly ?? null,
     alleles: (dto.alleles ?? []).map(mapPatientAllele),
+    rejectedAlleles: (dto.rejected_alleles ?? []).map((r) => ({
+      allele: r.allele,
+      mhcClass: r.class,
+      reason: r.reason,
+    })),
     annotatedVariants: dto.annotated_variants,
     proteinChangingVariants: dto.protein_changing_variants,
     peptidesGenerated: dto.peptides_generated,

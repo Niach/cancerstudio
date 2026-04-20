@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { Btn, Card, CardHead, Chip, Eyebrow } from "@/components/ui-kit";
+import { Btn, Callout, Card, CardHead, Chip, Dot, Eyebrow } from "@/components/ui-kit";
 import { useTweaks } from "@/components/dev/TweaksProvider";
 import CandidateDeck, {
   type DeckFilter,
@@ -93,68 +93,70 @@ export default function EpitopeSelectionStagePanel({
     setPicks([]);
   }, []);
 
+  const header = (
+    <div className="cs-view-head">
+      <div>
+        <div className="cs-crumb">
+          {workspace.displayName} / 06 Epitope selection
+        </div>
+        <h1 style={{ textWrap: "pretty", margin: "4px 0 0" }}>
+          Pick the fragments your vaccine will carry.
+        </h1>
+        <p
+          style={{
+            maxWidth: "62ch",
+            marginTop: 12,
+            fontSize: 16.5,
+            lineHeight: 1.6,
+            color: "var(--ink-2)",
+          }}
+        >
+          A vaccine carries about seven mutant fragments. The goal: cover a
+          few driver genes, reach several alleles, and skip anything that
+          looks like a healthy protein.
+        </p>
+      </div>
+      <div style={{ textAlign: "right", minWidth: 200 }}>
+        <Chip kind="live">Stage 06 · Live</Chip>
+        <div
+          style={{
+            marginTop: 8,
+            fontSize: 12.5,
+            fontFamily: "var(--font-mono)",
+            color: "var(--muted)",
+            letterSpacing: "0.08em",
+            whiteSpace: "nowrap",
+          }}
+        >
+          pVACview 5.4 · manual review
+        </div>
+      </div>
+    </div>
+  );
+
   if (summary.status === "blocked") {
     return (
-      <div className="cs-view cs-fade-in">
-        <div className="cs-view-head">
-          <div>
-            <div className="cs-crumb">Workspace / 06 Epitope selection</div>
-            <h1 style={{ margin: "4px 0 0" }}>
-              Pick the fragments your vaccine will carry.
-            </h1>
+      <>
+        {header}
+        <Callout tone="warm">
+          <Dot style={{ color: "var(--warm)" }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)" }}>
+              {summary.blockingReason ??
+                "Finish neoantigen prediction before curating the cassette."}
+            </div>
+            <p className="cs-tiny" style={{ margin: "4px 0 0" }}>
+              Epitope selection unlocks once neoantigen prediction is done.
+            </p>
           </div>
-          <Chip kind="planned">Stage 06 · Blocked</Chip>
-        </div>
-        <Card pad>
-          <Eyebrow>Blocked</Eyebrow>
-          <p style={{ marginTop: 8, color: "var(--ink-2)" }}>
-            {summary.blockingReason ??
-              "Finish neoantigen prediction before curating the cassette."}
-          </p>
-        </Card>
-      </div>
+        </Callout>
+      </>
     );
   }
 
   return (
-    <div className="cs-view cs-fade-in">
-      <div className="cs-view-head">
-        <div>
-          <div className="cs-crumb">Workspace / 06 Epitope selection</div>
-          <h1 style={{ margin: "4px 0 0" }}>
-            Pick the fragments your vaccine will carry.
-          </h1>
-          <p
-            style={{
-              maxWidth: "62ch",
-              marginTop: 12,
-              fontSize: 16.5,
-              lineHeight: 1.6,
-              color: "var(--ink-2)",
-            }}
-          >
-            We found {summary.candidates.length} mutations the immune system
-            can see. A vaccine fits about seven of them. The goal: cover a few
-            driver genes, reach several alleles, and skip anything that looks
-            like a healthy protein.
-          </p>
-        </div>
-        <div style={{ textAlign: "right", minWidth: 200 }}>
-          <Chip kind="live">Stage 06 · Live</Chip>
-          <div
-            style={{
-              marginTop: 8,
-              fontSize: 12.5,
-              fontFamily: "var(--font-mono)",
-              color: "var(--muted)",
-              letterSpacing: "0.08em",
-              whiteSpace: "nowrap",
-            }}
-          >
-            pVACview 5.4 · manual review
-          </div>
-        </div>
-      </div>
+    <>
+      {header}
 
       <div style={{ marginBottom: 16 }}>
         <CassettePanel
@@ -288,6 +290,6 @@ export default function EpitopeSelectionStagePanel({
           <Btn variant="ghost">Peek at the roadmap →</Btn>
         </Link>
       </div>
-    </div>
+    </>
   );
 }

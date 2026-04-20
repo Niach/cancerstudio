@@ -46,9 +46,11 @@ export default function GeneLollipop({ focus }: GeneLollipopProps) {
     [focus.symbol],
   );
 
+  const totalVariants = focus.variants.length;
   const variants = focus.variants.filter(
     (v) => v.proteinPosition != null && v.proteinPosition > 0,
   );
+  const nonCodingCount = totalVariants - variants.length;
 
   const variantMaxPos = variants.reduce(
     (acc, v) => Math.max(acc, v.proteinPosition ?? 0),
@@ -59,10 +61,13 @@ export default function GeneLollipop({ focus }: GeneLollipopProps) {
     : 0;
   const vepLength = focus.proteinLength ?? 0;
   const explicitLength = vepLength > 0 ? vepLength : preset?.proteinLength ?? 0;
+  // If we don't have a real protein length, pad the inferred track generously
+  // so a lone high-position variant doesn't plant itself on top of the C-cap
+  // and domain labels at the end of the bar.
   const length =
     explicitLength > 0 && explicitLength >= variantMaxPos
       ? explicitLength
-      : Math.max(variantMaxPos * 1.1, presetMaxDomain, 100);
+      : Math.max(variantMaxPos * 1.25, presetMaxDomain, 100);
   const inferredLength = explicitLength === 0 || explicitLength < variantMaxPos;
   const domains: ProteinDomain[] =
     focus.domains && focus.domains.length > 0
@@ -73,11 +78,11 @@ export default function GeneLollipop({ focus }: GeneLollipopProps) {
       ? focus.role
       : preset?.role ?? null;
 
-  if (!variants.length) return null;
+  if (!variants.length && totalVariants === 0) return null;
 
   const W = 900;
   const H = 260;
-  const PX = 46;
+  const PX = 56;
   const TRACK_Y = H - 72;
   const trackXStart = PX - 4;
   const trackWidth = W - (PX - 4) * 2;
@@ -118,6 +123,12 @@ export default function GeneLollipop({ focus }: GeneLollipopProps) {
               }}
             >
               {variants.length} mutation{variants.length === 1 ? "" : "s"} along the protein
+              {nonCodingCount > 0 ? (
+                <span style={{ color: "var(--muted-2)", fontSize: 14 }}>
+                  {" "}· {nonCodingCount} non-coding hit
+                  {nonCodingCount === 1 ? "" : "s"} not shown
+                </span>
+              ) : null}
             </span>
           </h3>
           {role ? (
@@ -212,6 +223,14 @@ export default function GeneLollipop({ focus }: GeneLollipopProps) {
             const bandWidth = Math.max(endX - startX, 6);
             const fill = domainFill(domain);
             const showLabel = bandWidth > 58;
+            // Pixel budget for the label: ~6px per glyph at 10px mono. Keep
+            // it inside the band, and keep the band inside the track so we
+            // never collide with the N/C caps or escape the viewBox.
+            const maxChars = Math.max(3, Math.floor((bandWidth - 10) / 6));
+            const labelText =
+              domain.label.length > maxChars
+                ? `${domain.label.slice(0, Math.max(1, maxChars - 1))}…`
+                : domain.label;
             return (
               <g key={`${domain.label}-${idx}`}>
                 <rect
@@ -236,7 +255,7 @@ export default function GeneLollipop({ focus }: GeneLollipopProps) {
                     letterSpacing="0.06em"
                     style={{ pointerEvents: "none" }}
                   >
-                    {domain.label}
+                    {labelText}
                   </text>
                 ) : null}
                 <title>{`${domain.label} · ${domain.start}–${domain.end} aa`}</title>

@@ -16,6 +16,8 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         python3.11 \
         python3.11-venv \
+        python3.11-dev \
+        python3.11-tk \
         python3-pip \
         pigz \
         curl \
@@ -44,6 +46,7 @@ RUN apt-get update \
         libbio-db-hts-perl \
         libfile-copy-recursive-perl \
         tabix \
+        tcsh \
     && update-alternatives --install /usr/bin/python python /usr/bin/python3.11 100 \
     && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 100 \
     && rm -rf /var/lib/apt/lists/*
@@ -104,13 +107,24 @@ WORKDIR /app
 COPY backend/requirements.txt /app/requirements.txt
 RUN python -m pip install --upgrade pip \
     && python -m pip install -r /app/requirements.txt \
-    && python -m pip install "pvactools==5.4.0"
+    && python -m pip install "pvactools==5.4.0" "numpy<2" \
+    # pvactools 5.4.0's pip wheel omits the cancer-hotspot gene list its
+    # post-processing step requires. Fetch it from the matching GitHub tag;
+    # without this file, pvacseq runs fail right before aggregation.
+    # pvactools is a namespace package (no __file__), so resolve via a submodule.
+    && PVAC_SUPPORT=$(python -c "import os, pvactools.tools; print(os.path.join(os.path.dirname(os.path.dirname(pvactools.tools.__file__)), 'supporting_files'))") \
+    && mkdir -p "$PVAC_SUPPORT" \
+    && curl -fsSL \
+        https://raw.githubusercontent.com/griffithlab/pVACtools/v5.4.0/pvactools/supporting_files/cancer_census_hotspot_gene_list.tsv \
+        -o "$PVAC_SUPPORT/cancer_census_hotspot_gene_list.tsv"
 
-# Mount point for externally-licensed MHC binding predictors (NetMHCpan 4.1 +
-# NetMHCIIpan 4.3). We cannot redistribute these, so the user drops them into
-# ${CANCERSTUDIO_DATA_ROOT}/netmhc on the host; docker-compose bind-mounts them
-# here read-only. pVACseq invokes the binaries via the env vars below.
-RUN mkdir -p /opt/netmhc
+# Mount point for externally-licensed MHC binding predictors (NetMHCpan 4.2 +
+# NetMHCIIpan 4.3). We cannot redistribute these, so the user drops the
+# DTU-shipped install directories into ${CANCERSTUDIO_NETMHC_DIR} on the host;
+# docker-compose bind-mounts that dir at /tools/src:ro so the stock DTU wrapper
+# scripts (which hardcode NMHOME=/tools/src/netMHCpan-4.2 etc.) work with no
+# user-side edits. pVACseq invokes the binaries via the env vars below.
+RUN mkdir -p /tools/src
 
 COPY backend/app /app/app
 COPY backend/tests /app/tests
@@ -121,9 +135,9 @@ ENV CANCERSTUDIO_APP_DATA_DIR=/app-data \
     CANCERSTUDIO_VEP_CACHE_DIR=/vep-cache \
     CANCERSTUDIO_VEP_PLUGINS_DIR=/opt/vep-plugins \
     CANCERSTUDIO_VEP_RELEASE=111 \
-    CANCERSTUDIO_NETMHC_DIR=/opt/netmhc \
-    CANCERSTUDIO_NETMHCPAN_BIN=/opt/netmhc/netMHCpan-4.1/netMHCpan \
-    CANCERSTUDIO_NETMHCIIPAN_BIN=/opt/netmhc/netMHCIIpan-4.3/netMHCIIpan \
+    CANCERSTUDIO_NETMHC_DIR=/tools/src \
+    CANCERSTUDIO_NETMHCPAN_BIN=/tools/src/netMHCpan-4.2/netMHCpan \
+    CANCERSTUDIO_NETMHCIIPAN_BIN=/tools/src/netMHCIIpan-4.3/netMHCIIpan \
     PYTHONPATH=/app
 
 EXPOSE 8000

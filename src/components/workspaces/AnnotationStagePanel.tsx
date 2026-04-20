@@ -133,7 +133,18 @@ export default function AnnotationStagePanel({
     let base: GeneFocus;
     if (focusedGene && focusedGene !== metrics.topGeneFocus.symbol) {
       const hit = metrics.cancerGeneHits.find((h) => h.symbol === focusedGene);
-      if (hit) {
+      const hitVariants = hit?.variants ?? [];
+      if (hit && hitVariants.length > 0) {
+        base = {
+          symbol: hit.symbol,
+          role: hit.role,
+          transcriptId: hit.transcriptId ?? null,
+          proteinLength: hit.proteinLength ?? null,
+          variants: hitVariants,
+        };
+      } else if (hit) {
+        // Fallback: scan global top_variants for anything matching this symbol.
+        // Only hit if the backend didn't ship per-hit variants (older payload).
         const variants = metrics.topVariants
           .filter((v) => v.geneSymbol === focusedGene)
           .map((v) => ({
@@ -150,8 +161,8 @@ export default function AnnotationStagePanel({
           base = {
             symbol: hit.symbol,
             role: hit.role,
-            transcriptId: null,
-            proteinLength: null,
+            transcriptId: hit.transcriptId ?? null,
+            proteinLength: hit.proteinLength ?? null,
             variants,
           };
         } else {

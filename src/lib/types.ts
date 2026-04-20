@@ -434,15 +434,6 @@ export interface AnnotationConsequenceEntry {
   count: number;
 }
 
-export interface CancerGeneHit {
-  symbol: string;
-  role: string;
-  variantCount: number;
-  highestImpact: AnnotationImpactTier;
-  topHgvsp?: string | null;
-  topConsequence?: string | null;
-}
-
 export interface GeneFocusVariant {
   chromosome: string;
   position: number;
@@ -452,6 +443,18 @@ export interface GeneFocusVariant {
   consequence: string;
   impact: AnnotationImpactTier;
   tumorVaf?: number | null;
+}
+
+export interface CancerGeneHit {
+  symbol: string;
+  role: string;
+  variantCount: number;
+  highestImpact: AnnotationImpactTier;
+  topHgvsp?: string | null;
+  topConsequence?: string | null;
+  transcriptId?: string | null;
+  proteinLength?: number | null;
+  variants?: GeneFocusVariant[];
 }
 
 export interface ProteinDomain {
@@ -610,6 +613,12 @@ export interface PatientAllele {
   source?: string | null;
 }
 
+export interface RejectedAllele {
+  allele: string;
+  mhcClass: MhcClass;
+  reason: string;
+}
+
 export interface BindingBucket {
   key: BindingTier;
   label: string;
@@ -663,6 +672,7 @@ export interface NeoantigenMetrics {
   speciesLabel?: string | null;
   assembly?: string | null;
   alleles: PatientAllele[];
+  rejectedAlleles?: RejectedAllele[];
   annotatedVariants: number;
   proteinChangingVariants: number;
   peptidesGenerated: number;
@@ -827,7 +837,7 @@ export const PIPELINE_STAGES: PipelineStage[] = [
     name: "Neoantigen Prediction",
     description: "Predict MHC binding for mutant peptides against DLA alleles",
     icon: "Target",
-    tools: ["pVACseq", "NetMHCpan-4.1"],
+    tools: ["pVACseq", "NetMHCpan-4.2"],
     implementationState: "live",
     group: "primary",
   },

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 
 import { Btn, Card, Eyebrow } from "@/components/ui-kit";
-import type { PatientAllele } from "@/lib/types";
+import type { PatientAllele, RejectedAllele } from "@/lib/types";
 import { CLASS_I_ACCENT, CLASS_II_ACCENT } from "./colors";
 
 interface DlaAllelePanelProps {
@@ -9,6 +9,7 @@ interface DlaAllelePanelProps {
   speciesLabel: string;
   editable: boolean;
   onChange: (next: PatientAllele[]) => void | Promise<void>;
+  rejectedAlleles?: RejectedAllele[];
 }
 
 export default function DlaAllelePanel({
@@ -16,6 +17,7 @@ export default function DlaAllelePanel({
   speciesLabel,
   editable,
   onChange,
+  rejectedAlleles,
 }: DlaAllelePanelProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<PatientAllele[]>(alleles);
@@ -30,6 +32,17 @@ export default function DlaAllelePanel({
     () => (editing ? draft : alleles).filter((a) => a.class === "II"),
     [alleles, draft, editing],
   );
+
+  // Map allele name → skip reason. Hide rejection state while editing
+  // so the row is visually editable; backend decides anew on next run.
+  const rejectedByName = useMemo(() => {
+    if (editing) return new Map<string, string>();
+    const map = new Map<string, string>();
+    for (const r of rejectedAlleles ?? []) {
+      map.set(r.allele, r.reason);
+    }
+    return map;
+  }, [rejectedAlleles, editing]);
 
   function startEditing() {
     setDraft(alleles);
@@ -139,6 +152,7 @@ export default function DlaAllelePanel({
           accent={CLASS_I_ACCENT}
           editing={editing}
           onRemove={removeAllele}
+          rejectedByName={rejectedByName}
         />
         <AlleleBlock
           title="Class II"
@@ -146,6 +160,7 @@ export default function DlaAllelePanel({
           accent={CLASS_II_ACCENT}
           editing={editing}
           onRemove={removeAllele}
+          rejectedByName={rejectedByName}
         />
       </div>
 
@@ -207,12 +222,14 @@ function AlleleBlock({
   accent,
   editing,
   onRemove,
+  rejectedByName,
 }: {
   title: string;
   items: PatientAllele[];
   accent: string;
   editing: boolean;
   onRemove: (allele: string) => void;
+  rejectedByName: Map<string, string>;
 }) {
   return (
     <div
@@ -249,86 +266,125 @@ function AlleleBlock({
             No alleles configured.
           </p>
         ) : null}
-        {items.map((a) => (
-          <div
-            key={a.allele}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              padding: "8px 12px",
-              borderRadius: 8,
-              background: "var(--surface-sunk)",
-              border: "1px solid var(--line)",
-            }}
-          >
-            <span
+        {items.map((a) => {
+          const skipReason = rejectedByName.get(a.allele);
+          const skipped = Boolean(skipReason);
+          return (
+            <div
+              key={a.allele}
               style={{
-                flex: 1,
-                fontFamily: "var(--font-mono)",
-                fontSize: 13,
-                color: "var(--ink-2)",
-                fontWeight: 500,
+                display: "flex",
+                flexDirection: "column",
+                gap: 4,
+                padding: "8px 12px",
+                borderRadius: 8,
+                background: "var(--surface-sunk)",
+                border: "1px solid var(--line)",
+                opacity: skipped ? 0.6 : 1,
               }}
             >
-              {a.allele}
-            </span>
-            <span
-              style={{
-                padding: "2px 8px",
-                borderRadius: 4,
-                background:
-                  a.typing === "typed"
-                    ? "color-mix(in oklch, var(--accent) 16%, transparent)"
-                    : "var(--surface-strong)",
-                color: a.typing === "typed" ? "var(--accent-ink)" : "var(--muted)",
-                border:
-                  "1px solid " +
-                  (a.typing === "typed"
-                    ? "color-mix(in oklch, var(--accent) 38%, transparent)"
-                    : "var(--line-strong)"),
-                fontFamily: "var(--font-mono)",
-                fontSize: 10,
-                textTransform: "uppercase",
-                letterSpacing: "0.16em",
-                fontWeight: 700,
-              }}
-            >
-              {a.typing}
-            </span>
-            {typeof a.frequency === "number" ? (
-              <span
-                style={{
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 11.5,
-                  color: "var(--muted-2)",
-                  fontVariantNumeric: "tabular-nums",
-                  minWidth: 46,
-                  textAlign: "right",
-                }}
-              >
-                {Math.round(a.frequency * 100)}% freq
-              </span>
-            ) : null}
-            {editing ? (
-              <button
-                onClick={() => onRemove(a.allele)}
-                aria-label={`Remove ${a.allele}`}
-                style={{
-                  border: "none",
-                  background: "transparent",
-                  color: "var(--muted)",
-                  cursor: "pointer",
-                  fontSize: 14,
-                  padding: 2,
-                  lineHeight: 1,
-                }}
-              >
-                ×
-              </button>
-            ) : null}
-          </div>
-        ))}
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span
+                  style={{
+                    flex: 1,
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 13,
+                    color: "var(--ink-2)",
+                    fontWeight: 500,
+                    textDecoration: skipped ? "line-through" : "none",
+                  }}
+                >
+                  {a.allele}
+                </span>
+                {skipped ? (
+                  <span
+                    style={{
+                      padding: "2px 8px",
+                      borderRadius: 4,
+                      background: "color-mix(in oklch, var(--danger) 12%, transparent)",
+                      color: "var(--danger)",
+                      border: "1px solid color-mix(in oklch, var(--danger) 42%, transparent)",
+                      fontFamily: "var(--font-mono)",
+                      fontSize: 10,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.16em",
+                      fontWeight: 700,
+                    }}
+                  >
+                    Skipped
+                  </span>
+                ) : (
+                  <span
+                    style={{
+                      padding: "2px 8px",
+                      borderRadius: 4,
+                      background:
+                        a.typing === "typed"
+                          ? "color-mix(in oklch, var(--accent) 16%, transparent)"
+                          : "var(--surface-strong)",
+                      color: a.typing === "typed" ? "var(--accent-ink)" : "var(--muted)",
+                      border:
+                        "1px solid " +
+                        (a.typing === "typed"
+                          ? "color-mix(in oklch, var(--accent) 38%, transparent)"
+                          : "var(--line-strong)"),
+                      fontFamily: "var(--font-mono)",
+                      fontSize: 10,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.16em",
+                      fontWeight: 700,
+                    }}
+                  >
+                    {a.typing}
+                  </span>
+                )}
+                {typeof a.frequency === "number" ? (
+                  <span
+                    style={{
+                      fontFamily: "var(--font-mono)",
+                      fontSize: 11.5,
+                      color: "var(--muted-2)",
+                      fontVariantNumeric: "tabular-nums",
+                      minWidth: 46,
+                      textAlign: "right",
+                    }}
+                  >
+                    {Math.round(a.frequency * 100)}% freq
+                  </span>
+                ) : null}
+                {editing ? (
+                  <button
+                    onClick={() => onRemove(a.allele)}
+                    aria-label={`Remove ${a.allele}`}
+                    style={{
+                      border: "none",
+                      background: "transparent",
+                      color: "var(--muted)",
+                      cursor: "pointer",
+                      fontSize: 14,
+                      padding: 2,
+                      lineHeight: 1,
+                    }}
+                  >
+                    ×
+                  </button>
+                ) : null}
+              </div>
+              {skipped ? (
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: 11.5,
+                    lineHeight: 1.4,
+                    color: "var(--muted-2)",
+                  }}
+                >
+                  {skipReason}
+                </p>
+              ) : null}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

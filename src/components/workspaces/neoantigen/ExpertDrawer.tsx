@@ -12,7 +12,7 @@ export default function ExpertDrawer({
     <Card style={{ marginTop: 20 }}>
       <CardHead
         eyebrow="Expert · pVACseq command"
-        title={pvacseqVersion ?? "NetMHCpan 4.1 + NetMHCIIpan 4.3"}
+        title={pvacseqVersion ?? "NetMHCpan 4.2 + NetMHCIIpan 4.3"}
       />
       <pre
         style={{

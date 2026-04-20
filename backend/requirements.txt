@@ -1,6 +1,10 @@
 fastapi>=0.115.0
 uvicorn[standard]>=0.30.0
 pydantic>=2.9.0
+# pvactools 5.4.0 pins pandas==2.0.3, which was built against numpy 1.x —
+# numpy 2.x triggers an ABI mismatch at pandas import time. Hold numpy on
+# the 1.x line until we bump pvactools.
+numpy<2
 biopython>=1.84
 httpx>=0.28.0
 pytest>=8.3.0

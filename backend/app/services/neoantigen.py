@@ -1,7 +1,7 @@
 """Neoantigen prediction stage service (pVACseq + NetMHCpan / NetMHCIIpan).
 
 Consumes the annotated VCF from stage 4, runs pVACseq twice — once for class I
-binding against NetMHCpan 4.1, once for class II binding against NetMHCIIpan 4.3 —
+binding against NetMHCpan 4.2, once for class II binding against NetMHCIIpan 4.3 —
 and parses the resulting ``all_epitopes.tsv`` / ``filtered.tsv`` output into a
 ``NeoantigenMetricsResponse`` that the frontend's binding heatmap, ranking scatter,
 antigen funnel, and top-candidates table consume directly.
@@ -15,9 +15,11 @@ a paused run can resume with class-II alone without rerunning class-I.
 from __future__ import annotations
 
 import csv
+import gzip
 import json
 import math
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -26,6 +28,7 @@ import time
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Callable, Iterable, Optional
 
@@ -55,6 +58,7 @@ from app.models.schemas import (
     NeoantigenStageSummaryResponse,
     PatientAllele,
     PipelineStageId,
+    RejectedAllele,
     TopCandidate,
 )
 from app.services.annotation import (
@@ -72,7 +76,35 @@ from app.services.workspace_store import (
 
 
 NEOANTIGEN_STAGE_ID = PipelineStageId.NEOANTIGEN_PREDICTION.value
-PVACSEQ_SAMPLE_NAME = "sample"
+
+
+def _detect_tumor_sample_name(vcf_path: Path) -> str:
+    """Return the tumor sample name from a VCF's ``#CHROM`` header line.
+
+    cancerstudio's variant-calling stage writes the tumor column with a
+    ``.tumor`` suffix. Prefer an exact suffix match; fall back to a
+    case-insensitive substring; and finally error with the observed samples
+    so the user can diagnose a hand-edited VCF.
+    """
+    opener = gzip.open if str(vcf_path).endswith(".gz") else open
+    with opener(vcf_path, "rt") as handle:  # type: ignore[arg-type]
+        for line in handle:
+            if line.startswith("#CHROM"):
+                samples = line.rstrip("\n").split("\t")[9:]
+                for name in samples:
+                    if name.endswith(".tumor") or name.endswith("_tumor"):
+                        return name
+                for name in samples:
+                    if "tumor" in name.lower():
+                        return name
+                raise RuntimeError(
+                    "Could not identify a tumor sample in the VCF #CHROM header. "
+                    f"Samples found: {samples!r}. cancerstudio expects a sample "
+                    "name ending in '.tumor' or '_tumor'."
+                )
+            if not line.startswith("#"):
+                break
+    raise RuntimeError(f"VCF {vcf_path} has no #CHROM header line.")
 
 # Default pVACseq knobs. Mirror the prototype's Expert drawer copy.
 CLASS_I_EPITOPE_LENGTHS = (8, 9, 10, 11)
@@ -130,10 +162,12 @@ class NeoantigenInputs:
     species_label: Optional[str]
     assembly: Optional[str]
     annotated_vcf: Path
+    tumor_sample_name: str
     run_dir: Path
     class_i_alleles: list[PatientAllele]
     class_ii_alleles: list[PatientAllele]
     patient_alleles: list[PatientAllele]
+    rejected_alleles: list[tuple[PatientAllele, str]]
 
 
 def _derive_pid_dir_on_disk(workspace_id: str, run_id: str) -> Path:
@@ -963,8 +997,23 @@ def start_neoantigen_run(workspace_id: str, run_id: str) -> NeoantigenInputs:
 
         config = load_workspace_neoantigen_config(workspace)
         alleles = _patient_alleles_from_config(config)
-        class_i = [a for a in alleles if a.mhc_class == "I"]
-        class_ii = [a for a in alleles if a.mhc_class == "II"]
+        class_i_raw = [a for a in alleles if a.mhc_class == "I"]
+        class_ii_raw = [a for a in alleles if a.mhc_class == "II"]
+
+        class_i, class_i_rejected = _normalize_alleles_for_pvacseq(
+            class_i_raw, species=workspace.species, algorithm="NetMHCpan"
+        )
+        class_ii, class_ii_rejected = _normalize_alleles_for_pvacseq(
+            class_ii_raw, species=workspace.species, algorithm="NetMHCIIpan"
+        )
+        rejected_alleles = class_i_rejected + class_ii_rejected
+
+        if not class_i and not class_ii:
+            raise RuntimeError(
+                "None of the configured MHC alleles are recognized by pvacseq for "
+                f"species '{workspace.species}'. Rejected: "
+                + "; ".join(f"{a.allele} ({why})" for a, why in rejected_alleles)
+            )
 
         payload = _parse_payload(run.result_payload)
         species_label = payload.get("species_label")
@@ -989,6 +1038,7 @@ def start_neoantigen_run(workspace_id: str, run_id: str) -> NeoantigenInputs:
         species = workspace.species
 
     run_dir = get_neoantigen_run_root(workspace_id, run_id)
+    tumor_sample_name = _detect_tumor_sample_name(annotated_vcf)
     return NeoantigenInputs(
         workspace_id=workspace_id,
         run_id=run_id,
@@ -996,10 +1046,12 @@ def start_neoantigen_run(workspace_id: str, run_id: str) -> NeoantigenInputs:
         species_label=species_label,
         assembly=assembly,
         annotated_vcf=annotated_vcf,
+        tumor_sample_name=tumor_sample_name,
         run_dir=run_dir,
         class_i_alleles=class_i,
         class_ii_alleles=class_ii,
         patient_alleles=alleles,
+        rejected_alleles=rejected_alleles,
     )
 
 
@@ -1012,8 +1064,120 @@ def _pvacseq_binary() -> str:
     return os.getenv("PVACSEQ_BINARY", "pvacseq")
 
 
+def _pvacseq_threads() -> int:
+    """Number of concurrent NetMHCpan subprocesses pvacseq should spawn.
+
+    Each NetMHCpan instance loads the model (~100–300 MB) then scores a
+    200-peptide chunk. On a typical desktop 4–8 in parallel is the sweet
+    spot; beyond that disk I/O for model files starts to dominate. Override
+    with ``CANCERSTUDIO_PVACSEQ_THREADS``.
+    """
+    override = os.getenv("CANCERSTUDIO_PVACSEQ_THREADS")
+    if override:
+        try:
+            return max(1, int(override))
+        except ValueError:
+            pass
+    cpus = os.cpu_count() or 4
+    return max(1, min(cpus, 8))
+
+
+# pvacseq species→predictor compatibility map. Human is ubiquitous; for
+# non-human species pvacseq only enumerates the alleles the IEDB wrappers
+# for each predictor know how to route. For dog that's a handful of DLA-I
+# names in a flat form (e.g. ``DLA-8850801`` for the allele written
+# ``DLA-88*508:01`` in the IPD-MHC catalog) and zero class II alleles.
+@lru_cache(maxsize=32)
+def _pvacseq_supported_alleles(species: str, algorithm: str) -> frozenset[str]:
+    try:
+        result = subprocess.run(
+            [
+                _pvacseq_binary(),
+                "valid_alleles",
+                "-s",
+                species,
+                "-p",
+                algorithm,
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30.0,
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        return frozenset()
+    return frozenset(
+        line.strip() for line in result.stdout.splitlines() if line.strip()
+    )
+
+
+def _allele_candidates(name: str) -> Iterable[str]:
+    """Yield plausible renderings of a patient allele name to try against pvacseq.
+
+    Upstream conventions vary: the IPD-MHC catalog writes ``DLA-88*508:01``
+    while pvacseq's IEDB wrapper recognizes the flat ``DLA-8850801`` form.
+    Workspace UIs also commonly store leading-zero field groups that some
+    catalogs strip. We try the original spelling first, then flattened and
+    leading-zero-stripped variants, before giving up.
+    """
+    yield name
+    flat = name.replace("*", "").replace(":", "")
+    if flat != name:
+        yield flat
+    m = re.match(r"^([A-Za-z0-9-]+)\*0+(\d+:\d+)$", name)
+    if m:
+        stripped = f"{m.group(1)}*{m.group(2)}"
+        yield stripped
+        yield stripped.replace("*", "").replace(":", "")
+
+
+def _normalize_alleles_for_pvacseq(
+    alleles: list[PatientAllele],
+    species: str,
+    algorithm: str,
+) -> tuple[list[PatientAllele], list[tuple[PatientAllele, str]]]:
+    """Map patient allele names to pvacseq-accepted forms.
+
+    Returns ``(accepted, rejected)`` where ``accepted`` is a list of
+    ``PatientAllele`` records whose ``.allele`` field has been rewritten to
+    the form pvacseq expects, and ``rejected`` is a list of
+    ``(original_allele, reason)`` pairs for alleles with no acceptable form.
+    """
+    valid = _pvacseq_supported_alleles(species, algorithm)
+    accepted: list[PatientAllele] = []
+    rejected: list[tuple[PatientAllele, str]] = []
+    if not valid:
+        reason = (
+            f"pvacseq has no {algorithm} alleles registered for species "
+            f"'{species}'. The predictor cannot score any MHC class "
+            f"{alleles[0].mhc_class if alleles else '?'} peptides for this "
+            "species."
+        )
+        return accepted, [(a, reason) for a in alleles]
+    for allele in alleles:
+        match: Optional[str] = None
+        for candidate in _allele_candidates(allele.allele):
+            if candidate in valid:
+                match = candidate
+                break
+        if match is None:
+            rejected.append(
+                (
+                    allele,
+                    f"not in pvacseq's {algorithm} allele list for species "
+                    f"'{species}'. Tried: {', '.join(_allele_candidates(allele.allele))}",
+                )
+            )
+            continue
+        if match == allele.allele:
+            accepted.append(allele)
+        else:
+            accepted.append(allele.model_copy(update={"allele": match}))
+    return accepted, rejected
+
+
 def _netmhcpan_version() -> str:
-    return os.getenv("CANCERSTUDIO_NETMHCPAN_VERSION", "NetMHCpan 4.1")
+    return os.getenv("CANCERSTUDIO_NETMHCPAN_VERSION", "NetMHCpan 4.2")
 
 
 def _netmhciipan_version() -> str:
@@ -1043,6 +1207,10 @@ def _run_pvacseq(
     epitope_flag: str,
     epitope_lengths: tuple[int, ...],
     command_log: list[str],
+    progress_cb: Optional[Callable[[int, NeoantigenRuntimePhase], None]] = None,
+    phase: Optional[NeoantigenRuntimePhase] = None,
+    progress_start: int = 0,
+    progress_end: int = 0,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     allele_string = ",".join(a.allele for a in alleles)
@@ -1050,7 +1218,7 @@ def _run_pvacseq(
         _pvacseq_binary(),
         "run",
         str(inputs.annotated_vcf),
-        PVACSEQ_SAMPLE_NAME,
+        inputs.tumor_sample_name,
         allele_string,
         predictor,
         str(output_dir),
@@ -1058,9 +1226,112 @@ def _run_pvacseq(
         ",".join(str(length) for length in epitope_lengths),
         "--binding-threshold",
         str(int(BINDING_THRESHOLD_NM)),
+        "--n-threads",
+        str(_pvacseq_threads()),
     ]
     command_log.append(" ".join(command))
-    _run_subprocess(command, run_id=inputs.run_id)
+
+    stop_event = threading.Event()
+    watcher: Optional[threading.Thread] = None
+    if (
+        progress_cb is not None
+        and phase is not None
+        and progress_end > progress_start
+    ):
+        watcher = threading.Thread(
+            target=_watch_pvacseq_chunk_progress,
+            kwargs={
+                "stop": stop_event,
+                "output_dir": output_dir,
+                "n_alleles": len(alleles),
+                "progress_cb": progress_cb,
+                "phase": phase,
+                "progress_start": progress_start,
+                "progress_end": progress_end,
+            },
+            daemon=True,
+        )
+        watcher.start()
+    try:
+        _run_subprocess(command, run_id=inputs.run_id)
+    finally:
+        stop_event.set()
+        if watcher is not None:
+            watcher.join(timeout=2.0)
+    # Only bump to the phase's upper bound after a clean return — on a
+    # pause/cancel/failure, leave whatever value the watcher last reported
+    # so the UI reflects the real position we stopped at.
+    if progress_cb is not None and phase is not None and progress_end > progress_start:
+        try:
+            progress_cb(progress_end, phase)
+        except Exception:  # progress updates are best-effort
+            pass
+
+
+def _watch_pvacseq_chunk_progress(
+    *,
+    stop: threading.Event,
+    output_dir: Path,
+    n_alleles: int,
+    progress_cb: Callable[[int, NeoantigenRuntimePhase], None],
+    phase: NeoantigenRuntimePhase,
+    progress_start: int,
+    progress_end: int,
+    poll_seconds: float = 8.0,
+) -> None:
+    """Poll pvacseq's on-disk state to emit sub-phase progress.
+
+    The phase band ``progress_start..progress_end`` is split:
+
+    * ``0.0..0.65`` — NetMHCpan scoring. Fraction is
+      ``keys / (fasta_chunks × n_alleles)`` where ``.fa.split_*`` are input
+      chunks and ``.key`` are pvacseq's per-chunk completion markers.
+    * ``0.65..1.0`` — post-processing. Bumps as pvacseq emits the aggregate
+      artifacts ``all_epitopes.tsv``, ``filtered.tsv``, ``aggregated.tsv``.
+
+    Without the second half the bar would pin at 65% while aggregation,
+    TSL/binding filtering, and gene-of-interest marking silently run for
+    several minutes on big workspaces.
+    """
+    last_reported = progress_start
+    span = progress_end - progress_start
+    while not stop.wait(poll_seconds):
+        try:
+            if not output_dir.exists():
+                continue
+            fasta_chunks = 0
+            key_chunks = 0
+            for entry in output_dir.rglob("*.fa.split_*"):
+                if entry.name.endswith(".key"):
+                    key_chunks += 1
+                else:
+                    fasta_chunks += 1
+            expected = fasta_chunks * max(n_alleles, 1)
+            chunk_fraction = (
+                min(1.0, key_chunks / expected) if expected > 0 else 0.0
+            )
+            combined = 0.65 * chunk_fraction
+            # Unlock the aggregation band once all chunks are scored OR once
+            # the first aggregated artifact appears — whichever happens first
+            # (per-chunk .key accounting can lag on the last few chunks).
+            has_all = any(output_dir.rglob("*.all_epitopes.tsv"))
+            has_filtered = any(output_dir.rglob("*.filtered.tsv"))
+            has_aggregated = any(output_dir.rglob("*.aggregated.tsv"))
+            if chunk_fraction >= 0.99 or has_all:
+                combined = max(combined, 0.70)
+            if has_filtered:
+                combined = max(combined, 0.85)
+            if has_aggregated:
+                combined = max(combined, 0.95)
+            target = int(progress_start + span * combined)
+            # Progress is monotonic from the UI's perspective.
+            target = max(target, last_reported)
+            if target > last_reported:
+                progress_cb(target, phase)
+                last_reported = target
+        except Exception:
+            # Never let the watcher bring down the main run.
+            continue
 
 
 # --------------------------------------------------------------------------- #
@@ -1315,7 +1586,17 @@ def _build_heatmap(
         affinities = best_per_peptide[(entry.peptide, entry.mhc_class)]
         ic50_row: list[float] = []
         for allele_name in allele_order:
-            ic50_row.append(affinities.get(allele_name, 99_999.0))
+            # The stage 5 normalizer rewrites patient alleles into pvacseq's
+            # accepted form before invoking pvacseq (e.g. DLA-88*034:01 →
+            # DLA-8803401), and filtered.tsv records the rewritten name.
+            # `all_alleles` keeps the original display form. Try both when
+            # looking up the cell IC50 so the heatmap isn't all-99999.
+            ic50 = 99_999.0
+            for candidate in _allele_candidates(allele_name):
+                if candidate in affinities:
+                    ic50 = affinities[candidate]
+                    break
+            ic50_row.append(ic50)
         rows.append(
             HeatmapRow(
                 seq=entry.peptide,
@@ -1419,9 +1700,30 @@ def compute_neoantigen_metrics(
     class_i = _parse_all_epitopes(class_i_all_path, "I") if class_i_all_path else []
     class_ii = _parse_all_epitopes(class_ii_all_path, "II") if class_ii_all_path else []
 
-    # Count each peptide once per class for buckets.
-    best_per_peptide: dict[tuple[str, str], float] = {}
+    # total_peptides (for the funnel) stays tied to the full pre-filter pool:
+    # that's what "how many peptide fragments did we score" literally means.
+    total_per_peptide: dict[tuple[str, str], float] = {}
     for entry in class_i + class_ii:
+        key = (entry.peptide, entry.mhc_class)
+        existing = total_per_peptide.get(key)
+        if existing is None or entry.ic50 < existing:
+            total_per_peptide[key] = entry.ic50
+    total_peptides = len(total_per_peptide)
+
+    # Filtered rows = pVACseq's official "passed" list (IC50 < 500 nM).
+    # Fall back to our own threshold if the file is missing.
+    filtered_class_i = _parse_all_epitopes(class_i_filtered_path, "I") if class_i_filtered_path else []
+    filtered_class_ii = _parse_all_epitopes(class_ii_filtered_path, "II") if class_ii_filtered_path else []
+    if not filtered_class_i and not filtered_class_ii:
+        filtered_class_i = [e for e in class_i if e.ic50 < BINDING_THRESHOLD_NM]
+        filtered_class_ii = [e for e in class_ii if e.ic50 < BINDING_THRESHOLD_NM]
+
+    # Buckets + heatmap must reflect the filtered (visible-to-the-UI) set so
+    # their counts match the top-candidates table. Computing them off the
+    # unfiltered all_epitopes dump previously produced "36 strong" vs "1 strong"
+    # dissonance and a heatmap of non-binders showing 100k in every cell.
+    best_per_peptide: dict[tuple[str, str], float] = {}
+    for entry in filtered_class_i + filtered_class_ii:
         key = (entry.peptide, entry.mhc_class)
         existing = best_per_peptide.get(key)
         if existing is None or entry.ic50 < existing:
@@ -1430,16 +1732,6 @@ def compute_neoantigen_metrics(
     tier_counts: dict[BindingTier, int] = defaultdict(int)
     for ic50 in best_per_peptide.values():
         tier_counts[_bucket_for_ic50(ic50)] += 1
-
-    total_peptides = len(best_per_peptide)
-
-    # Filtered rows = pVACseq's official "passed" list. Fall back to our own
-    # threshold if the file is missing.
-    filtered_class_i = _parse_all_epitopes(class_i_filtered_path, "I") if class_i_filtered_path else []
-    filtered_class_ii = _parse_all_epitopes(class_ii_filtered_path, "II") if class_ii_filtered_path else []
-    if not filtered_class_i and not filtered_class_ii:
-        filtered_class_i = [e for e in class_i if e.ic50 < BINDING_THRESHOLD_NM]
-        filtered_class_ii = [e for e in class_ii if e.ic50 < BINDING_THRESHOLD_NM]
 
     # Unique peptides per class in the filtered set
     unique_class_i = {e.peptide for e in filtered_class_i}
@@ -1471,7 +1763,7 @@ def compute_neoantigen_metrics(
         ),
     ]
 
-    heatmap = _build_heatmap(class_i, class_ii, inputs.patient_alleles)
+    heatmap = _build_heatmap(filtered_class_i, filtered_class_ii, inputs.patient_alleles)
     top = _build_top_candidates(filtered_class_i, filtered_class_ii)
 
     return NeoantigenMetricsResponse(
@@ -1481,6 +1773,14 @@ def compute_neoantigen_metrics(
         species_label=inputs.species_label,
         assembly=inputs.assembly,
         alleles=inputs.patient_alleles,
+        rejected_alleles=[
+            RejectedAllele(
+                allele=a.allele,
+                mhc_class=a.mhc_class,
+                reason=reason,
+            )
+            for a, reason in inputs.rejected_alleles
+        ],
         annotated_variants=annotated_total,
         protein_changing_variants=protein_changing,
         peptides_generated=total_peptides,
@@ -1592,8 +1892,14 @@ def run_neoantigen(workspace_id: str, run_id: str) -> None:
 
         progress_cb(10, NeoantigenRuntimePhase.GENERATING_FASTA)
 
+        # The progress bands below are deliberately asymmetric: class II
+        # only has a narrow sliver because most canine/feline workspaces skip
+        # it entirely (no pvacseq-valid DLA/FLA class II alleles). When class
+        # II is present, NetMHCIIpan still runs faster than NetMHCpan on
+        # 12-18-mers, so the narrower band is still honest.
         if inputs.class_i_alleles:
             progress_cb(20, NeoantigenRuntimePhase.RUNNING_CLASS_I)
+            class_i_end = 55 if inputs.class_ii_alleles else 85
             _run_pvacseq(
                 inputs=inputs,
                 alleles=inputs.class_i_alleles,
@@ -1602,6 +1908,10 @@ def run_neoantigen(workspace_id: str, run_id: str) -> None:
                 epitope_flag="-e1",
                 epitope_lengths=CLASS_I_EPITOPE_LENGTHS,
                 command_log=command_log,
+                progress_cb=progress_cb,
+                phase=NeoantigenRuntimePhase.RUNNING_CLASS_I,
+                progress_start=20,
+                progress_end=class_i_end,
             )
 
         if inputs.class_ii_alleles:
@@ -1614,6 +1924,10 @@ def run_neoantigen(workspace_id: str, run_id: str) -> None:
                 epitope_flag="-e2",
                 epitope_lengths=CLASS_II_EPITOPE_LENGTHS,
                 command_log=command_log,
+                progress_cb=progress_cb,
+                phase=NeoantigenRuntimePhase.RUNNING_CLASS_II,
+                progress_start=55,
+                progress_end=85,
             )
 
         progress_cb(85, NeoantigenRuntimePhase.PARSING)

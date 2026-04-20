@@ -33,9 +33,9 @@ services:
       CANCERSTUDIO_APP_DATA_DIR: /app-data
       CANCERSTUDIO_INBOX_DIR: /inbox
       CANCERSTUDIO_VEP_CACHE_DIR: /vep-cache
-      CANCERSTUDIO_NETMHC_DIR: /opt/netmhc
-      CANCERSTUDIO_NETMHCPAN_BIN: /opt/netmhc/netMHCpan-4.1/netMHCpan
-      CANCERSTUDIO_NETMHCIIPAN_BIN: /opt/netmhc/netMHCIIpan-4.3/netMHCIIpan
+      CANCERSTUDIO_NETMHC_DIR: /tools/src
+      CANCERSTUDIO_NETMHCPAN_BIN: /tools/src/netMHCpan-4.2/netMHCpan
+      CANCERSTUDIO_NETMHCIIPAN_BIN: /tools/src/netMHCIIpan-4.3/netMHCIIpan
       CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
     ports:
       - "127.0.0.1:8000:8000"
@@ -43,7 +43,10 @@ services:
       - ${CANCERSTUDIO_DATA_ROOT:-~/cancerstudio-data}:/app-data
       - ${CANCERSTUDIO_DATA_ROOT:-~/cancerstudio-data}/inbox:/inbox
       - ${CANCERSTUDIO_DATA_ROOT:-~/cancerstudio-data}/vep-cache:/vep-cache
-      - ${CANCERSTUDIO_NETMHC_DIR:-${CANCERSTUDIO_DATA_ROOT:-~/cancerstudio-data}/netmhc}:/opt/netmhc:ro
+      # NetMHCpan / NetMHCIIpan are externally licensed (DTU) — the host dir
+      # lands at /tools/src inside the container so DTU's stock wrapper scripts
+      # (which hardcode NMHOME=/tools/src/netMHCpan-4.2 etc.) work with zero edits.
+      - ${CANCERSTUDIO_NETMHC_DIR:-${CANCERSTUDIO_DATA_ROOT:-~/cancerstudio-data}/netmhc}:/tools/src:ro
       # Source bind mounts for hot reload during dev. In production builds
       # the COPYd /app/app layer is authoritative; these just shadow it.
       - ./backend/app:/app/app

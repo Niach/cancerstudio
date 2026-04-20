@@ -488,15 +488,6 @@ class AnnotationConsequenceEntry(BaseModel):
     count: int
 
 
-class CancerGeneHit(BaseModel):
-    symbol: str
-    role: str
-    variant_count: int
-    highest_impact: AnnotationImpactTier
-    top_hgvsp: Optional[str] = None
-    top_consequence: Optional[str] = None
-
-
 class GeneFocusVariant(BaseModel):
     chromosome: str
     position: int
@@ -506,6 +497,20 @@ class GeneFocusVariant(BaseModel):
     consequence: str
     impact: AnnotationImpactTier
     tumor_vaf: Optional[float] = None
+
+
+class CancerGeneHit(BaseModel):
+    symbol: str
+    role: str
+    variant_count: int
+    highest_impact: AnnotationImpactTier
+    top_hgvsp: Optional[str] = None
+    top_consequence: Optional[str] = None
+    # Full per-gene variant bundle so the frontend can paint the lollipop
+    # for any cancer-gene card the user clicks — not just the top focus.
+    transcript_id: Optional[str] = None
+    protein_length: Optional[int] = None
+    variants: List[GeneFocusVariant] = Field(default_factory=list)
 
 
 class ProteinDomain(BaseModel):
@@ -741,6 +746,15 @@ class TopCandidate(BaseModel):
         populate_by_name = True
 
 
+class RejectedAllele(BaseModel):
+    allele: str
+    mhc_class: MhcClass = Field(..., alias="class")
+    reason: str
+
+    class Config:
+        populate_by_name = True
+
+
 class NeoantigenMetricsResponse(BaseModel):
     pvacseq_version: Optional[str] = None
     netmhcpan_version: Optional[str] = None
@@ -748,6 +762,7 @@ class NeoantigenMetricsResponse(BaseModel):
     species_label: Optional[str] = None
     assembly: Optional[str] = None
     alleles: List[PatientAllele] = Field(default_factory=list)
+    rejected_alleles: List[RejectedAllele] = Field(default_factory=list)
     annotated_variants: int = 0
     protein_changing_variants: int = 0
     peptides_generated: int = 0
