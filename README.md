@@ -41,15 +41,15 @@ Every live stage is pause-and-resumable. Progress is surfaced honestly, tool nam
 
 ### Inputs
 
-Tumor + matched-normal sequencing for one patient. **FASTQ, BAM, or CRAM.** ≥30× coverage for confident somatic variant calling. Drop the files in `~/cancerstudio-data/inbox/` and the app registers them into a workspace — no OS file picker, no host-path plumbing.
+Tumor + matched-normal sequencing for one patient. **FASTQ, BAM, or CRAM.** ≥30× coverage for confident somatic variant calling. Drop the files in `~/cancerstudio-data/inbox/` and the app registers them into a workspace.
 
 ### Hardware
 
 | | Minimum | Recommended |
 | --- | --- | --- |
-| RAM | 16 GB | **64 GB** (35 GB free at first alignment) |
+| RAM | 32 GB | **64 GB** (35 GB free at first alignment) |
 | CPU | 8 cores | 16 cores |
-| Disk | 100 GB SSD | 500 GB SSD |
+| Disk | 200 GB SSD | 500 GB SSD |
 | GPU | — | NVIDIA (any Ampere+) — enables Parabricks GPU variant calling, 5–15× faster stage 3 |
 | OS | Linux, macOS, or Windows + WSL2 | Linux |
 
