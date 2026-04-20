@@ -12,8 +12,6 @@ import IngestionStagePanel from "@/components/workspaces/IngestionStagePanel";
 import NeoantigenPredictionStagePanel from "@/components/workspaces/NeoantigenPredictionStagePanel";
 import VariantCallingStagePanel from "@/components/workspaces/VariantCallingStagePanel";
 import TweaksPanel from "@/components/dev/TweaksPanel";
-import HelixMini from "@/components/helix/HelixMini";
-import { useTweaks } from "@/components/dev/TweaksProvider";
 import { api } from "@/lib/api";
 import {
   getPipelinePolicy,
@@ -92,8 +90,6 @@ export default function WorkspaceStageShell({
   const [constructOutputSummary, setConstructOutputSummary] = useState(
     initialConstructOutputSummary
   );
-  const { tweaks } = useTweaks();
-
   const stagePolicy = getPipelinePolicy(
     workspace,
     alignmentSummary,
@@ -168,7 +164,7 @@ export default function WorkspaceStageShell({
                 className="cs-mono-label"
                 style={{ fontSize: 9, letterSpacing: "0.18em" }}
               >
-                v0.4 · desktop
+                v0.4
               </span>
             </div>
           </Link>
@@ -276,21 +272,6 @@ export default function WorkspaceStageShell({
             </div>
           ) : null}
 
-          <div
-            style={{
-              marginTop: "auto",
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              paddingTop: 16,
-              borderTop: "1px solid var(--line)",
-            }}
-          >
-            <HelixMini size={22} hue={tweaks.accentHue} />
-            <span className="cs-tiny" style={{ fontSize: 13 }}>
-              Everything stays on your computer.
-            </span>
-          </div>
         </aside>
 
         <main>

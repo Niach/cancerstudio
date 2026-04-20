@@ -2,297 +2,198 @@ import Link from "next/link";
 
 import Helix from "@/components/helix/Helix";
 import TweaksPanel from "@/components/dev/TweaksPanel";
-import { Card, CardHead, Chip, Eyebrow, MonoLabel } from "@/components/ui-kit";
+import { Chip, Eyebrow } from "@/components/ui-kit";
 import { api } from "@/lib/api";
-import { describeWorkspaceProgress } from "@/lib/pipeline-policy";
-import { PIPELINE_STAGES } from "@/lib/types";
+import { PRIMARY_PIPELINE_STAGES } from "@/lib/types";
 import { formatDateTime, formatSpeciesLabel } from "@/lib/workspace-utils";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const workspaces = await api.listWorkspaces().catch(() => []);
-  const alignmentSummaries = await Promise.all(
-    workspaces.map(async (workspace) => ({
-      workspaceId: workspace.id,
-      summary: await api.getAlignmentStageSummary(workspace.id).catch(() => null),
-    }))
-  );
-  const alignmentByWorkspaceId = new Map(
-    alignmentSummaries.map((entry) => [entry.workspaceId, entry.summary])
-  );
-
-  const firstWorkspace = workspaces[0] ?? null;
-  const liveStageCount = PIPELINE_STAGES.filter(
-    (stage) => stage.implementationState === "live"
-  ).length;
 
   return (
     <div className="cs-theme">
       <div className="cs-view cs-fade-in">
-        <section className="cs-hero">
-          <div className="cs-hero-grid">
-            <div>
-              <Eyebrow>cancerstudio · desktop studio</Eyebrow>
-              <h1 className="cs-landing-title">
-                Two DNA samples.
-                <br />
-                One guided path to a personalized cancer vaccine.
-              </h1>
-              <p className="cs-landing-sub">
-                Give us a DNA sample from the tumor and a matched healthy sample.
-                We&apos;ll walk you through every step — from raw files to a
-                shortlist of mutations your vaccine can target. No command line.
-                Works for people, dogs, and cats. Nothing leaves your computer.
-              </p>
-
-              <div className="cs-landing-ctas">
-                {firstWorkspace ? (
-                  <Link
-                    href={`/workspaces/${firstWorkspace.id}`}
-                    className="cs-btn cs-btn-primary"
-                  >
-                    Open {firstWorkspace.displayName} →
-                  </Link>
-                ) : (
-                  <Link href="/workspaces/new" className="cs-btn cs-btn-primary">
-                    Start your first case →
-                  </Link>
-                )}
-                <Link href="/workspaces/new" className="cs-btn cs-btn-ghost">
-                  Start a new case
-                </Link>
-              </div>
-
-              <div className="cs-landing-stats">
-                <Stat
-                  label="Species supported"
-                  value="3"
-                  hint="dog · cat · human"
-                />
-                <Stat
-                  label="Live stages"
-                  value={`${liveStageCount} / ${PIPELINE_STAGES.length}`}
-                  hint="ingestion → annotation"
-                />
-                <Stat
-                  label="Runs locally"
-                  value="100%"
-                  hint="no cloud · no upload"
-                />
-              </div>
-            </div>
-
-            <div className="cs-landing-helix">
-              <Helix size={320} rungs={24} hue={152} speed={28} />
-            </div>
-          </div>
-        </section>
-
-        <div className="cs-landing-cards">
-          <Card>
-            <CardHead
-              eyebrow="Open"
-              title="Workspaces"
-              subtitle={
-                workspaces.length === 0
-                  ? "No workspaces yet."
-                  : `${workspaces.length} case${workspaces.length === 1 ? "" : "s"}`
-              }
-            />
-            {workspaces.length === 0 ? (
-              <div
-                style={{
-                  padding: "22px",
-                  color: "var(--muted)",
-                  fontSize: 14,
-                }}
-              >
-                Create a workspace to give us your first sample.
-              </div>
-            ) : (
-              <div>
-                {workspaces.map((workspace) => {
-                  const alignmentSummary = alignmentByWorkspaceId.get(workspace.id);
-                  const progressLabel = alignmentSummary
-                    ? describeWorkspaceProgress(workspace, alignmentSummary)
-                    : "Open this workspace to continue.";
-                  return (
-                    <Link
-                      key={workspace.id}
-                      href={`/workspaces/${workspace.id}`}
-                      style={{
-                        display: "block",
-                        padding: "16px 22px",
-                        textDecoration: "none",
-                        color: "inherit",
-                        borderBottom: "1px solid var(--line)",
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "flex-start",
-                          gap: 12,
-                        }}
-                      >
-                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                          <div
-                            style={{ display: "flex", alignItems: "center", gap: 10 }}
-                          >
-                            <span
-                              style={{
-                                fontFamily: "var(--font-display)",
-                                fontSize: 20,
-                                fontWeight: 500,
-                                letterSpacing: "-0.015em",
-                                color: "var(--ink)",
-                              }}
-                            >
-                              {workspace.displayName}
-                            </span>
-                            <Chip kind="live">
-                              {formatSpeciesLabel(workspace.species)}
-                            </Chip>
-                          </div>
-                          <div
-                            className="cs-tiny"
-                            style={{ fontSize: 13.5, lineHeight: 1.55 }}
-                          >
-                            {progressLabel}
-                          </div>
-                        </div>
-                        <span className="cs-tiny" style={{ whiteSpace: "nowrap" }}>
-                          {formatDateTime(workspace.updatedAt)}
-                        </span>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-            <div style={{ padding: "14px 22px" }}>
-              <Link
-                href="/workspaces/new"
-                style={{
-                  display: "block",
-                  width: "100%",
-                  padding: "14px 16px",
-                  border: "1.5px dashed var(--line-strong)",
-                  borderRadius: "var(--radius-cs)",
-                  background: "transparent",
-                  fontFamily: "inherit",
-                  color: "var(--muted)",
-                  cursor: "pointer",
-                  fontSize: 13.5,
-                  textAlign: "center",
-                  textDecoration: "none",
-                }}
-              >
-                + New workspace
-              </Link>
-            </div>
-          </Card>
-
-          <Card>
-            <CardHead
-              eyebrow="The pipeline"
-              title={`${PIPELINE_STAGES.length} stages. ${liveStageCount} live today.`}
-              subtitle="Roadmap stays visible so the workflow stays honest."
-            />
-            <ol
+        <div className="cs-view-head">
+          <div>
+            <div className="cs-crumb">Workspaces</div>
+            <h1>Your cases.</h1>
+            <p
               style={{
-                listStyle: "none",
-                padding: "6px 14px 14px",
-                margin: 0,
+                maxWidth: "58ch",
+                marginTop: 12,
+                fontSize: 16.5,
+                lineHeight: 1.6,
+                color: "var(--ink-2)",
               }}
             >
-              {PIPELINE_STAGES.map((stage, index) => (
-                <li
-                  key={stage.id}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "30px 1fr auto",
-                    gap: 12,
-                    alignItems: "center",
-                    padding: "8px 8px",
-                    borderRadius: 10,
-                    opacity: stage.implementationState === "live" ? 1 : 0.72,
-                  }}
-                >
-                  <span
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      fontSize: 11,
-                      color:
-                        stage.implementationState === "live"
-                          ? "var(--accent-ink)"
-                          : "var(--muted-2)",
-                      fontWeight: 600,
-                    }}
-                  >
-                    {String(index + 1).padStart(2, "0")}
-                  </span>
-                  <span style={{ fontSize: 14.5, fontWeight: 500, color: "var(--ink)" }}>
-                    {stage.name}
-                  </span>
-                  <Chip kind={stage.implementationState === "live" ? "live" : "planned"}>
-                    {stage.implementationState}
-                  </Chip>
-                </li>
-              ))}
-            </ol>
-          </Card>
+              Every case is a full pipeline: from raw DNA reads to a
+              personalized mRNA construct. Everything runs on your computer.
+            </p>
+          </div>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <Helix size={110} rungs={14} hue={152} speed={30} />
+            <Link href="/workspaces/new" className="cs-btn cs-btn-primary">
+              + New case
+            </Link>
+          </div>
         </div>
 
         <div
           style={{
-            marginTop: 28,
-            textAlign: "center",
-            fontSize: 12,
-            color: "var(--muted-2)",
+            display: "grid",
+            gridTemplateColumns: "repeat(2, 1fr)",
+            gap: 16,
           }}
         >
-          <MonoLabel>Everything stays on your computer.</MonoLabel>
+          {workspaces.map((workspace) => (
+            <Link
+              key={workspace.id}
+              href={`/workspaces/${workspace.id}`}
+              style={{
+                textAlign: "left",
+                padding: "22px 26px",
+                border: "1px solid var(--line)",
+                borderRadius: "var(--radius-cs-lg)",
+                background: "var(--surface-strong)",
+                fontFamily: "inherit",
+                color: "var(--ink)",
+                textDecoration: "none",
+                display: "block",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  justifyContent: "space-between",
+                  gap: 12,
+                }}
+              >
+                <div>
+                  <Eyebrow>Open case</Eyebrow>
+                  <h3
+                    style={{
+                      fontFamily: "var(--font-display)",
+                      fontWeight: 500,
+                      fontSize: 24,
+                      margin: "6px 0 4px",
+                      letterSpacing: "-0.02em",
+                      color: "var(--ink)",
+                    }}
+                  >
+                    {workspace.displayName}
+                  </h3>
+                  <div style={{ fontSize: 13.5, color: "var(--muted)" }}>
+                    {formatSpeciesLabel(workspace.species)}
+                  </div>
+                </div>
+                <Chip kind="live">Active</Chip>
+              </div>
+              <div
+                style={{
+                  marginTop: 18,
+                  display: "grid",
+                  gridTemplateColumns: "repeat(4, 1fr)",
+                  gap: 8,
+                }}
+              >
+                {PRIMARY_PIPELINE_STAGES.map((stage, index) => (
+                  <div
+                    key={stage.id}
+                    style={{
+                      padding: "6px 8px",
+                      borderRadius: 6,
+                      background: "var(--surface-sunk)",
+                      border: "1px solid var(--line)",
+                      fontFamily: "var(--font-mono)",
+                      letterSpacing: "0.08em",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 9,
+                        color: "var(--muted-2)",
+                        opacity: 0.7,
+                      }}
+                    >
+                      {String(index + 1).padStart(2, "0")}
+                    </div>
+                    <div
+                      style={{
+                        color: "var(--ink-2)",
+                        fontSize: 11,
+                        marginTop: 2,
+                      }}
+                    >
+                      {stage.name}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div
+                style={{
+                  marginTop: 16,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <span className="cs-tiny">
+                  Updated {formatDateTime(workspace.updatedAt)}
+                </span>
+                <span
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 12,
+                    color: "var(--accent-ink)",
+                  }}
+                >
+                  Open →
+                </span>
+              </div>
+            </Link>
+          ))}
+
+          <Link
+            href="/workspaces/new"
+            style={{
+              textAlign: "left",
+              padding: "22px 26px",
+              border: "1.5px dashed var(--line-strong)",
+              borderRadius: "var(--radius-cs-lg)",
+              background: "transparent",
+              fontFamily: "inherit",
+              color: "var(--muted)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              minHeight: 240,
+              textDecoration: "none",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 44,
+                fontFamily: "var(--font-display)",
+                color: "var(--muted-2)",
+              }}
+            >
+              +
+            </div>
+            <div style={{ fontSize: 15, marginTop: 8, color: "var(--ink-2)" }}>
+              Start a new case
+            </div>
+            <div style={{ fontSize: 12.5, marginTop: 4 }}>
+              Pick a species · name it · register files
+            </div>
+          </Link>
         </div>
       </div>
 
       <TweaksPanel />
-    </div>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: string;
-  hint: string;
-}) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 120 }}>
-      <MonoLabel style={{ whiteSpace: "nowrap" }}>{label}</MonoLabel>
-      <span
-        style={{
-          fontFamily: "var(--font-display)",
-          fontSize: 26,
-          fontWeight: 400,
-          letterSpacing: "-0.015em",
-          lineHeight: 1,
-          color: "var(--ink)",
-        }}
-      >
-        {value}
-      </span>
-      <span
-        className="cs-tiny"
-        style={{ fontSize: 12.5, whiteSpace: "nowrap" }}
-      >
-        {hint}
-      </span>
     </div>
   );
 }
