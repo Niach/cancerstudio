@@ -931,6 +931,7 @@ export interface ConstructOutputStageSummary {
   runs: ConstructOutputRun[];
   fullNt: string;
   totalNt: number;
+  genbank: string;
   cmoOptions: CmoOption[];
   selectedCmo?: string | null;
   order?: ConstructOutputOrder | null;

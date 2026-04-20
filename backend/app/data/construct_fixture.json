@@ -40,14 +40,5 @@
     "opt_nt": "AACATCATCCAGCTGCTGTTCATGGGCCAC",
     "gene": "KIT",
     "mut": "p.Asn816Ile"
-  },
-  "manufacturing_checks": [
-    { "id": "bsai",   "label": "No BsaI cut sites",                    "why": "keeps cloning assembly clean",              "status": "pass" },
-    { "id": "bsmbi",  "label": "No BsmBI cut sites",                   "why": "keeps cloning assembly clean",              "status": "pass" },
-    { "id": "homop",  "label": "No 7+ homopolymer runs",               "why": "synthesizers skip long A/T/G/C runs",       "status": "pass" },
-    { "id": "gc",     "label": "GC 30-70% in every 50-nt window",      "why": "Twist/IDT synthesis requirement",           "status": "pass" },
-    { "id": "hairp",  "label": "No strong hairpins at 5' end",         "why": "lets ribosomes initiate",                   "status": "pass" },
-    { "id": "repeat", "label": "No direct repeats >= 15 nt",           "why": "stops recombination during scale-up",       "status": "pass" },
-    { "id": "furin",  "label": "No accidental furin sites",            "why": "prevents protease clipping in the cell",    "status": "pass" }
-  ]
+  }
 }

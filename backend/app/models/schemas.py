@@ -1054,6 +1054,7 @@ class ConstructOutputStageSummaryResponse(BaseModel):
     runs: List[ConstructOutputRun]
     full_nt: str
     total_nt: int
+    genbank: str
     cmo_options: List[CmoOption]
     selected_cmo: Optional[str] = None
     order: Optional[ConstructOutputOrder] = None

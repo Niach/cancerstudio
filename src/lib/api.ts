@@ -1508,6 +1508,7 @@ type ConstructOutputStageSummaryDto = {
   runs: ConstructOutputRunDto[];
   full_nt: string;
   total_nt: number;
+  genbank: string;
   cmo_options: CmoOptionDto[];
   selected_cmo?: string | null;
   order?: ConstructOutputOrderDto | null;
@@ -1533,6 +1534,7 @@ function mapConstructOutputStageSummary(
     ),
     fullNt: dto.full_nt,
     totalNt: dto.total_nt,
+    genbank: dto.genbank ?? "",
     cmoOptions: (dto.cmo_options ?? []).map(
       (o): CmoOption => ({
         id: o.id,

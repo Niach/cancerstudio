@@ -5,9 +5,11 @@ user picks ~7 of the top peptides for the mRNA cassette. No subprocess
 runs here — the "stage" is a persisted shortlist plus the deck of
 candidates to choose from.
 
-The candidate deck and safety flags are served from a fixture for now
-(``backend/app/data/epitope_fixture.json``) so the UI is stable while
-the pipeline from stages 1–5 matures. The stage is gated on
+When stage 5 has completed for a workspace, the candidate deck is built
+from pVACseq's ``top`` candidates (via ``load_neoantigen_stage_summary``).
+For demo workspaces seeded without a real stage-5 run, or when the latest
+run has no parseable metrics yet, the service falls back to the fixture
+deck in ``backend/app/data/epitope_fixture.json``. The stage is gated on
 ``readyForEpitopeSelection`` from the neoantigen summary.
 """
 from __future__ import annotations
@@ -25,6 +27,8 @@ from app.models.schemas import (
     EpitopeSelectionUpdate,
     EpitopeStageStatus,
     EpitopeStageSummaryResponse,
+    NeoantigenStageSummaryResponse,
+    TopCandidate,
 )
 from app.services.neoantigen import load_neoantigen_stage_summary
 from app.services.workspace_store import (
@@ -38,6 +42,12 @@ from app.services.workspace_store import (
 FIXTURE_PATH = Path(__file__).resolve().parents[1] / "data" / "epitope_fixture.json"
 
 MAX_SELECTION = 8
+
+# Palette for allele chips, cycled in deck order.
+_ALLELE_COLORS = (
+    "#0f766e", "#0ea5e9", "#6366f1", "#8b5cf6",
+    "#d97706", "#dc2626", "#059669", "#7c3aed",
+)
 
 
 @lru_cache(maxsize=1)
@@ -69,6 +79,105 @@ def _build_safety() -> dict[str, EpitopeSafetyFlagResponse]:
 
 def _default_picks() -> list[str]:
     return list(_fixture()["default_picks"])
+
+
+def _tier_for(ic50: float) -> str:
+    return "strong" if ic50 < 100 else "moderate"
+
+
+def _deck_from_top(top: list[TopCandidate]) -> tuple[
+    list[EpitopeCandidateResponse], list[EpitopeAlleleResponse], list[str]
+]:
+    """Map pVACseq top candidates into stage-6 deck + allele chips + default
+    picks. Default picks prioritize distinct genes and at least one class-II
+    for T-cell help, matching the six plain-English goals in the UI."""
+    candidates: list[EpitopeCandidateResponse] = []
+    allele_seen: dict[str, str] = {}
+    for idx, c in enumerate(top, start=1):
+        pid = f"rd{idx:03d}"
+        if c.allele not in allele_seen:
+            allele_seen[c.allele] = _ALLELE_COLORS[
+                len(allele_seen) % len(_ALLELE_COLORS)
+            ]
+        candidates.append(
+            EpitopeCandidateResponse(
+                id=pid,
+                seq=c.seq,
+                gene=c.gene,
+                mutation=c.mut,
+                length=c.length,
+                **{"class": c.mhc_class},
+                allele_id=c.allele,
+                ic50_nm=float(c.ic50),
+                agretopicity=float(c.agretopicity) if c.agretopicity is not None else 0.0,
+                vaf=float(c.vaf) if c.vaf is not None else 0.0,
+                tpm=float(c.tpm) if c.tpm is not None else 0.0,
+                cancer_gene=bool(c.cancer_gene),
+                driver_context=None,
+                tier=_tier_for(c.ic50),
+                flags=[],
+            )
+        )
+
+    alleles = [
+        EpitopeAlleleResponse.model_validate(
+            {
+                "id": allele_id,
+                "class": _allele_class(allele_id),
+                "color": color,
+            }
+        )
+        for allele_id, color in allele_seen.items()
+    ]
+
+    default_picks = _pick_defaults(candidates)
+    return candidates, alleles, default_picks
+
+
+def _allele_class(allele_id: str) -> str:
+    """Quick class-I/II split: HLA-DR/DQ/DP and DLA-DRB/DQB/DLAII → II; else I."""
+    upper = allele_id.upper()
+    if any(marker in upper for marker in ("DRB", "DQB", "DPB", "-DR", "-DQ", "-DP")):
+        return "II"
+    return "I"
+
+
+def _pick_defaults(candidates: list[EpitopeCandidateResponse]) -> list[str]:
+    """Pick up to 7 defaults: strongest class-I candidates across distinct genes,
+    plus 1–2 class-II picks for T-cell help. Skip passenger (non-cancer) genes
+    when possible — the stage-6 goals checklist demands that."""
+    sorted_c = sorted(candidates, key=lambda p: (p.ic50_nm, -p.vaf))
+
+    picks: list[str] = []
+    genes: set[str] = set()
+
+    for p in sorted_c:
+        if p.mhc_class != "I" or not p.cancer_gene:
+            continue
+        if p.gene in genes:
+            continue
+        picks.append(p.id)
+        genes.add(p.gene)
+        if len(picks) >= 5:
+            break
+
+    for p in sorted_c:
+        if p.mhc_class != "II" or not p.cancer_gene:
+            continue
+        picks.append(p.id)
+        if sum(1 for pid in picks if _class_of(pid, candidates) == "II") >= 2:
+            break
+        if len(picks) >= 7:
+            break
+
+    return picks[:MAX_SELECTION]
+
+
+def _class_of(pid: str, candidates: list[EpitopeCandidateResponse]) -> Optional[str]:
+    for c in candidates:
+        if c.id == pid:
+            return c.mhc_class
+    return None
 
 
 def _goals_pass(selection: list[str], candidates: list[EpitopeCandidateResponse],
@@ -121,6 +230,22 @@ def _blocked_summary(workspace_id: str, reason: str) -> EpitopeStageSummaryRespo
     )
 
 
+def _real_deck_from_summary(
+    summary: NeoantigenStageSummaryResponse,
+) -> Optional[tuple[
+    list[EpitopeCandidateResponse], list[EpitopeAlleleResponse], list[str]
+]]:
+    """Return (candidates, alleles, default_picks) built from stage-5 output,
+    or ``None`` when no parseable top-candidate data is available (e.g. a demo
+    workspace seeded without a real stage-5 run)."""
+    if summary.latest_run is None or summary.latest_run.metrics is None:
+        return None
+    top = summary.latest_run.metrics.top
+    if not top:
+        return None
+    return _deck_from_top(list(top))
+
+
 def load_epitope_stage_summary(workspace_id: str) -> EpitopeStageSummaryResponse:
     neoantigen_summary = load_neoantigen_stage_summary(workspace_id)
     if not neoantigen_summary.ready_for_epitope_selection:
@@ -130,10 +255,15 @@ def load_epitope_stage_summary(workspace_id: str) -> EpitopeStageSummaryResponse
         )
         return _blocked_summary(workspace_id, reason)
 
-    candidates = _build_candidates()
-    safety = _build_safety()
-    alleles = _build_alleles()
-    default_picks = _default_picks()
+    real = _real_deck_from_summary(neoantigen_summary)
+    if real is not None:
+        candidates, alleles, default_picks = real
+        safety: dict[str, EpitopeSafetyFlagResponse] = {}
+    else:
+        candidates = _build_candidates()
+        safety = _build_safety()
+        alleles = _build_alleles()
+        default_picks = _default_picks()
 
     with session_scope() as session:
         workspace = get_workspace_record(session, workspace_id)
@@ -165,7 +295,16 @@ def load_epitope_stage_summary(workspace_id: str) -> EpitopeStageSummaryResponse
 def update_epitope_selection(
     workspace_id: str, payload: EpitopeSelectionUpdate
 ) -> EpitopeStageSummaryResponse:
-    candidates = _build_candidates()
+    # Use whatever deck is currently active (real data from stage 5 output if
+    # available, else fixture) so selections are validated against the deck
+    # the user actually saw.
+    summary = load_neoantigen_stage_summary(workspace_id)
+    real = (
+        _real_deck_from_summary(summary)
+        if summary.ready_for_epitope_selection
+        else None
+    )
+    candidates = real[0] if real is not None else _build_candidates()
     selection = _filtered_selection(payload.peptide_ids, candidates)
 
     with session_scope() as session:

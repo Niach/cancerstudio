@@ -223,29 +223,9 @@ function renderDownload(
   if (format === "json") {
     return JSON.stringify(summary, null, 2);
   }
-  // minimal GenBank-style stub — enough to be opened by tooling, not a full record
-  let feats = "";
-  let cursor = 1;
-  summary.runs.forEach((r) => {
-    const start = cursor;
-    const end = cursor + r.nt.length - 1;
-    feats += `     misc_feature    ${start}..${end}\n                     /label="${r.label}"\n`;
-    cursor = end + 1;
-  });
-  const seq = summary.fullNt.toLowerCase().match(/.{1,60}/g) ?? [];
-  const seqBlock = seq
-    .map((line, idx) => {
-      const pos = idx * 60 + 1;
-      return `${pos.toString().padStart(9, " ")} ${
-        line.match(/.{1,10}/g)?.join(" ") ?? line
-      }`;
-    })
-    .join("\n");
-  return (
-    `LOCUS       ${summary.constructId.padEnd(16)} ${summary.totalNt} bp    mRNA\n` +
-    `DEFINITION  ${summary.constructId} personalized neoantigen cassette\n` +
-    `FEATURES             Location/Qualifiers\n${feats}ORIGIN\n${seqBlock}\n//\n`
-  );
+  // Backend generates the real GenBank record via Biopython SeqIO — we just
+  // hand it to the download. Empty string only in the blocked/loading state.
+  return summary.genbank;
 }
 
 function mimeFor(format: "fasta" | "genbank" | "json"): string {

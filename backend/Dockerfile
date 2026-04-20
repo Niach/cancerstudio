@@ -11,6 +11,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 ARG STROBEALIGN_VERSION=0.17.0
 ARG GATK_VERSION=4.5.0.0
 ARG VEP_RELEASE=111
+ARG LINEARDESIGN_REF=main
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -74,6 +75,14 @@ RUN curl -fsSL \
         "/tmp/strobealign-${STROBEALIGN_VERSION}/build/strobealign" \
         /usr/local/bin/strobealign \
     && rm -rf /tmp/strobealign*
+
+# LinearDesign — stage 7 codon optimizer (Zhang et al. Nature 2023). The
+# repo's `lineardesign` wrapper is python2-only; we skip it and call the
+# compiled binary `bin/LinearDesign_2D` directly from our Python service.
+RUN git clone --depth 1 --branch "${LINEARDESIGN_REF}" \
+        https://github.com/LinearDesignSoftware/LinearDesign.git /opt/lineardesign \
+    && make -C /opt/lineardesign \
+    && ln -sf /opt/lineardesign/bin/LinearDesign_2D /usr/local/bin/LinearDesign_2D
 
 # Ensembl VEP — installed natively so the backend can call `vep` as a subprocess
 # like the other bioinformatics binaries. Bio::DB::HTS comes from the distro

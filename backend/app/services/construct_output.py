@@ -9,13 +9,25 @@ locks the sequence.
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import random
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
+from Bio.Seq import Seq
+from Bio.SeqFeature import FeatureLocation, SeqFeature
+from Bio.SeqIO import write as seqio_write
+from Bio.SeqRecord import SeqRecord
+
+try:  # Biopython 1.78+ removed the Alphabet module; 1.77 (pinned by pvactools) still requires it.
+    from Bio.Alphabet import generic_dna  # type: ignore
+except ImportError:  # pragma: no cover — exercised only on the modern dev venv
+    generic_dna = None
+
 from app.db import session_scope
+from app.models.records import IngestionBatchRecord, PipelineRunRecord
 from app.models.schemas import (
     AuditEntry,
     CmoOption,
@@ -29,11 +41,12 @@ from app.models.schemas import (
     DosingScheduleItem,
 )
 from app.services.construct_design import (
+    _optimized_orf_nt,
     load_construct_stage_summary,
-    reverse_translate,
 )
 from app.services.workspace_store import (
     get_workspace_record,
+    load_workspace_construct_config,
     load_workspace_construct_output_config,
     store_workspace_construct_output_config,
     utc_now,
@@ -76,13 +89,25 @@ def _segment_run_kind(segment_kind: str, mhc_class: Optional[str]) -> str:
     return "linker"
 
 
-def _build_runs(construct_summary) -> list[ConstructOutputRun]:
+def _build_runs(
+    construct_summary, *, species: str = "human"
+) -> list[ConstructOutputRun]:
     flanks = construct_summary.flanks
+    # Optimize the whole ORF as one unit so LinearDesign can balance codons
+    # across segment boundaries, then split back by per-segment AA length.
+    orf_nt, _cai = _optimized_orf_nt(
+        construct_summary.aa_seq,
+        lambda_value=construct_summary.options.lambda_value,
+        species=species,
+    )
     runs: list[ConstructOutputRun] = [
         ConstructOutputRun(kind="utr5", label="5' UTR", nt=flanks.utr5),
     ]
+    cursor = 0
     for segment in construct_summary.segments:
-        nt = reverse_translate(segment.aa, table="opt")
+        seg_nt_len = len(segment.aa) * 3
+        nt = orf_nt[cursor : cursor + seg_nt_len]
+        cursor += seg_nt_len
         if segment.kind == "peptide":
             label = (
                 f"{segment.label} · {segment.sub}"
@@ -132,26 +157,176 @@ def _compute_checksum(full_nt: str) -> str:
     return f"sha256:{digest[:16]}"
 
 
+_RUN_TO_FEATURE_KEY = {
+    "utr5": "5'UTR",
+    "utr3": "3'UTR",
+    "polyA": "polyA_signal",
+    "stop": "misc_feature",
+    "signal": "sig_peptide",
+    "mitd": "misc_feature",
+    "classI": "misc_feature",
+    "classII": "misc_feature",
+    "linker": "misc_feature",
+}
+
+
+def _build_genbank(
+    construct_summary, runs: list[ConstructOutputRun], construct_id: str, species: str
+) -> str:
+    """Assemble a real GenBank record via Biopython. The whole signal + linkers +
+    peptide cassette + MITD runs are grouped into a single CDS feature with a
+    /translation qualifier; individual runs survive as misc_feature annotations
+    for downstream tools that want to highlight cassette anatomy."""
+    full_nt = "".join(r.nt for r in runs)
+    seq = Seq(full_nt, generic_dna) if generic_dna is not None else Seq(full_nt)
+    record = SeqRecord(
+        seq,
+        id=construct_id,
+        name=construct_id[:16] or "mRNA",
+        description=f"{construct_id} personalized neoantigen cassette ({species})",
+        annotations={
+            "molecule_type": "mRNA",
+            "topology": "linear",
+            "data_file_division": "SYN",
+        },
+    )
+
+    cursor = 0
+    cds_start: Optional[int] = None
+    cds_end: int = 0
+    for run in runs:
+        start = cursor
+        end = cursor + len(run.nt)
+        cursor = end
+        key = _RUN_TO_FEATURE_KEY.get(run.kind, "misc_feature")
+        quals: dict[str, str] = {"label": run.label}
+        if run.kind == "polyA":
+            quals["note"] = f"poly(A) tail ({len(run.nt)} nt)"
+        record.features.append(
+            SeqFeature(FeatureLocation(start, end), type=key, qualifiers=quals)
+        )
+        if run.kind in {"signal", "linker", "classI", "classII", "mitd", "stop"}:
+            if cds_start is None:
+                cds_start = start
+            cds_end = end
+
+    if cds_start is not None and cds_end > cds_start:
+        cds_bytes = full_nt[cds_start:cds_end]
+        cds_nt = (
+            Seq(cds_bytes, generic_dna) if generic_dna is not None else Seq(cds_bytes)
+        )
+        try:
+            translation = str(cds_nt.translate(to_stop=True))
+        except Exception:
+            translation = ""
+        record.features.insert(
+            0,
+            SeqFeature(
+                FeatureLocation(cds_start, cds_end),
+                type="CDS",
+                qualifiers={
+                    "label": "neoantigen cassette",
+                    "product": "personalized neoantigen polypeptide",
+                    "translation": translation,
+                },
+            ),
+        )
+
+    buf = io.StringIO()
+    seqio_write([record], buf, "genbank")
+    return buf.getvalue()
+
+
+# Each completed pipeline stage contributes one audit entry. Narrative text is
+# static (these are fixed pipeline steps); timestamps and inclusion are derived
+# from the workspace's actual run history.
+_STAGE_NARRATIVE: dict[str, tuple[str, str]] = {
+    "alignment":             ("02", "Aligned tumor + normal reads with strobealign"),
+    "variant-calling":       ("03", "Called somatic variants with GATK Mutect2"),
+    "annotation":            ("04", "Annotated variants with Ensembl VEP 111"),
+    "neoantigen-prediction": ("05", "Predicted neoantigen binding with pVACseq"),
+}
+
+
+def _fmt_when(dt) -> str:
+    return dt.strftime("%m-%d %H:%M") if dt else ""
+
+
 def _build_audit_trail(
-    construct_summary, output_config: dict
+    workspace_id: str, construct_summary, output_config: dict
 ) -> list[AuditEntry]:
-    template = _fixture()["audit_trail_template"]
     operator = "operator@cancerstudio.dev"
     trail: list[AuditEntry] = []
-    for entry in template:
-        when = output_config.get("event_timestamps", {}).get(
-            f"{entry['stage']}-{entry['what']}",
-            utc_now().strftime("%m-%d %H:%M"),
+
+    with session_scope() as session:
+        batch = (
+            session.query(IngestionBatchRecord)
+            .filter_by(workspace_id=workspace_id)
+            .order_by(IngestionBatchRecord.created_at.asc())
+            .first()
         )
+        runs = (
+            session.query(PipelineRunRecord)
+            .filter_by(workspace_id=workspace_id, status="completed")
+            .order_by(PipelineRunRecord.completed_at.asc())
+            .all()
+        )
+        run_snapshots = [
+            (r.stage_id, r.completed_at, r.created_at) for r in runs
+        ]
+        batch_created = batch.created_at if batch else None
+        workspace = get_workspace_record(session, workspace_id)
+        construct_config = load_workspace_construct_config(workspace) or {}
+    construct_confirmed_at = construct_config.get("confirmed_at")
+
+    if batch_created is not None:
         trail.append(
             AuditEntry(
-                stage=entry["stage"],
-                when=when,
-                who=operator if entry["kind"] == "human" else "pipeline",
-                what=entry["what"],
-                kind=entry["kind"],
+                stage="01",
+                when=_fmt_when(batch_created),
+                who="pipeline",
+                what="Ingested tumor + normal FASTQ",
+                kind="auto",
             )
         )
+
+    # Deduplicate by stage — only the latest completed run of each stage matters.
+    by_stage: dict[str, object] = {}
+    for stage_id, completed_at, _ in run_snapshots:
+        if stage_id in _STAGE_NARRATIVE:
+            by_stage[stage_id] = completed_at
+    for stage_id, (stage_num, what) in _STAGE_NARRATIVE.items():
+        completed = by_stage.get(stage_id)
+        if completed is None:
+            continue
+        trail.append(
+            AuditEntry(
+                stage=stage_num,
+                when=_fmt_when(completed),
+                who="pipeline",
+                what=what,
+                kind="auto",
+            )
+        )
+
+    # Stage 6 has no explicit "confirmed" timestamp — the status derives from
+    # the goals checklist. Skip it rather than fake one.
+
+    if construct_summary.options.confirmed:
+        trail.append(
+            AuditEntry(
+                stage="07",
+                when=str(construct_confirmed_at) if construct_confirmed_at else _fmt_when(utc_now()),
+                who=operator,
+                what=(
+                    f"Confirmed construct (λ={construct_summary.options.lambda_value:.2f}"
+                    f", SP={'on' if construct_summary.options.signal else 'off'}"
+                    f", MITD={'on' if construct_summary.options.mitd else 'off'})"
+                ),
+                kind="human",
+            )
+        )
+
     if output_config.get("released"):
         trail.append(
             AuditEntry(
@@ -162,6 +337,7 @@ def _build_audit_trail(
                 kind="human",
             )
         )
+
     return trail
 
 
@@ -187,6 +363,7 @@ def _blocked_summary(
         runs=[],
         full_nt="",
         total_nt=0,
+        genbank="",
         cmo_options=_cmo_options(),
         selected_cmo=None,
         order=None,
@@ -206,15 +383,18 @@ def load_construct_output_summary(
         )
         return _blocked_summary(workspace_id, reason)
 
-    runs = _build_runs(construct_summary)
-    full_nt = "".join(r.nt for r in runs)
-    checksum = _compute_checksum(full_nt)
-
     with session_scope() as session:
         workspace = get_workspace_record(session, workspace_id)
         display_name = workspace.display_name
         species = workspace.species
         output_config = load_workspace_construct_output_config(workspace)
+
+    runs = _build_runs(construct_summary, species=species)
+    full_nt = "".join(r.nt for r in runs)
+    checksum = _compute_checksum(full_nt)
+    construct_id = _construct_id(workspace_id, display_name)
+    species_label = _species_label(species)
+    genbank = _build_genbank(construct_summary, runs, construct_id, species_label)
 
     released = bool(output_config.get("released"))
     selected_cmo = output_config.get("selected_cmo")
@@ -234,8 +414,8 @@ def load_construct_output_summary(
         workspace_id=workspace_id,
         status=status,
         blocking_reason=None,
-        construct_id=_construct_id(workspace_id, display_name),
-        species=_species_label(species),
+        construct_id=construct_id,
+        species=species_label,
         version=_fixture()["version"],
         checksum=checksum,
         released_at=output_config.get("released_at") if released else None,
@@ -243,11 +423,12 @@ def load_construct_output_summary(
         runs=runs,
         full_nt=full_nt,
         total_nt=len(full_nt),
+        genbank=genbank,
         cmo_options=_cmo_options(),
         selected_cmo=selected_cmo,
         order=order,
         dosing=_dosing_protocol(),
-        audit_trail=_build_audit_trail(construct_summary, output_config),
+        audit_trail=_build_audit_trail(workspace_id, construct_summary, output_config),
     )
 
 

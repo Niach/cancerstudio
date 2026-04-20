@@ -3,10 +3,13 @@
 Stage 7 wraps the picked epitopes from stage 6 with canonical vaccine
 flanks (tPA signal peptide, AAY/GPGPG linkers, MITD trafficking tail,
 5' UTR/Kozak, 3' UTR, poly(A)) and computes codon-optimization metrics
-(LinearDesign-style lambda sweep across CAI vs. MFE). Like stage 6, this
-stage is fixture-backed: no external tool binary is invoked. The user's
-design choices (lambda value, signal/MITD toggles, confirmation) persist
-on ``WorkspaceRecord.construct_config`` as a JSON blob.
+(LinearDesign-style lambda sweep across CAI vs. MFE). Manufacturability
+checks run against the real assembled bytes via DNAchisel
+(``construct_checks.run_manufacturing_checks``); the codon tables, λ/CAI
+curve, and wild-type→optimized preview are still fixture-backed and
+scheduled for later Track B steps. User design choices (lambda value,
+signal/MITD toggles, confirmation) persist on
+``WorkspaceRecord.construct_config`` as a JSON blob.
 """
 from __future__ import annotations
 
@@ -14,6 +17,8 @@ import json
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
+
+import RNA
 
 from app.db import session_scope
 from app.models.schemas import (
@@ -29,6 +34,9 @@ from app.models.schemas import (
     ConstructStageSummaryResponse,
     EpitopeCandidateResponse,
 )
+from app.services.codon_repair import repair as repair_orf
+from app.services.construct_checks import run_manufacturing_checks
+from app.services import lineardesign
 from app.services.epitope_selection import load_epitope_stage_summary
 from app.services.workspace_store import (
     get_workspace_record,
@@ -71,11 +79,58 @@ def _linkers() -> dict[str, str]:
     return dict(_fixture()["linkers"])
 
 
-def _manufacturing_checks() -> list[ConstructManufacturingCheck]:
-    return [
-        ConstructManufacturingCheck(**entry)
-        for entry in _fixture()["manufacturing_checks"]
-    ]
+def _optimized_orf_nt(
+    aa_seq: str, *, lambda_value: float, species: str = "human"
+) -> tuple[str, Optional[float]]:
+    """Return (orf_nt, cai_or_none). Two-phase optimization: LinearDesign picks
+    codons for CAI+MFE against the species-specific codon usage table, then
+    DNAchisel nudges synonymous codons to clear manufacturability breaches
+    (restriction sites, GC windows, direct repeats, long homopolymers) while
+    keeping the protein byte-identical. Falls back to naive reverse-translate
+    + repair when the LinearDesign binary is missing."""
+    if not aa_seq:
+        return "", None
+    try:
+        result = lineardesign.optimize(
+            aa_seq, lambda_value=lambda_value, species=species
+        )
+        return repair_orf(result.dna), result.cai
+    except lineardesign.LinearDesignUnavailable:
+        return repair_orf(reverse_translate(aa_seq)), None
+
+
+def _assemble_full_nt(
+    aa_seq: str, *, lambda_value: float, species: str = "human"
+) -> tuple[str, str, int, Optional[float]]:
+    """Return (full_nt, orf_nt, poly_a_len, cai_or_none). Kozak is not
+    concatenated — the ORF's own start codon (from the signal peptide's M)
+    serves as the start, matching what ``construct_output._build_runs``
+    emits."""
+    flanks = _fixture()["flanks"]
+    orf_nt, cai = _optimized_orf_nt(
+        aa_seq, lambda_value=lambda_value, species=species
+    )
+    poly_a_len = int(flanks["poly_a_len"])
+    full_nt = (
+        flanks["utr5"]
+        + orf_nt
+        + "TAA"
+        + flanks["utr3"]
+        + ("A" * poly_a_len)
+    )
+    return full_nt, orf_nt, poly_a_len, cai
+
+
+def _manufacturing_checks(
+    aa_seq: str, *, lambda_value: float, species: str = "human"
+) -> list[ConstructManufacturingCheck]:
+    if not aa_seq:
+        full_nt, orf_nt, poly_a_len = "", "", 0
+    else:
+        full_nt, orf_nt, poly_a_len, _cai = _assemble_full_nt(
+            aa_seq, lambda_value=lambda_value, species=species
+        )
+    return run_manufacturing_checks(full_nt, orf_nt, poly_a_len=poly_a_len)
 
 
 def reverse_translate(aa: str, table: str = "opt") -> str:
@@ -164,35 +219,89 @@ def build_orf(
     return segments, aa_seq
 
 
-def compute_metrics(aa_seq: str, *, lambda_value: float) -> ConstructMetrics:
+def compute_metrics(
+    aa_seq: str, *, lambda_value: float, species: str = "human"
+) -> ConstructMetrics:
+    """Assemble the real bytes, then measure them. CAI comes from LinearDesign
+    (falling back to a λ-interpolation when the binary is unavailable). GC is
+    counted from the bytes. MFE is folded by ViennaRNA on the full cap-through-
+    stop sequence of *LinearDesign's* optimized construct — more meaningful
+    vet-side than LinearDesign's own ORF-only fold because UTR structure
+    matters for initiation."""
     nt_len = len(aa_seq) * 3
-    cai = round(0.60 + (0.98 - 0.60) * lambda_value, 2)
-    mfe = round(-900 + (-620 - -900) * lambda_value)
-    gc = round(0.52 + (0.62 - 0.52) * lambda_value, 3)
-    flanks = _fixture()["flanks"]
-    full_nt = (
-        len(flanks["utr5"])
-        + nt_len
-        + 3  # stop codon
-        + len(flanks["utr3"])
-        + flanks["poly_a_len"]
-    )
+    if aa_seq:
+        full_nt, _orf_nt, poly_a_len, ld_cai = _assemble_full_nt(
+            aa_seq, lambda_value=lambda_value, species=species
+        )
+        scannable = full_nt[:-poly_a_len] if poly_a_len else full_nt
+        gc = round(sum(1 for c in scannable if c in "GC") / len(scannable), 3)
+        _, mfe_raw = RNA.fold(scannable)
+        mfe = round(mfe_raw)
+        full_mrna_nt = len(full_nt)
+        cai = round(ld_cai, 2) if ld_cai is not None else round(
+            0.60 + (0.98 - 0.60) * lambda_value, 2
+        )
+    else:
+        flanks = _fixture()["flanks"]
+        gc = 0.0
+        mfe = 0
+        full_mrna_nt = (
+            len(flanks["utr5"]) + nt_len + 3 + len(flanks["utr3"]) + flanks["poly_a_len"]
+        )
+        cai = round(0.60 + (0.98 - 0.60) * lambda_value, 2)
     return ConstructMetrics(
         aa_len=len(aa_seq),
         nt_len=nt_len,
         cai=cai,
         mfe=mfe,
         gc=gc,
-        full_mrna_nt=full_nt,
+        full_mrna_nt=full_mrna_nt,
         mfe_per_nt=round(mfe / nt_len, 3) if nt_len else 0.0,
     )
 
 
-def _build_preview() -> ConstructPreview:
-    raw = _fixture()["preview_peptide"]
-    aa = raw["aa"]
-    unopt_nt = raw["unopt_nt"]
-    opt_nt = raw["opt_nt"]
+def _build_preview(
+    picked: Optional[list[EpitopeCandidateResponse]] = None,
+    *,
+    lambda_value: float = 0.65,
+    species: str = "human",
+) -> ConstructPreview:
+    """Show naive single-codon reverse-translation vs. LinearDesign's codon
+    picks for the first picked peptide of this workspace. Educational: the
+    residue-by-residue diff makes it obvious which positions LinearDesign
+    chose differently from the naive single-best-codon approach, and why
+    CAI/MFE change with λ."""
+    target = None
+    if picked:
+        for p in picked:
+            if p.mhc_class == "I":
+                target = p
+                break
+        if target is None:
+            target = picked[0]
+
+    if target is None:
+        # No selection yet — fall back to the fixture's demo peptide so the UI
+        # has something to render in the scaffolded state.
+        raw = _fixture()["preview_peptide"]
+        aa = raw["aa"]
+        unopt_nt = raw["unopt_nt"]
+        opt_nt = raw["opt_nt"]
+        gene = raw["gene"]
+        mut = raw["mut"]
+    else:
+        aa = target.seq
+        unopt_nt = reverse_translate(aa, table="unopt")
+        try:
+            opt_result = lineardesign.optimize(
+                aa, lambda_value=lambda_value, species=species
+            )
+            opt_nt = opt_result.dna
+        except lineardesign.LinearDesignUnavailable:
+            opt_nt = reverse_translate(aa, table="opt")
+        gene = target.gene
+        mut = target.mutation
+
     codons: list[ConstructPreviewCodon] = []
     for i, residue in enumerate(aa):
         u = unopt_nt[i * 3 : i * 3 + 3]
@@ -200,7 +309,7 @@ def _build_preview() -> ConstructPreview:
         codons.append(
             ConstructPreviewCodon(aa=residue, unopt=u, opt=o, swapped=u != o)
         )
-    return ConstructPreview(gene=raw["gene"], mut=raw["mut"], codons=codons)
+    return ConstructPreview(gene=gene, mut=mut, codons=codons)
 
 
 def _default_options() -> ConstructDesignOptions:
@@ -249,7 +358,7 @@ def _blocked_summary(workspace_id: str, reason: str) -> ConstructStageSummaryRes
             mfe_per_nt=0.0,
         ),
         preview=_build_preview(),
-        manufacturing_checks=_manufacturing_checks(),
+        manufacturing_checks=_manufacturing_checks("", lambda_value=0.65),
         peptide_count=0,
         ready_for_output=False,
     )
@@ -281,11 +390,14 @@ def load_construct_stage_summary(workspace_id: str) -> ConstructStageSummaryResp
     with session_scope() as session:
         workspace = get_workspace_record(session, workspace_id)
         config = load_workspace_construct_config(workspace)
+        species = workspace.species
 
     options = _load_options(config)
 
     segments, aa_seq = build_orf(picked, signal=options.signal, mitd=options.mitd)
-    metrics = compute_metrics(aa_seq, lambda_value=options.lambda_value)
+    metrics = compute_metrics(
+        aa_seq, lambda_value=options.lambda_value, species=species
+    )
 
     status = (
         ConstructDesignStatus.CONFIRMED
@@ -303,8 +415,12 @@ def load_construct_stage_summary(workspace_id: str) -> ConstructStageSummaryResp
         segments=segments,
         aa_seq=aa_seq,
         metrics=metrics,
-        preview=_build_preview(),
-        manufacturing_checks=_manufacturing_checks(),
+        preview=_build_preview(
+            picked, lambda_value=options.lambda_value, species=species
+        ),
+        manufacturing_checks=_manufacturing_checks(
+            aa_seq, lambda_value=options.lambda_value, species=species
+        ),
         peptide_count=len(picked),
         ready_for_output=options.confirmed,
     )

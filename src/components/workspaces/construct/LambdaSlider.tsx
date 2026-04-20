@@ -167,7 +167,7 @@ export default function LambdaSlider({ lambda, onChange, metrics }: LambdaSlider
           label="Folding energy (MFE)"
           value={metrics.mfe.toLocaleString()}
           unit="kcal/mol"
-          sub={metrics.mfe < -850 ? "very stable" : metrics.mfe < -750 ? "stable" : "moderate"}
+          sub={metrics.mfe < -500 ? "very stable" : metrics.mfe < -350 ? "stable" : "moderate"}
         />
       </div>
     </div>
