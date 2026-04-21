@@ -117,15 +117,23 @@ WEAK_BINDER_NM = 5000.0
 TOP_CANDIDATES_LIMIT = 10
 HEATMAP_PEPTIDE_LIMIT = 12
 
-# Known cancer gene symbols — reused to flag the `cancer_gene` badge. Intentionally
-# narrow; the annotation stage ships the full ~700-symbol list in data/cancer_genes.csv.
-COMMON_CANCER_GENES = {
-    "TP53", "KRAS", "BRAF", "EGFR", "PIK3CA", "PTEN", "RB1", "APC", "ATM",
-    "BRCA1", "BRCA2", "KIT", "NOTCH1", "SETD2", "FBXW7", "IDH1", "IDH2",
-    "MYC", "NRAS", "HRAS", "SMAD4", "CDKN2A", "VHL", "NF1", "NF2", "MLH1",
-    "MSH2", "MSH6", "PMS2", "STK11", "AKT1", "ERBB2", "MET", "ALK", "ROS1",
-    "RET", "FLT3", "JAK2", "CTNNB1", "FGFR1", "FGFR2", "FGFR3",
-}
+# Fraction of top-candidate slots reserved for cancer-gene peptides when any are
+# available. Stops stronger-binding passengers (olfactory receptors, anonymous
+# ENSCAFG entries) from squeezing canonical drivers off the shortlist.
+CANCER_GENE_SHORTLIST_FLOOR = 0.7
+
+
+def _is_cancer_gene(symbol: str) -> bool:
+    """Check a gene symbol against the shared ~250-symbol driver list.
+
+    Sources from the same `data/cancer_genes.csv` the annotation stage uses,
+    so neoantigen, annotation, and any downstream consumer agree on what
+    counts as a driver.
+    """
+    if not symbol:
+        return False
+    from app.services.annotation import load_cancer_genes
+    return symbol.upper() in load_cancer_genes()
 
 
 # --------------------------------------------------------------------------- #
@@ -1623,9 +1631,27 @@ def _build_top_candidates(
         if existing is None or entry.ic50 < existing.ic50:
             by_peptide[key] = entry
 
-    ranked = sorted(by_peptide.values(), key=lambda e: e.ic50)[:TOP_CANDIDATES_LIMIT]
+    all_binders = sorted(by_peptide.values(), key=lambda e: e.ic50)
+    driver_binders = [e for e in all_binders if _is_cancer_gene(e.gene)]
+    other_binders = [e for e in all_binders if not _is_cancer_gene(e.gene)]
+
+    # Reserve up to CANCER_GENE_SHORTLIST_FLOOR of the slots for drivers when any
+    # exist, then fill the remainder with the best non-driver binders by IC50.
+    # A pure IC50 sort pushes drivers off the list for real canine/human data —
+    # passenger mutations (olfactory receptors, ENSCAFG entries) often bind more
+    # strongly than the drivers that actually matter for a vaccine.
+    driver_cap = (
+        min(len(driver_binders), math.ceil(TOP_CANDIDATES_LIMIT * CANCER_GENE_SHORTLIST_FLOOR))
+        if driver_binders else 0
+    )
+    picks = driver_binders[:driver_cap]
+    remainder = TOP_CANDIDATES_LIMIT - len(picks)
+    if remainder > 0:
+        picks.extend(other_binders[:remainder])
+    picks.sort(key=lambda e: e.ic50)
+
     out: list[TopCandidate] = []
-    for entry in ranked:
+    for entry in picks:
         agretopicity: Optional[float] = None
         if entry.wt_ic50 and entry.wt_ic50 > 0 and entry.ic50 > 0:
             agretopicity = round(entry.wt_ic50 / entry.ic50, 1)
@@ -1642,7 +1668,7 @@ def _build_top_candidates(
                 agretopicity=agretopicity,
                 vaf=entry.vaf,
                 tpm=entry.tpm,
-                cancer_gene=entry.gene.upper() in COMMON_CANCER_GENES,
+                cancer_gene=_is_cancer_gene(entry.gene),
                 strong=entry.ic50 < STRONG_BINDER_NM,
             )
         )

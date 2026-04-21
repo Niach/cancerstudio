@@ -204,8 +204,13 @@ def _goals_pass(selection: list[str], candidates: list[EpitopeCandidateResponse]
     if pool_has_class_ii and sum(1 for p in picks if p.mhc_class == "II") < 1:
         return False
 
-    pool_has_cancer_gene = any(c.cancer_gene for c in candidates)
-    if pool_has_cancer_gene and not all(p.cancer_gene for p in picks):
+    # Require at least one driver peptide when any exist in the pool. The full
+    # "all picks must be cancer genes" rule is unreachable on real canine data
+    # where pVACseq usually surfaces at most 1-2 driver binders — requiring all
+    # six+ slots to be drivers would block completion even when the shortlist
+    # *does* include every driver available.
+    cancer_gene_pool = sum(1 for c in candidates if c.cancer_gene)
+    if cancer_gene_pool > 0 and not any(p.cancer_gene for p in picks):
         return False
 
     if any(safety.get(p.id) and safety[p.id].risk == "critical" for p in picks):
