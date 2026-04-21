@@ -389,6 +389,20 @@ export default function VariantCallingStagePanel({
               : "GATK Mutect2"}
             {metrics?.referenceLabel ? ` · ${metrics.referenceLabel}` : null}
           </div>
+          {metrics ? (
+            <div
+              style={{
+                marginTop: 3,
+                fontSize: 11.5,
+                fontFamily: "var(--font-mono)",
+                color: "var(--muted-2)",
+              }}
+            >
+              {metrics.ponLabel
+                ? `Panel-of-normals: ${metrics.ponLabel}`
+                : `No panel-of-normals available for ${workspace.species}`}
+            </div>
+          ) : null}
         </div>
       </div>
 

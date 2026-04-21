@@ -356,6 +356,7 @@ export interface VariantCallingMetrics {
   tumorSample?: string | null;
   normalSample?: string | null;
   referenceLabel?: string | null;
+  ponLabel?: string | null;
   perChromosome: ChromosomeMetricsEntry[];
   filterBreakdown: FilterBreakdownEntry[];
   vafHistogram: VafHistogramBin[];

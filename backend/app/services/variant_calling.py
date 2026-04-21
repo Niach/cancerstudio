@@ -30,7 +30,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.db import session_scope
-from app.runtime import get_variant_calling_run_root, resolve_app_data_path
+from app.runtime import (
+    get_reference_bundle_root,
+    get_variant_calling_run_root,
+    resolve_app_data_path,
+)
 from app.models.records import (
     PipelineArtifactRecord,
     PipelineRunRecord,
@@ -39,6 +43,7 @@ from app.models.schemas import (
     ChromosomeMetricsEntry,
     FilterBreakdownEntry,
     PipelineStageId,
+    ReferencePreset,
     SampleLane,
     TopVariantEntry,
     VafHistogramBin,
@@ -97,6 +102,83 @@ class VariantCallingArtifactDownload:
     content_type: Optional[str]
 
 
+@dataclass(frozen=True)
+class PonSource:
+    """How to find the packaged panel-of-normals for a reference preset."""
+
+    relative_path: str  # resolved under get_reference_bundle_root()
+    label: str  # human-readable — shown in the stage chip + command log
+
+
+# Canine + feline PONs are not yet built. Dog10K's population VCFs are the
+# natural seed for a canine PON — see CLAUDE.md "Known Gaps". Keep the key
+# present so the species gate is obvious in code, not in config.
+PON_BY_PRESET: dict[ReferencePreset, Optional[PonSource]] = {
+    ReferencePreset.GRCH38: PonSource(
+        relative_path="pon/grch38/1000g_pon.ensembl.vcf.gz",
+        label="Broad 1000G (hg38)",
+    ),
+    ReferencePreset.CANFAM4: None,
+    ReferencePreset.FELCAT9: None,
+}
+
+PON_ENV_VARS = {
+    ReferencePreset.GRCH38: "CANCERSTUDIO_PON_GRCH38_VCF",
+}
+
+
+@dataclass(frozen=True)
+class PonConfig:
+    vcf_path: Path
+    tbi_path: Path
+    # `pbrun prepon` generates a `.pon` sidecar next to the VCF; only present
+    # when Parabricks has indexed the PON. Absent on CPU-only boxes — the
+    # stock-GATK path doesn't need it.
+    parabricks_index_path: Optional[Path]
+    label: str
+
+
+def resolve_pon_config(preset: ReferencePreset) -> Optional[PonConfig]:
+    """Locate the panel-of-normals for a reference preset.
+
+    Returns ``None`` when:
+      * no PON is packaged for this preset (dog/cat today), or
+      * the VCF / tabix index is not on disk, or
+      * ``CANCERSTUDIO_PON_<PRESET>_VCF`` is set to the empty string
+        (explicit opt-out for debugging / offline use).
+
+    Env vars mirror the ``REFERENCE_*_FASTA`` pattern in alignment.py and take
+    precedence over the packaged path when set.
+    """
+    env_key = PON_ENV_VARS.get(preset)
+    override = os.getenv(env_key) if env_key else None
+    source = PON_BY_PRESET.get(preset)
+
+    if override is not None:
+        if not override.strip():
+            return None
+        vcf_path = Path(override).expanduser()
+        label = source.label if source else preset.value
+    elif source is not None:
+        vcf_path = get_reference_bundle_root() / source.relative_path
+        label = source.label
+    else:
+        return None
+
+    if not vcf_path.is_file():
+        return None
+    tbi_path = Path(str(vcf_path) + ".tbi")
+    if not tbi_path.is_file():
+        return None
+    parabricks_path = Path(str(vcf_path) + ".pon")
+    return PonConfig(
+        vcf_path=vcf_path,
+        tbi_path=tbi_path,
+        parabricks_index_path=parabricks_path if parabricks_path.is_file() else None,
+        label=label,
+    )
+
+
 @dataclass
 class VariantCallingInputs:
     workspace_id: str
@@ -105,6 +187,12 @@ class VariantCallingInputs:
     tumor_bam: Path
     normal_bam: Path
     run_dir: Path
+    # Set when a panel-of-normals is applied (human workspaces today). The
+    # label rides through onto the metrics response so the UI can render a
+    # "Panel-of-normals: <label>" chip on successful runs.
+    pon_vcf: Optional[Path] = None
+    pon_parabricks_index: Optional[Path] = None
+    pon_label: Optional[str] = None
 
 
 # --------------------------------------------------------------------------- #
@@ -725,6 +813,20 @@ def create_variant_calling_run(
 
         analysis_profile = serialize_analysis_profile(workspace)
         reference = resolve_reference_config(workspace.species, analysis_profile)
+        pon = resolve_pon_config(reference.preset) if reference.preset else None
+
+        # Stash PON metadata on the run record so the worker (which reads
+        # result_payload via start_variant_calling_run) sees the same PON
+        # the operator did, even if env vars change between create + start.
+        initial_payload: dict = {}
+        if pon is not None:
+            initial_payload["pon"] = {
+                "label": pon.label,
+                "vcf_path": str(pon.vcf_path),
+                "parabricks_index_path": (
+                    str(pon.parabricks_index_path) if pon.parabricks_index_path else None
+                ),
+            }
 
         timestamp = utc_now()
         run = PipelineRunRecord(
@@ -740,7 +842,7 @@ def create_variant_calling_run(
             reference_path=str(reference.fasta_path),
             runtime_phase=VariantCallingRuntimePhase.PREPARING_REFERENCE.value,
             command_log=None,
-            result_payload=None,
+            result_payload=json.dumps(initial_payload) if initial_payload else None,
             blocking_reason=None,
             error=None,
             created_at=timestamp,
@@ -1034,6 +1136,27 @@ def start_variant_calling_run(workspace_id: str, run_id: str) -> VariantCallingI
         session.add(run)
         session.add(workspace)
 
+    # Pull PON metadata stored at create time (if any) and re-resolve against
+    # the container-side filesystem. The vcf path was persisted as host-style
+    # under /app-data so resolve_app_data_path is a no-op in the container but
+    # normalises paths when the backend runs natively.
+    pon_payload = existing_payload.get("pon") if isinstance(existing_payload.get("pon"), dict) else None
+    pon_vcf: Optional[Path] = None
+    pon_parabricks_index: Optional[Path] = None
+    pon_label: Optional[str] = None
+    if pon_payload:
+        raw_vcf = pon_payload.get("vcf_path")
+        if raw_vcf:
+            resolved = resolve_app_data_path(raw_vcf)
+            if resolved.is_file():
+                pon_vcf = resolved
+                pon_label = pon_payload.get("label")
+        raw_pbx = pon_payload.get("parabricks_index_path")
+        if raw_pbx:
+            resolved_pbx = resolve_app_data_path(raw_pbx)
+            if resolved_pbx.is_file():
+                pon_parabricks_index = resolved_pbx
+
     run_dir = get_variant_calling_run_root(workspace_id, run_id)
     return VariantCallingInputs(
         workspace_id=workspace_id,
@@ -1042,6 +1165,9 @@ def start_variant_calling_run(workspace_id: str, run_id: str) -> VariantCallingI
         tumor_bam=tumor_bam,
         normal_bam=normal_bam,
         run_dir=run_dir,
+        pon_vcf=pon_vcf,
+        pon_parabricks_index=pon_parabricks_index,
+        pon_label=pon_label,
     )
 
 
@@ -1383,6 +1509,8 @@ def run_mutect2_pipeline(
         ]
         if normal_sample:
             cmd.extend(["-normal", normal_sample])
+        if inputs.pon_vcf is not None:
+            cmd.extend(["--panel-of-normals", str(inputs.pon_vcf)])
         cmd.extend(
             [
                 "-L",
@@ -1415,6 +1543,8 @@ def run_mutect2_pipeline(
         ]
         if normal_sample:
             sample_cmd.extend(["-normal", normal_sample])
+        if inputs.pon_vcf is not None:
+            sample_cmd.extend(["--panel-of-normals", str(inputs.pon_vcf)])
         sample_cmd.extend(
             [
                 "-L",
@@ -1574,6 +1704,13 @@ def run_parabricks_pipeline(
         "--out-vcf",
         str(raw_vcf),
     ]
+    # Parabricks mutectcaller needs a `pbrun prepon`-built .pon sidecar next to
+    # the VCF; resolve_pon_config only sets parabricks_index_path when that file
+    # exists. If prepon hasn't been run yet, fall back to the Parabricks-less
+    # PON path (the flag will still work on the CPU fallback if that kicks in;
+    # on GPU without the sidecar, we skip to avoid a hard failure).
+    if inputs.pon_vcf is not None and inputs.pon_parabricks_index is not None:
+        pb_cmd.extend(["--pon", str(inputs.pon_vcf)])
     command_log.append(" ".join(pb_cmd))
 
     # Parabricks is single-shot with no stdout progress hook, so we poll the
@@ -1839,6 +1976,7 @@ def compute_variant_metrics(
     tumor_sample: Optional[str],
     normal_sample: Optional[str],
     reference_label: Optional[str],
+    pon_label: Optional[str] = None,
 ) -> VariantCallingMetricsResponse:
     per_chrom_counts: dict[str, dict[str, int]] = defaultdict(
         lambda: {"total": 0, "pass": 0, "snv": 0, "indel": 0}
@@ -1981,6 +2119,7 @@ def compute_variant_metrics(
         tumor_sample=tumor_sample,
         normal_sample=normal_sample,
         reference_label=reference_label,
+        pon_label=pon_label,
         per_chromosome=per_chromosome,
         filter_breakdown=filter_breakdown,
         vaf_histogram=histogram,
@@ -2098,6 +2237,13 @@ def run_variant_calling(
         def shard_progress_cb(completed: int, total: int) -> None:
             set_shard_progress(run_id, completed, total)
 
+        if inputs.pon_label:
+            command_log.append(f"# panel-of-normals: {inputs.pon_label}")
+        else:
+            command_log.append(
+                "# panel-of-normals: none available for this reference"
+            )
+
         if current_acceleration_mode() == "gpu_parabricks":
             # Single-shot whole-genome call on GPU. No per-contig resume;
             # cancel discards the raw VCF and a resume re-runs from scratch.
@@ -2125,6 +2271,7 @@ def run_variant_calling(
             tumor_sample=tumor_sample,
             normal_sample=normal_sample,
             reference_label=inputs.reference_label,
+            pon_label=inputs.pon_label,
         )
 
         persist_variant_calling_success(

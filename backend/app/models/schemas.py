@@ -401,6 +401,7 @@ class VariantCallingMetricsResponse(BaseModel):
     tumor_sample: Optional[str] = None
     normal_sample: Optional[str] = None
     reference_label: Optional[str] = None
+    pon_label: Optional[str] = None
     per_chromosome: List[ChromosomeMetricsEntry] = Field(default_factory=list)
     filter_breakdown: List[FilterBreakdownEntry] = Field(default_factory=list)
     vaf_histogram: List[VafHistogramBin] = Field(default_factory=list)

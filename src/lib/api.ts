@@ -321,6 +321,7 @@ type VariantCallingMetricsDto = {
   tumor_sample?: string | null;
   normal_sample?: string | null;
   reference_label?: string | null;
+  pon_label?: string | null;
   per_chromosome: ChromosomeMetricsDto[];
   filter_breakdown: FilterBreakdownDto[];
   vaf_histogram: VafHistogramBinDto[];
@@ -759,6 +760,7 @@ function mapVariantCallingRun(dto: VariantCallingRunDto): VariantCallingRun {
           tumorSample: dto.metrics.tumor_sample ?? null,
           normalSample: dto.metrics.normal_sample ?? null,
           referenceLabel: dto.metrics.reference_label ?? null,
+          ponLabel: dto.metrics.pon_label ?? null,
           perChromosome: dto.metrics.per_chromosome.map((entry) => ({
             chromosome: entry.chromosome,
             length: entry.length,
