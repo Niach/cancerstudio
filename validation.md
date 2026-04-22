@@ -198,6 +198,30 @@ The test locks these values as a regression baseline ± 0.05 so any
 drift gets caught without the maintainer silently re-tuning a
 threshold.
 
+### MHCflurry as license-free alternative — 2026-04-22
+
+NetMHCpan is under DTU academic/commercial license. **MHCflurry 2.0**
+(openvax, Apache-2) is the leading free-software class-I binding
+predictor. Installed in the backend image alongside NetMHCpan and
+replayed against the same canonical-TAA benchmark to verify it's a
+viable swap-in when a NetMHCpan license is not available:
+
+| Predictor | AUC | Binder median | Binders < 500 nM | License |
+| --- | --- | --- | --- | --- |
+| NetMHCpan 4.2 | 1.000 | 36 nM | 10/12 | DTU (academic / commercial) |
+| MHCflurry 2.0 | 1.000 | 33 nM | 11/12 | Apache-2 (free) |
+
+MHCflurry 2.0.6 pre-dates Keras 3 and requires the `tf-keras` compat
+shim plus `TF_USE_LEGACY_KERAS=1` to run on modern TensorFlow; both
+are set by default in the backend Dockerfile.
+
+**Caveat: class-I only.** MHCflurry has no class-II equivalent, so
+NetMHCIIpan (also DTU-licensed) is still required for class-II
+prediction if class-II peptides are needed.
+
+`backend/tests/validation/stage5/test_mhcflurry_canonical.py`
+regression-locks this result.
+
 ### Canonical TAA benchmark — 2026-04-22
 
 Companion to the IEDB test, with a cleaner positive/negative split.

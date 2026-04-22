@@ -137,7 +137,16 @@ RUN python -m pip install --upgrade pip \
     && mkdir -p "$PVAC_SUPPORT" \
     && curl -fsSL \
         https://raw.githubusercontent.com/griffithlab/pVACtools/v5.4.0/pvactools/supporting_files/cancer_census_hotspot_gene_list.tsv \
-        -o "$PVAC_SUPPORT/cancer_census_hotspot_gene_list.tsv"
+        -o "$PVAC_SUPPORT/cancer_census_hotspot_gene_list.tsv" \
+    # MHCflurry is a license-free alternative to NetMHCpan for class-I binding
+    # prediction. Pulled in transitively by pvactools 5.4.0 (pinned to 2.0.6),
+    # but 2.0.6 was built against Keras 2.x and breaks on Keras 3.x. The
+    # tf-keras package plus TF_USE_LEGACY_KERAS=1 restores compatibility;
+    # see CLAUDE.md stage 5 for the runtime configuration.
+    && python -m pip install tf-keras \
+    # Pre-fetch the class-I pan models so first-run predictions don't block
+    # on a 164 MB download. Stores at /root/.local/share/mhcflurry/...
+    && mhcflurry-downloads fetch models_class1_pan
 
 # Mount point for externally-licensed MHC binding predictors (NetMHCpan 4.2 +
 # NetMHCIIpan 4.3). We cannot redistribute these, so the user drops the
@@ -159,6 +168,7 @@ ENV CANCERSTUDIO_APP_DATA_DIR=/app-data \
     CANCERSTUDIO_NETMHC_DIR=/tools/src \
     CANCERSTUDIO_NETMHCPAN_BIN=/tools/src/netMHCpan-4.2/netMHCpan \
     CANCERSTUDIO_NETMHCIIPAN_BIN=/tools/src/netMHCIIpan-4.3/netMHCIIpan \
+    TF_USE_LEGACY_KERAS=1 \
     PYTHONPATH=/app
 
 EXPOSE 8000
