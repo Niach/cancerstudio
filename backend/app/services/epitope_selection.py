@@ -178,6 +178,21 @@ def _pick_defaults(candidates: list[EpitopeCandidateResponse]) -> list[str]:
         if len(picks) >= 7:
             break
 
+    # Phase 2b — class-II floor. If the pool offers class-II candidates but
+    # none cleared phase 2 (usually because every class-II binder overlaps a
+    # gene already picked by phase 1), relax the distinct-gene rule and take
+    # the best class-II cancer-gene peptide. Same-gene class-I + class-II
+    # pairs give complementary CD4+ help for the CD8+ response on the same
+    # driver — a feature, not a compromise. Passenger class-II is accepted
+    # only if no cancer-gene class-II exists, mirroring phase-3 rescue.
+    has_class_ii_pick = any(_class_of(pid, candidates) == "II" for pid in picks)
+    pool_class_ii = [p for p in sorted_c if p.mhc_class == "II"]
+    if not has_class_ii_pick and pool_class_ii and len(picks) < MAX_SELECTION:
+        preferred = [p for p in pool_class_ii if p.cancer_gene and p.id not in picks]
+        pool = preferred or [p for p in pool_class_ii if p.id not in picks]
+        if pool:
+            picks.append(pool[0].id)
+
     # Phase 3 — if the cancer-gene pool didn't reach the 6-pick goals floor,
     # top up with the next-best distinct-gene candidates, passengers included.
     # Keeps gene diversity rising and unblocks epitope completion when the
