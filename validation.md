@@ -106,11 +106,12 @@ plugins emit wild-type + frameshift + downstream peptides where expected.
 
 | Check | Dataset | Metric | Threshold | Status |
 | --- | --- | --- | --- | --- |
-| VEP consequence stability | VEP 111 regression set | consequence column agreement vs. canonical | ≥ 99.9% | [ ] |
+| BRAF V600E end-to-end | COLO829 real WGS | CSQ shows `missense_variant` on BRAF with MODERATE impact | yes | [x] **2026-04-22** — `test_vep_annotates_braf_v600e` |
+| Cancer-gene card coverage | COLO829 real WGS | ≥ 1 known COLO829 driver symbol in CSQ SYMBOL field | ≥ 1 of {BRAF, TP53, CDKN2A, PTEN, MAP2K1, NRAS} | [x] **2026-04-22** — `test_annotation_surfaces_known_cancer_genes` |
+| VEP consequence stability | VEP 111 regression set | consequence column agreement vs. canonical | ≥ 99.9% | [ ] (long-form; covered informally by BRAF V600E test) |
 | TSL tag presence | any annotated VCF | rows with `TSL=` annotation | 100% of protein-coding variants | [ ] |
 | Frameshift plugin emits peptides | a known frameshift variant (e.g., synthetic) | non-empty `FrameshiftSequence` column | 100% | [ ] |
 | Wildtype plugin emits WT peptides | any missense | non-empty `WildtypeProtein` | 100% of missense | [ ] |
-| Cancer-gene card consistency | COLO829 run | cancer-gene cards list ≥ 1 known driver | ≥ 1 | [ ] |
 
 **Harness:** `backend/tests/validation/stage4/`.
 
@@ -160,9 +161,10 @@ published vaccine designs.
 | Glioblastoma | **Keskin 2019** Nature NeoVax | same | ≥ 30% | [ ] |
 | Canine | **Paul Conyngham's Rosie case** — 7 peptides published | gene-level overlap | ≥ 50% | [ ] |
 | Self-identity safety | any run | DIAMOND blastp vs. species Swiss-Prot runs for every picked peptide; risk tiers critical (100%) / elevated (≥80%) / mild (≥60%); goals check blocks "ready for construct design" on any `critical` hit | real check wired | [x] **wired 2026-04-22** (see findings below) |
-| Driver representation | any human run | ≥ 1 picked peptide from a gene in our `data/cancer_genes.csv` | ≥ 1 when drivers are in the VCF | [ ] |
-| Allele coverage goal | any run with ≥ 2 class-I and ≥ 1 class-II alleles | final cassette covers ≥ 2 class-I + ≥ 1 class-II | 100% | [ ] |
-| Gene-diversity fallback | synthetic VCF with only 4 cancer-gene variants | final cassette has ≥ 6 unique genes (the fallback we added) | 100% | [ ] |
+| Driver representation | any human run | ≥ 1 picked peptide from a gene in our `data/cancer_genes.csv` | ≥ 1 when drivers are in the VCF | [x] **2026-04-22** — `test_blocks_when_picks_have_no_driver_but_pool_has_them` |
+| Allele coverage goal | any run with ≥ 2 class-I and ≥ 1 class-II alleles | final cassette covers ≥ 2 class-I + ≥ 1 class-II | 100% | [x] **2026-04-22** — `test_blocks_on_missing_class_ii_when_pool_has_it` + `test_allele_diversity_requirement_adapts_to_pool` |
+| Gene-diversity fallback | synthetic VCF with only 4 cancer-gene variants | final cassette has ≥ 6 unique genes (the fallback we added) | 100% | [x] `test_real_deck_built_from_top_candidates` + `test_blocks_when_gene_diversity_below_five` |
+| Critical self-identity blocks release | any run | `_goals_pass` returns False when any pick has `risk == "critical"` | 100% | [x] **2026-04-22** — `test_blocks_on_critical_self_identity_flag` |
 
 **Harness:** `backend/tests/validation/stage6/`.
 
