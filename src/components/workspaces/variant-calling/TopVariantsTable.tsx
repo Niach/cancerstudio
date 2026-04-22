@@ -6,8 +6,24 @@ interface TopVariantsTableProps {
   variants: TopVariantEntry[];
 }
 
+function variantTypeLabel(v: TopVariantEntry) {
+  switch (v.variantType) {
+    case "insertion":
+      return "insertion";
+    case "deletion":
+      return "deletion";
+    case "mnv":
+      return "mnv";
+    default:
+      return "snv";
+  }
+}
+
 export default function TopVariantsTable({ variants }: TopVariantsTableProps) {
   if (!variants.length) return null;
+
+  const gridTemplate =
+    "1.1fr 0.9fr 0.9fr 0.9fr 0.9fr 0.9fr";
 
   return (
     <div className="cs-card">
@@ -16,26 +32,23 @@ export default function TopVariantsTable({ variants }: TopVariantsTableProps) {
           <div style={{ marginBottom: 6 }}>
             <span className="cs-mono-label">Top variants</span>
           </div>
-          <h3>Highest-confidence somatic calls</h3>
+          <h3>Highest-impact mutations</h3>
           <p className="cs-tiny" style={{ margin: "2px 0 0" }}>
-            Sorted by VAF × depth — biggest signal first.
+            Sorted by VAF. PASS calls first.
           </p>
         </div>
       </div>
-      <div>
+      <div style={{ padding: "0 8px 10px" }}>
         <div
           className="cs-data-row cs-data-head"
-          style={{
-            gridTemplateColumns: "60px 1.4fr 1fr 1.2fr 1.4fr 1fr 80px",
-          }}
+          style={{ gridTemplateColumns: gridTemplate }}
         >
-          <span>CHR</span>
-          <span>LOCUS</span>
-          <span>REF → ALT</span>
-          <span>VAF</span>
-          <span>FILTER</span>
-          <span>T / N DEPTH</span>
-          <span style={{ textAlign: "right" }}>STATUS</span>
+          <span>Chr:Pos</span>
+          <span>Ref → Alt</span>
+          <span>Type</span>
+          <span style={{ textAlign: "right" }}>VAF</span>
+          <span style={{ textAlign: "right" }}>T / N depth</span>
+          <span style={{ textAlign: "right" }}>Filter</span>
         </div>
         {variants.map((v, i) => {
           const vaf = v.tumorVaf ?? 0;
@@ -43,33 +56,22 @@ export default function TopVariantsTable({ variants }: TopVariantsTableProps) {
             <div
               key={i}
               className="cs-data-row"
-              style={{
-                gridTemplateColumns: "60px 1.4fr 1fr 1.2fr 1.4fr 1fr 80px",
-              }}
+              style={{ gridTemplateColumns: gridTemplate }}
             >
               <span
                 style={{
                   fontFamily: "var(--font-mono)",
-                  fontWeight: 600,
-                  color: "var(--ink-2)",
-                }}
-              >
-                {v.chromosome}
-              </span>
-              <span
-                style={{
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 11.5,
+                  fontSize: 12,
                   color: "var(--muted)",
                 }}
               >
-                {v.position.toLocaleString()}
+                {v.chromosome}:{v.position.toLocaleString()}
               </span>
               <span
                 style={{ fontFamily: "var(--font-mono)", fontSize: 12.5 }}
               >
                 <span style={{ color: "var(--muted)" }}>{v.ref}</span>
-                <span style={{ margin: "0 6px", color: "var(--muted-2)" }}>
+                <span style={{ margin: "0 4px", color: "var(--muted-2)" }}>
                   →
                 </span>
                 <span
@@ -85,70 +87,48 @@ export default function TopVariantsTable({ variants }: TopVariantsTableProps) {
                 </span>
               </span>
               <span
-                style={{ display: "flex", alignItems: "center", gap: 8 }}
-              >
-                <div
-                  style={{
-                    width: 60,
-                    height: 5,
-                    borderRadius: 999,
-                    background:
-                      "color-mix(in oklch, var(--ink) 6%, transparent)",
-                    overflow: "hidden",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: `${vaf * 100}%`,
-                      height: "100%",
-                      background: v.isPass ? "var(--accent)" : "var(--warm)",
-                    }}
-                  />
-                </div>
-                <span
-                  style={{
-                    fontFamily: "var(--font-mono)",
-                    fontSize: 11.5,
-                    fontVariantNumeric: "tabular-nums",
-                    color: "var(--ink-2)",
-                  }}
-                >
-                  {(vaf * 100).toFixed(1)}%
-                </span>
-              </span>
-              <span
                 style={{
                   fontFamily: "var(--font-mono)",
                   fontSize: 11,
                   color: "var(--muted-2)",
+                  textTransform: "lowercase",
                 }}
               >
-                {v.filter}
+                {variantTypeLabel(v)}
               </span>
               <span
                 style={{
+                  textAlign: "right",
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 12.5,
+                  fontVariantNumeric: "tabular-nums",
+                  color: "var(--ink-2)",
+                }}
+              >
+                {(vaf * 100).toFixed(1)}%
+              </span>
+              <span
+                style={{
+                  textAlign: "right",
                   fontFamily: "var(--font-mono)",
                   fontSize: 11.5,
                   color: "var(--muted)",
+                  fontVariantNumeric: "tabular-nums",
                 }}
               >
                 {v.tumorDepth ?? "—"}× / {v.normalDepth ?? "—"}×
               </span>
-              <span style={{ textAlign: "right" }}>
-                {v.isPass ? (
-                  <span className="cs-chip cs-chip-live">PASS</span>
-                ) : (
-                  <span
-                    className="cs-chip"
-                    style={{
-                      background:
-                        "color-mix(in oklch, var(--warm) 14%, transparent)",
-                      color: "var(--warm)",
-                    }}
-                  >
-                    filtered
-                  </span>
-                )}
+              <span
+                style={{
+                  textAlign: "right",
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 10.5,
+                  color: v.isPass ? "var(--accent-ink)" : "var(--warm)",
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                }}
+              >
+                {v.isPass ? "PASS" : v.filter}
               </span>
             </div>
           );

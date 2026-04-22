@@ -5,7 +5,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import FilterBreakdown from "@/components/workspaces/variant-calling/FilterBreakdown";
 import Karyogram from "@/components/workspaces/variant-calling/Karyogram";
-import MetricsRibbon from "@/components/workspaces/variant-calling/MetricsRibbon";
 import TopVariantsTable from "@/components/workspaces/variant-calling/TopVariantsTable";
 import VafDistribution from "@/components/workspaces/variant-calling/VafDistribution";
 import Helix from "@/components/helix/Helix";
@@ -349,6 +348,8 @@ export default function VariantCallingStagePanel({
 
   const totalVariants = metrics?.totalVariants ?? 0;
   const passCount = metrics?.passCount ?? 0;
+  const snvCount = metrics?.snvCount ?? 0;
+  const indelCount = metrics?.indelCount ?? 0;
 
   return (
     <>
@@ -357,9 +358,7 @@ export default function VariantCallingStagePanel({
           <div className="cs-crumb">
             {workspace.displayName} / 03 Variant calling
           </div>
-          <h1>
-            {passCount.toLocaleString()} cancer-specific mutations.
-          </h1>
+          <h1>The tumor&apos;s mutation map.</h1>
           <p
             style={{
               maxWidth: "62ch",
@@ -369,9 +368,9 @@ export default function VariantCallingStagePanel({
               color: "var(--ink-2)",
             }}
           >
-            These are the changes that appear in the tumor but not in the healthy
-            sample. We kept the high-confidence ones and grouped the rest into
-            plain-language buckets so you can see what was set aside and why.
+            We compared tumor and normal position by position.{" "}
+            {passCount.toLocaleString()} high-confidence mutations passed filters
+            out of {totalVariants.toLocaleString()} candidates.
           </p>
         </div>
         <div style={{ textAlign: "right" }}>
@@ -385,8 +384,8 @@ export default function VariantCallingStagePanel({
             }}
           >
             {latestRun?.accelerationMode === "gpu_parabricks"
-              ? "Parabricks · GPU"
-              : "GATK Mutect2"}
+              ? "Parabricks · tumor-normal"
+              : "Mutect2 · tumor-normal"}
             {metrics?.referenceLabel ? ` · ${metrics.referenceLabel}` : null}
           </div>
           {metrics ? (
@@ -408,38 +407,63 @@ export default function VariantCallingStagePanel({
 
       {metrics && totalVariants > 0 ? (
         <>
-          <Karyogram
-            chromosomes={metrics.perChromosome}
-            topVariants={metrics.topVariants}
-            referenceLabel={metrics.referenceLabel}
-          />
-
-          <div style={{ marginTop: 20 }}>
-            <MetricsRibbon metrics={metrics} />
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(4, 1fr)",
+              gap: 12,
+              marginBottom: 16,
+            }}
+          >
+            <MetricCard
+              label="Total candidates"
+              value={totalVariants.toLocaleString()}
+            />
+            <MetricCard
+              label="PASS variants"
+              value={passCount.toLocaleString()}
+              accent
+            />
+            <MetricCard
+              label="SNVs / Indels"
+              value={`${snvCount.toLocaleString()} / ${indelCount.toLocaleString()}`}
+            />
+            <MetricCard
+              label="Ti/Tv"
+              value={
+                metrics.tiTvRatio != null ? metrics.tiTvRatio.toFixed(2) : "—"
+              }
+            />
           </div>
+
+          <Card style={{ marginBottom: 16 }}>
+            <Karyogram
+              chromosomes={metrics.perChromosome}
+              referenceLabel={metrics.referenceLabel}
+              hue={tweaks.accentHue}
+            />
+          </Card>
 
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1.1fr 1fr",
-              gap: 20,
-              marginTop: 20,
+              gridTemplateColumns: "1.3fr 1fr",
+              gap: 16,
+              marginBottom: 16,
             }}
           >
-            <FilterBreakdown
-              entries={metrics.filterBreakdown}
-              totalVariants={metrics.totalVariants}
-            />
             <VafDistribution
               bins={metrics.vafHistogram}
               meanVaf={metrics.meanVaf}
               medianVaf={metrics.medianVaf}
             />
+            <FilterBreakdown
+              entries={metrics.filterBreakdown}
+              totalVariants={metrics.totalVariants}
+            />
           </div>
 
-          <div style={{ marginTop: 20 }}>
-            <TopVariantsTable variants={metrics.topVariants} />
-          </div>
+          <TopVariantsTable variants={metrics.topVariants} />
         </>
       ) : (
         <Card style={{ padding: "28px 24px", fontSize: 14 }}>
@@ -475,7 +499,7 @@ export default function VariantCallingStagePanel({
         style={{
           marginTop: 24,
           padding: "18px 22px",
-          borderRadius: "var(--radius-cs)",
+          borderRadius: "var(--radius-cs-lg)",
           border: "1px dashed var(--line-strong)",
           background: "var(--surface-sunk)",
           display: "flex",
@@ -487,22 +511,66 @@ export default function VariantCallingStagePanel({
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <Eyebrow>Next</Eyebrow>
-          <span style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>
-            Annotation (Ensembl VEP) reads what each mutation means.
-          </span>
-          <span className="cs-tiny" style={{ fontSize: 12.5 }}>
-            It checks each mutation against what scientists already know — which
-            gene it&apos;s in, what it changes, and whether that gene matters in
-            cancer.
+          <span style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)" }}>
+            Annotate these variants against the{" "}
+            {workspace.species === "human"
+              ? "human"
+              : workspace.species === "dog"
+                ? "canine"
+                : "feline"}{" "}
+            cancer gene list.
           </span>
         </div>
         <Link
           href={`/workspaces/${workspace.id}/annotation`}
-          className="cs-btn cs-btn-ghost"
+          className="cs-btn cs-btn-primary"
         >
-          Open annotation →
+          Open stage 04 →
         </Link>
       </div>
     </>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: string;
+  accent?: boolean;
+}) {
+  return (
+    <div
+      style={{
+        padding: "14px 18px",
+        borderRadius: "var(--radius-cs-lg)",
+        background: accent
+          ? "color-mix(in oklch, var(--accent) 8%, var(--surface-strong))"
+          : "var(--surface-strong)",
+        border:
+          "1px solid " +
+          (accent
+            ? "color-mix(in oklch, var(--accent) 30%, var(--line))"
+            : "var(--line)"),
+      }}
+    >
+      <div className="cs-mono-label">{label}</div>
+      <div
+        style={{
+          fontFamily: "var(--font-display)",
+          fontSize: 28,
+          fontWeight: 400,
+          marginTop: 6,
+          letterSpacing: "-0.02em",
+          color: accent ? "var(--accent-ink)" : "var(--ink)",
+          lineHeight: 1.1,
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        {value}
+      </div>
+    </div>
   );
 }
