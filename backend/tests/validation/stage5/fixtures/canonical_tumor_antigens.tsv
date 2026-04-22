@@ -1,0 +1,40 @@
+# Canonical class-I tumor-associated neoantigens from the oncology literature,
+# with published HLA restriction and T-cell response outcome. Used as a
+# stage-5 sanity check: NetMHCpan should call these as binders (IC50 < 5000 nM)
+# and the strong subset (IC50 < 100 nM per literature) as strong binders.
+#
+# Each peptide is either:
+#   - source_type=binder: published to bind its HLA allele and, in most cases,
+#     published to elicit a CD8+ T-cell response in patients.
+#   - source_type=anchor_broken: the same binder with the pos-2 and C-terminal
+#     anchor residues replaced by glycine. For HLA-A*02:01 these positions are
+#     strongly biased toward L/I/M/V; replacing with G is the standard way to
+#     produce a clean synthetic non-binder without the "curation bias" of
+#     IEDB's Negative set. Used as a negative control for the binder AUC.
+#
+# Citations (PMIDs) reference the primary paper that first reported the
+# peptide + HLA pairing; many of these are now canonical across the field.
+peptide	allele	outcome	source	source_type	pmid
+ELAGIGILTV	HLA-A*02:01	binder	MART-1 26-35 (A27L modified)	binder	7536812
+AAGIGILTV	HLA-A*02:01	binder	MART-1 27-35 wild-type	binder	7536812
+ITDQVPFSV	HLA-A*02:01	binder	gp100 209-217 (T210M modified)	binder	8557689
+SLLMWITQC	HLA-A*02:01	binder	NY-ESO-1 157-165	binder	9486758
+SLLMWITQV	HLA-A*02:01	binder	NY-ESO-1 157-165 (C165V modified)	binder	11086051
+VLDGLDVLL	HLA-A*02:01	binder	PRAME 100-108	binder	16477032
+ILAKFLHWL	HLA-A*02:01	binder	hTERT 865-873	binder	10860769
+LMLGEFLKL	HLA-A*02:01	binder	Survivin 96-104	binder	11007126
+YMLDLQPET	HLA-A*02:01	binder	HPV16 E7 11-19	binder	7679095
+EVDPIGHLY	HLA-A*01:01	binder	MAGE-A3 168-176	binder	8027357
+ESDPIVAQY	HLA-A*01:01	binder	MAGE-A1 161-169	binder	7694820
+KVAELVHFL	HLA-A*02:01	binder	MAGE-A3 112-120	binder	9743527
+EGAGIGILTG	HLA-A*02:01	anchor_broken	MART-1 26-35 anchors→G	anchor_broken	N/A
+AGGIGILTG	HLA-A*02:01	anchor_broken	MART-1 27-35 anchors→G	anchor_broken	N/A
+IGDQVPFSG	HLA-A*02:01	anchor_broken	gp100 anchors→G	anchor_broken	N/A
+SGLMWITQG	HLA-A*02:01	anchor_broken	NY-ESO-1 157-165 anchors→G	anchor_broken	N/A
+VGDGLDVLG	HLA-A*02:01	anchor_broken	PRAME 100-108 anchors→G	anchor_broken	N/A
+IGAKFLHWG	HLA-A*02:01	anchor_broken	hTERT 865-873 anchors→G	anchor_broken	N/A
+LGLGEFLKG	HLA-A*02:01	anchor_broken	Survivin 96-104 anchors→G	anchor_broken	N/A
+YGLDLQPEG	HLA-A*02:01	anchor_broken	HPV16 E7 11-19 anchors→G	anchor_broken	N/A
+EGDPIGHLG	HLA-A*01:01	anchor_broken	MAGE-A3 168-176 anchors→G	anchor_broken	N/A
+EGDPIVAQG	HLA-A*01:01	anchor_broken	MAGE-A1 161-169 anchors→G	anchor_broken	N/A
+KGAELVHFG	HLA-A*02:01	anchor_broken	MAGE-A3 112-120 anchors→G	anchor_broken	N/A
