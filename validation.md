@@ -22,7 +22,7 @@ requires a prospective trial and is out of scope.
 | **3 · Variant Calling** | SMaHT v1.0 COLO829 SNV truth | **F1 = 0.866** (P 0.816 / R 0.923) at VAF ≥ 0.1; BRAF V600E called at VAF 0.674 | F1 ≥ 0.85 | `tests/validation/stage3/test_colo829_f1.py` |
 | **4 · Annotation** | VEP 111 on real COLO829 | BRAF V600E: `missense_variant` + MODERATE + BRAF symbol; cancer-gene coverage ≥ 1 driver | canonical annotation present | `tests/validation/stage4/test_vep_colo829.py` |
 | **5 · Neoantigen Prediction** | NetMHCpan 4.2 / NetMHCIIpan 4.3 integration (informal) | ran end-to-end on canine DLBCL + COLO829 | — | _TESLA DUA pending; informal-only for now_ |
-| **6 · Epitope Selection** | 10-assertion goals contract + live DIAMOND self-identity check | every safety gate exercised on crafted fixtures | 10/10 contract assertions pass | `tests/validation/stage6/test_goals_contract.py`, `services/self_identity.py` |
+| **6 · Epitope Selection** | 10-assertion goals contract + pure-Python substring + d=1 self-identity check | every safety gate exercised on crafted fixtures; self-identity recall 100% on 50 known self-peptides, FP rate 0% on 50 random peptides | 10/10 contract + recall ≥95% + FP <30% | `tests/validation/stage6/` |
 | **7 · mRNA Construct** | BNT162b2 + mRNA-1273 vial-sequenced reference replay | BNT162b2 7/7 manufacturability pass; mRNA-1273 baseline: 5/7 + 2 documented divergences; protein identity + λ determinism; human CAI 0.869 | 7/7 on clean input; baseline stable | `tests/validation/stage7/` |
 | **8 · Construct Output** | determinism + GenBank round-trip | same input → same sha256; single-base edit flips; Biopython round-trip byte-identical; pinned-hash regression | byte-identical | `tests/validation/stage8/` |
 
@@ -223,30 +223,66 @@ published vaccine designs.
 often impossible. Fallback: compare *peptide sets* against their published
 picks, using the trials' patient-reported WES summary tables where available.
 
-### Self-identity check — wired 2026-04-22
+### Self-identity check — wired 2026-04-22, re-implemented 2026-04-22
 
-Replaces the fixture-only flags with real DIAMOND blastp against UniProt
-Swiss-Prot, keyed to the workspace's species (human / dog / cat). The
-proteome is auto-bootstrapped on first real-data stage-6 load and cached
-under `${CANCERSTUDIO_DATA_ROOT}/references/proteome/{species}/`, mirroring
-the PON bootstrap. Risk tiers:
+Replaces the fixture-only flags with a **pure-Python substring +
+single-mismatch regex scan** against UniProt Swiss-Prot, keyed to the
+workspace's species (human / dog / cat). The proteome is
+auto-bootstrapped on first real-data stage-6 load and cached under
+`${CANCERSTUDIO_DATA_ROOT}/references/proteome/{species}/`.
 
-* `critical` — 100% identity over the full peptide (blocks "ready for
-  construct design" via the existing goals check)
-* `elevated` — ≥80% identity over ≥80% of peptide length
-* `mild`     — ≥60% identity; surfaced but non-blocking
+**Why not DIAMOND.** The first implementation used DIAMOND blastp,
+which is the industry-standard BLAST-accelerator. It turned out to
+be *silently non-functional* for class-I neoantigen peptides (8-11
+aa): DIAMOND's seed-and-extend heuristic doesn't seed on queries
+shorter than ~15 aa and returned zero hits for every 9-mer we tested,
+including literal substrings of the same proteome. Caught by the
+stage-6 recall validation (see below). Replaced with an in-memory
+substring scan: ~5 s per 50-peptide cassette, deterministic.
 
-Fail-open on infrastructure issues (DIAMOND missing, proteome
-unavailable, subprocess error) — logged prominently; safety dict is
-empty. A hard-blocking fallback is a follow-up (noted under open gaps).
+Risk tiers emitted by the real check:
 
-**Known gap — canine/feline Swiss-Prot is thin.** Dog has ~500 reviewed
-entries, cat ~300. Dog TrEMBL (~46k unreviewed entries) has better
-coverage but lower per-entry quality. For the MVP we accept the
-undercoverage; if a canine peptide fails to match a self-protein because
-the *true* self-protein is unreviewed, the UI will say "safe" when it
-isn't. The operator override (future PR) and expanded TrEMBL fallback
-are both logged here as follow-ups rather than silently shipped.
+* `critical` — exact substring match (100% identity); blocks "ready
+  for construct design" via the existing goals check
+* `elevated` — one mismatch anywhere (≥80% identity on 9-11-mer
+  peptides)
+
+The historical `mild` tier (≥60% identity) was retired for short
+peptides: on a 20k-protein human Swiss-Prot, a random 9-mer has a
+**98% probability of matching at mild thresholds** purely by chance.
+That signal is statistically meaningless for tumor neoantigens. The
+field still exists in `EpitopeSafetyFlagResponse` for fixture-deck
+compatibility; the UI renders mild flags if a fixture supplies one
+but the real check never emits one.
+
+Fail-open on infrastructure issues (proteome unavailable, I/O error)
+— logged prominently; safety dict empty. A hard-blocking fallback is
+a follow-up.
+
+**Known gap — canine/feline Swiss-Prot is thin.** Dog has ~500
+reviewed entries, cat ~300. Dog TrEMBL (~46k unreviewed entries) has
+better coverage but lower per-entry quality. For the MVP we accept
+the undercoverage; if a canine peptide fails to match a self-protein
+because the *true* self-protein is unreviewed, the UI will say "safe"
+when it isn't. The operator override (future PR) and expanded TrEMBL
+fallback are both logged here as follow-ups rather than silently
+shipped.
+
+### Stage 6 self-identity recall + specificity — 2026-04-22
+
+Two public-data validations lock the real check's behaviour:
+
+* **Recall**: 50 9-mer windows sampled from UniProt human Swiss-Prot.
+  By construction each peptide is an exact substring of a reviewed
+  human protein. Assertion: **≥95% flagged**. Observed: 100% (all
+  50 hit the critical tier).
+* **Specificity**: 50 random uniformly-sampled 9-mers. Assertion:
+  **<30% flagged** (false-positive rate). Observed: 0/50 after
+  dropping the mild tier. (Before the drop: 49/50 — which is how we
+  found the tier was broken for short peptides.)
+
+Both tests live under `backend/tests/validation/stage6/test_self_identity_recall.py`
+and run in-container in under 5 s once the proteome cache is warm.
 
 ## Stage 7 — mRNA Construct Design
 
