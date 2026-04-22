@@ -104,10 +104,20 @@ class VariantCallingArtifactDownload:
 
 @dataclass(frozen=True)
 class PonSource:
-    """How to find the packaged panel-of-normals for a reference preset."""
+    """How to find + bootstrap the panel-of-normals for a reference preset."""
 
     relative_path: str  # resolved under get_reference_bundle_root()
     label: str  # human-readable — shown in the stage chip + command log
+    download_vcf_url: Optional[str] = None  # upstream VCF URL
+    download_tbi_url: Optional[str] = None  # upstream tabix URL
+    # Upstream conventions vs. our reference's conventions. For GRCh38 we
+    # rewrite UCSC contigs (chr1..chrM) to Ensembl (1..MT). Keys are upstream
+    # names, values are the matching reference names.
+    contig_rename: Optional[dict[str, str]] = None
+
+
+_GRCH38_UCSC_TO_ENSEMBL = {f"chr{i}": str(i) for i in range(1, 23)}
+_GRCH38_UCSC_TO_ENSEMBL.update({"chrX": "X", "chrY": "Y", "chrM": "MT"})
 
 
 # Canine + feline PONs are not yet built. Dog10K's population VCFs are the
@@ -117,6 +127,15 @@ PON_BY_PRESET: dict[ReferencePreset, Optional[PonSource]] = {
     ReferencePreset.GRCH38: PonSource(
         relative_path="pon/grch38/1000g_pon.ensembl.vcf.gz",
         label="Broad 1000G (hg38)",
+        download_vcf_url=(
+            "https://storage.googleapis.com/gatk-best-practices/"
+            "somatic-hg38/1000g_pon.hg38.vcf.gz"
+        ),
+        download_tbi_url=(
+            "https://storage.googleapis.com/gatk-best-practices/"
+            "somatic-hg38/1000g_pon.hg38.vcf.gz.tbi"
+        ),
+        contig_rename=_GRCH38_UCSC_TO_ENSEMBL,
     ),
     ReferencePreset.CANFAM4: None,
     ReferencePreset.FELCAT9: None,
@@ -177,6 +196,257 @@ def resolve_pon_config(preset: ReferencePreset) -> Optional[PonConfig]:
         parabricks_index_path=parabricks_path if parabricks_path.is_file() else None,
         label=label,
     )
+
+
+def ensure_pon_ready(
+    preset: ReferencePreset,
+    reference_fasta: Path,
+    command_log: Optional[list[str]] = None,
+) -> Optional[PonConfig]:
+    """Return a PonConfig for this preset, downloading + harmonizing the VCF
+    on first use.
+
+    Mirrors the reference-genome bootstrap: the Broad's UCSC-convention PON
+    is fetched once, contigs are renamed + re-ordered to match our Ensembl
+    GRCh38 (primary assembly only, alts/decoys dropped), and `pbrun prepon`
+    builds the Parabricks sidecar when the binary is available.
+
+    Failure modes are non-fatal — a PON is an enhancement, not a requirement.
+    If the download, bcftools pipeline, or prepon step fails, we log why and
+    let the run proceed without a PON rather than block variant calling.
+    """
+    env_key = PON_ENV_VARS.get(preset)
+    if env_key is not None and os.getenv(env_key) is not None:
+        # User-supplied override path. Honour it; don't auto-download.
+        return resolve_pon_config(preset)
+
+    source = PON_BY_PRESET.get(preset)
+    if source is None or source.download_vcf_url is None:
+        return resolve_pon_config(preset)
+
+    existing = resolve_pon_config(preset)
+    if existing is not None and existing.parabricks_index_path is not None:
+        return existing
+    # Missing the Parabricks sidecar but VCF/tbi exist → just (re)run prepon.
+    if existing is not None:
+        _run_prepon(existing.vcf_path, command_log)
+        return resolve_pon_config(preset)
+
+    try:
+        _bootstrap_pon(preset, source, reference_fasta, command_log)
+    except Exception as error:  # pragma: no cover — network / tool failures
+        _append_log(
+            command_log,
+            f"# panel-of-normals: bootstrap failed ({error}); proceeding without",
+        )
+        return None
+    return resolve_pon_config(preset)
+
+
+def _append_log(command_log: Optional[list[str]], line: str) -> None:
+    if command_log is not None:
+        command_log.append(line)
+
+
+def _bootstrap_pon(
+    preset: ReferencePreset,
+    source: PonSource,
+    reference_fasta: Path,
+    command_log: Optional[list[str]],
+) -> None:
+    """Download Broad PON, harmonize contigs to match our reference, index."""
+    import fcntl
+    from urllib.request import urlopen
+
+    assert source.download_vcf_url is not None
+    assert source.download_tbi_url is not None
+    assert source.contig_rename is not None
+
+    out_dir = (get_reference_bundle_root() / source.relative_path).parent
+    out_dir.mkdir(parents=True, exist_ok=True)
+    final_vcf = get_reference_bundle_root() / source.relative_path
+    final_tbi = Path(str(final_vcf) + ".tbi")
+
+    fai_path = Path(str(reference_fasta) + ".fai")
+    if not fai_path.is_file():
+        raise RuntimeError(
+            f"Cannot harmonize PON — reference FAI missing at {fai_path}"
+        )
+
+    lock_path = out_dir / ".bootstrap.lock"
+    with lock_path.open("w", encoding="utf-8") as lock_handle:
+        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
+        # Another worker may have completed bootstrap while we were waiting.
+        if final_vcf.is_file() and final_tbi.is_file():
+            _run_prepon(final_vcf, command_log)
+            return
+
+        _append_log(
+            command_log,
+            f"# panel-of-normals: downloading {source.download_vcf_url}",
+        )
+        raw_vcf = out_dir / ".raw.vcf.gz"
+        raw_tbi = out_dir / ".raw.vcf.gz.tbi"
+        with urlopen(source.download_vcf_url, timeout=300) as response, raw_vcf.open(
+            "wb"
+        ) as destination:
+            shutil.copyfileobj(response, destination)
+        with urlopen(source.download_tbi_url, timeout=60) as response, raw_tbi.open(
+            "wb"
+        ) as destination:
+            shutil.copyfileobj(response, destination)
+
+        _append_log(
+            command_log,
+            f"# panel-of-normals: harmonizing contigs against {fai_path.name}",
+        )
+        _harmonize_pon(raw_vcf, fai_path, source.contig_rename, final_vcf)
+        raw_vcf.unlink(missing_ok=True)
+        raw_tbi.unlink(missing_ok=True)
+
+    _run_prepon(final_vcf, command_log)
+
+
+def _harmonize_pon(
+    raw_vcf: Path,
+    fai_path: Path,
+    rename_map: dict[str, str],
+    output_vcf: Path,
+) -> None:
+    """Filter to primary assembly, rename contigs, reorder to match FAI.
+
+    Produces output_vcf + output_vcf.tbi. Uses bcftools exclusively (already
+    in the backend container, via `samtools`'s host package).
+    """
+    bcftools = os.getenv("BCFTOOLS_BINARY", "bcftools")
+    out_dir = output_vcf.parent
+
+    # 1. Write a chrom-rename TSV.
+    rename_tsv = out_dir / ".rename-chrs.tsv"
+    rename_tsv.write_text(
+        "".join(f"{src}\t{dst}\n" for src, dst in rename_map.items()),
+        encoding="utf-8",
+    )
+
+    # 2. Restrict to primary-assembly contigs (upstream names) AND rewrite
+    #    them to the reference's convention in one bcftools pipeline.
+    filtered_vcf = out_dir / ".filtered.vcf.gz"
+    regions = ",".join(rename_map.keys())
+    view_proc = subprocess.Popen(
+        [bcftools, "view", "-r", regions, str(raw_vcf), "-Ou"],
+        stdout=subprocess.PIPE,
+    )
+    annotate_cmd = [
+        bcftools,
+        "annotate",
+        "--rename-chrs",
+        str(rename_tsv),
+        "-Oz",
+        "-o",
+        str(filtered_vcf),
+    ]
+    annotate_proc = subprocess.Popen(annotate_cmd, stdin=view_proc.stdout)
+    assert view_proc.stdout is not None
+    view_proc.stdout.close()
+    if annotate_proc.wait() != 0:
+        raise RuntimeError("bcftools annotate --rename-chrs failed")
+    if view_proc.wait() != 0:
+        raise RuntimeError("bcftools view (pre-filter) failed")
+
+    # 3. Reheader: replace ##contig= lines with the reference FAI's ordering.
+    new_header_path = out_dir / ".new-header.vcf"
+    _write_reheadered_header(filtered_vcf, fai_path, new_header_path)
+    reheadered_vcf = out_dir / ".reheadered.vcf.gz"
+    subprocess.run(
+        [bcftools, "reheader", "-h", str(new_header_path), str(filtered_vcf), "-o", str(reheadered_vcf)],
+        check=True,
+    )
+
+    # 4. Sort records to match the new contig order, write to final path.
+    subprocess.run(
+        [bcftools, "sort", "-Oz", "-o", str(output_vcf), str(reheadered_vcf)],
+        check=True,
+    )
+    subprocess.run(
+        [bcftools, "index", "-f", "-t", str(output_vcf)],
+        check=True,
+    )
+
+    # Cleanup intermediates.
+    for intermediate in (rename_tsv, filtered_vcf, new_header_path, reheadered_vcf):
+        intermediate.unlink(missing_ok=True)
+
+
+def _write_reheadered_header(
+    vcf_path: Path, fai_path: Path, output_path: Path
+) -> None:
+    """Read an existing VCF header, replace the ##contig= block with entries
+    ordered by the reference FAI, and write it out.
+    """
+    bcftools = os.getenv("BCFTOOLS_BINARY", "bcftools")
+    result = subprocess.run(
+        [bcftools, "view", "-h", str(vcf_path)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    fai_order: list[str] = []
+    lengths: dict[str, int] = {}
+    with fai_path.open() as fh:
+        for line in fh:
+            name, length = line.split("\t", 2)[:2]
+            fai_order.append(name)
+            lengths[name] = int(length)
+
+    new_lines: list[str] = []
+    contigs_written = False
+    for line in result.stdout.splitlines():
+        if line.startswith("##contig="):
+            if not contigs_written:
+                for name in fai_order:
+                    new_lines.append(
+                        f"##contig=<ID={name},length={lengths[name]}>"
+                    )
+                contigs_written = True
+            continue
+        new_lines.append(line)
+    if not contigs_written:
+        for name in fai_order:
+            new_lines.append(f"##contig=<ID={name},length={lengths[name]}>")
+
+    output_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+
+
+def _run_prepon(vcf_path: Path, command_log: Optional[list[str]]) -> None:
+    """Run `pbrun prepon` to emit the Parabricks PON sidecar.
+
+    No-op when Parabricks isn't installed (CPU-only boxes) or when the
+    sidecar already exists. Failures are logged but non-fatal — the GATK
+    path still works without prepon.
+    """
+    sidecar = Path(str(vcf_path) + ".pon")
+    if sidecar.is_file():
+        return
+    pbrun = os.getenv("PARABRICKS_BINARY", "pbrun")
+    pbrun_path = shutil.which(pbrun)
+    if pbrun_path is None:
+        _append_log(
+            command_log,
+            "# panel-of-normals: pbrun not found; skipping Parabricks prepon index",
+        )
+        return
+    try:
+        _append_log(command_log, "# panel-of-normals: building Parabricks prepon index")
+        subprocess.run(
+            [pbrun_path, "prepon", "--in-pon-file", str(vcf_path)],
+            check=True,
+            capture_output=True,
+        )
+    except subprocess.CalledProcessError as error:  # pragma: no cover
+        _append_log(
+            command_log,
+            f"# panel-of-normals: prepon failed ({error}); GPU path will run without PON",
+        )
 
 
 @dataclass
@@ -813,20 +1083,10 @@ def create_variant_calling_run(
 
         analysis_profile = serialize_analysis_profile(workspace)
         reference = resolve_reference_config(workspace.species, analysis_profile)
-        pon = resolve_pon_config(reference.preset) if reference.preset else None
 
-        # Stash PON metadata on the run record so the worker (which reads
-        # result_payload via start_variant_calling_run) sees the same PON
-        # the operator did, even if env vars change between create + start.
+        # PON is resolved + bootstrapped at run-start time (in the worker) so
+        # the synchronous API call doesn't block on a download / harmonization.
         initial_payload: dict = {}
-        if pon is not None:
-            initial_payload["pon"] = {
-                "label": pon.label,
-                "vcf_path": str(pon.vcf_path),
-                "parabricks_index_path": (
-                    str(pon.parabricks_index_path) if pon.parabricks_index_path else None
-                ),
-            }
 
         timestamp = utc_now()
         run = PipelineRunRecord(
@@ -1135,27 +1395,42 @@ def start_variant_calling_run(workspace_id: str, run_id: str) -> VariantCallingI
         workspace.updated_at = run.updated_at
         session.add(run)
         session.add(workspace)
+        reference_preset_value = run.reference_preset
 
-    # Pull PON metadata stored at create time (if any) and re-resolve against
-    # the container-side filesystem. The vcf path was persisted as host-style
-    # under /app-data so resolve_app_data_path is a no-op in the container but
-    # normalises paths when the backend runs natively.
-    pon_payload = existing_payload.get("pon") if isinstance(existing_payload.get("pon"), dict) else None
+    # Resolve + bootstrap the PON here, on the worker thread. First human run
+    # downloads the Broad VCF, renames contigs to match the Ensembl reference,
+    # re-sorts, and (if pbrun is available) builds the Parabricks sidecar.
+    # Subsequent runs find the harmonized file on disk and short-circuit.
     pon_vcf: Optional[Path] = None
     pon_parabricks_index: Optional[Path] = None
     pon_label: Optional[str] = None
-    if pon_payload:
-        raw_vcf = pon_payload.get("vcf_path")
-        if raw_vcf:
-            resolved = resolve_app_data_path(raw_vcf)
-            if resolved.is_file():
-                pon_vcf = resolved
-                pon_label = pon_payload.get("label")
-        raw_pbx = pon_payload.get("parabricks_index_path")
-        if raw_pbx:
-            resolved_pbx = resolve_app_data_path(raw_pbx)
-            if resolved_pbx.is_file():
-                pon_parabricks_index = resolved_pbx
+    if reference_preset_value:
+        try:
+            preset = ReferencePreset(reference_preset_value)
+        except ValueError:
+            preset = None
+        if preset is not None:
+            pon_config = ensure_pon_ready(preset, reference_path)
+            if pon_config is not None:
+                pon_vcf = pon_config.vcf_path
+                pon_parabricks_index = pon_config.parabricks_index_path
+                pon_label = pon_config.label
+
+                # Stamp the resolved PON on the run record for audit.
+                with session_scope() as session:
+                    run = get_variant_calling_run_record(session, workspace_id, run_id)
+                    payload = json.loads(run.result_payload) if run.result_payload else {}
+                    payload["pon"] = {
+                        "label": pon_config.label,
+                        "vcf_path": str(pon_config.vcf_path),
+                        "parabricks_index_path": (
+                            str(pon_config.parabricks_index_path)
+                            if pon_config.parabricks_index_path
+                            else None
+                        ),
+                    }
+                    run.result_payload = json.dumps(payload)
+                    session.add(run)
 
     run_dir = get_variant_calling_run_root(workspace_id, run_id)
     return VariantCallingInputs(

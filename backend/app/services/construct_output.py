@@ -255,7 +255,7 @@ def _fmt_when(dt) -> str:
 def _build_audit_trail(
     workspace_id: str, construct_summary, output_config: dict
 ) -> list[AuditEntry]:
-    operator = "operator@cancerstudio.dev"
+    operator = "operator@cancerstudio.org"
     trail: list[AuditEntry] = []
 
     with session_scope() as session:
@@ -461,7 +461,7 @@ def update_construct_output(
             existing["selected_cmo"] = cmo_id
             existing["released"] = True
             existing["released_at"] = utc_now().strftime("%Y-%m-%d %H:%M UTC")
-            existing["released_by"] = "operator@cancerstudio.dev"
+            existing["released_by"] = "operator@cancerstudio.org"
             existing["po_number"] = _po_number(workspace_id)
 
         else:  # pragma: no cover - pydantic restricts the literal

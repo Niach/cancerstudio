@@ -2409,6 +2409,24 @@ def execute_alignment_lane(
         run_command(index_command)
         command_log.append(quote_command(index_command))
 
+    # Reclaim the intermediate merge output. ``coord-sorted.bam`` is the pre-
+    # markdup concat of all chunk BAMs — once markdup + index have produced the
+    # final ``aligned.bam`` + ``.bai`` we don't need it anymore. It's literally
+    # half the alignment footprint on WGS (129 GB on COLO829 tumor alone).
+    if (
+        coordinate_bam.exists()
+        and final_bam.exists()
+        and final_bam.stat().st_size > 0
+        and final_bai.exists()
+    ):
+        try:
+            coordinate_bam.unlink()
+            command_log.append(f"# reclaimed intermediate {coordinate_bam.name}")
+        except OSError:
+            # Best-effort cleanup — if it fails we don't want the whole run
+            # to fail at the finishing line.
+            pass
+
     flagstat_command = [samtools_binary, "flagstat", str(final_bam)]
     if flagstat_path.exists() and flagstat_path.stat().st_size > 0:
         flagstat_stdout = flagstat_path.read_text()

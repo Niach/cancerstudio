@@ -145,12 +145,16 @@ def _allele_class(allele_id: str) -> str:
 def _pick_defaults(candidates: list[EpitopeCandidateResponse]) -> list[str]:
     """Pick up to 7 defaults: strongest class-I candidates across distinct genes,
     plus 1–2 class-II picks for T-cell help. Skip passenger (non-cancer) genes
-    when possible — the stage-6 goals checklist demands that."""
+    when possible, but fall back to them if the cancer-gene pool is too shallow
+    to hit the six-peptide goals floor (common on real canine data, and on
+    human pools where the pVACseq-filtered candidate set happens to cluster on
+    a handful of drivers only)."""
     sorted_c = sorted(candidates, key=lambda p: (p.ic50_nm, -p.vaf))
 
     picks: list[str] = []
     genes: set[str] = set()
 
+    # Phase 1 — strongest cancer-gene class-I, one per gene.
     for p in sorted_c:
         if p.mhc_class != "I" or not p.cancer_gene:
             continue
@@ -161,14 +165,31 @@ def _pick_defaults(candidates: list[EpitopeCandidateResponse]) -> list[str]:
         if len(picks) >= 5:
             break
 
+    # Phase 2 — class-II for T-cell help, distinct gene, cancer-gene preferred.
     for p in sorted_c:
         if p.mhc_class != "II" or not p.cancer_gene:
             continue
+        if p.gene in genes:
+            continue
         picks.append(p.id)
+        genes.add(p.gene)
         if sum(1 for pid in picks if _class_of(pid, candidates) == "II") >= 2:
             break
         if len(picks) >= 7:
             break
+
+    # Phase 3 — if the cancer-gene pool didn't reach the 6-pick goals floor,
+    # top up with the next-best distinct-gene candidates, passengers included.
+    # Keeps gene diversity rising and unblocks epitope completion when the
+    # upstream pVACseq filter surfaces only a few drivers (as on COLO829).
+    if len(picks) < 6:
+        for p in sorted_c:
+            if p.id in picks or p.gene in genes:
+                continue
+            picks.append(p.id)
+            genes.add(p.gene)
+            if len(picks) >= 7:
+                break
 
     return picks[:MAX_SELECTION]
 

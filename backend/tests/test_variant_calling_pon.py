@@ -21,6 +21,7 @@ from app.services.variant_calling import (
     PON_BY_PRESET,
     PonConfig,
     VariantCallingInputs,
+    ensure_pon_ready,
     resolve_pon_config,
 )
 
@@ -92,6 +93,41 @@ def test_env_var_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> No
 def test_env_var_empty_string_disables(fake_bundle: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CANCERSTUDIO_PON_GRCH38_VCF", "")
     assert resolve_pon_config(ReferencePreset.GRCH38) is None
+
+
+# ---------------------------------------------------------------------------
+# ensure_pon_ready — no-op path (files already in place)
+# ---------------------------------------------------------------------------
+
+
+def test_ensure_pon_short_circuits_when_fully_bootstrapped(fake_bundle: Path) -> None:
+    """When VCF + tbi + prepon sidecar all exist, ensure_pon_ready must not hit
+    the network and must return the cached config."""
+    (fake_bundle / "pon" / "grch38" / "1000g_pon.ensembl.vcf.gz.pon").write_bytes(b"x")
+    cfg = ensure_pon_ready(ReferencePreset.GRCH38, fake_bundle / "whatever.fa")
+    assert cfg is not None
+    assert cfg.parabricks_index_path is not None
+
+
+def test_ensure_pon_noop_for_species_without_source(fake_bundle: Path) -> None:
+    """Dog + cat have PON_BY_PRESET entries set to None; ensure_pon_ready must
+    return None without attempting a download."""
+    assert ensure_pon_ready(ReferencePreset.CANFAM4, fake_bundle / "x.fa") is None
+    assert ensure_pon_ready(ReferencePreset.FELCAT9, fake_bundle / "x.fa") is None
+
+
+def test_ensure_pon_env_override_skips_bootstrap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Env override should honour whatever the operator points at without
+    trying to re-download or re-harmonize."""
+    override = tmp_path / "custom.vcf.gz"
+    override.write_bytes(b"x")
+    (tmp_path / "custom.vcf.gz.tbi").write_bytes(b"x")
+    monkeypatch.setenv("CANCERSTUDIO_PON_GRCH38_VCF", str(override))
+    cfg = ensure_pon_ready(ReferencePreset.GRCH38, tmp_path / "x.fa")
+    assert cfg is not None
+    assert cfg.vcf_path == override
 
 
 # ---------------------------------------------------------------------------

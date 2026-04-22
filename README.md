@@ -28,7 +28,7 @@ Sample your DNA. Compute your cure. cancerstudio designs a personalized mRNA vac
 | --- | --- | --- | --- |
 | 1 | Ingestion | **Live** | samtools, pigz, fastp |
 | 2 | Alignment | **Live** — chunked stop-and-resume on commodity hardware | strobealign, samtools |
-| 3 | Variant Calling | **Live** — karyogram + plain-English filter buckets | GATK Mutect2 (GPU via NVIDIA Parabricks when available) |
+| 3 | Variant Calling | **Live** — karyogram + plain-English filter buckets, Broad 1000G panel-of-normals on human runs | GATK Mutect2 (GPU via NVIDIA Parabricks when available) |
 | 4 | Annotation | **Live** — cancer-gene cards + lollipop plot | Ensembl VEP 111 |
 | 5 | Neoantigen Prediction | **Live** — binding buckets + peptide × allele heatmap + antigen funnel | pVACseq 5.4.0, NetMHCpan 4.2, NetMHCIIpan 4.3 |
 | 6 | Epitope Selection | **Live** — 8-slot cassette curation UI | pVACview + custom scoring |
@@ -45,13 +45,13 @@ Tumor + matched-normal sequencing for one patient. **FASTQ, BAM, or CRAM.** ≥3
 
 ### Hardware
 
-| | Minimum | Recommended |
-| --- | --- | --- |
-| RAM | 32 GB | **64 GB** (35 GB free at first alignment) |
-| CPU | 8 cores | 16 cores |
-| Disk | 200 GB SSD | 500 GB SSD |
-| GPU | — | NVIDIA (any Ampere+) — enables Parabricks GPU variant calling, 5–15× faster stage 3 |
-| OS | Linux, macOS, or Windows + WSL2 | Linux |
+| | Recommended |
+| --- | --- |
+| RAM | 64 GB — strobealign indexing peaks around 31 GB free |
+| CPU | 16 cores |
+| Disk | 1 TB SSD — a 30× human WGS costs ~400 GB in the workspace (deduped BAMs + FASTQs); multiple cases share the ~55 GB reference + VEP cache + PON footprint |
+| GPU | NVIDIA Ampere+ (RTX 3090 / 4090 / A-series / H-series) — Parabricks accelerates stage 3 Mutect2 ~10× |
+| OS | Linux |
 
 The backend — FastAPI, samtools, pigz, strobealign, GATK, Parabricks, VEP, pVACtools — ships in one Docker image layered on `nvcr.io/nvidia/clara/clara-parabricks:4.7.0-1`. The Next.js frontend runs on the host. No cloud, no object storage.
 
@@ -67,6 +67,12 @@ Fill the academic-license form, agree to the DTU terms, and download the Linux t
 ### Reference
 
 Species reference genome — GRCh38 (human), UU_Cfam_GSD_1.0 (dog), or Felis_catus_9.0 (cat). Auto-downloaded on first alignment. If your workstation has less than 35 GB of free RAM, run `bash scripts/prepare-reference.sh` once beforehand to index outside the live app.
+
+### Panel-of-normals (human only)
+
+Human workspaces apply the Broad's 1000 Genomes panel-of-normals to Mutect2 so recurrent artefacts and low-frequency germline variants get filtered at call time. The Broad ships the VCF in UCSC convention (`chr1…chrM`); cancerstudio uses Ensembl GRCh38 (`1…MT`), so it auto-downloads the VCF on first variant-calling run, renames + re-orders contigs to match the reference FAI, and builds the Parabricks prepon sidecar for GPU runs. Lives under `~/cancerstudio-data/references/pon/grch38/`. Set `CANCERSTUDIO_PON_GRCH38_VCF=""` in `.env` to disable, or point at a custom VCF path to override.
+
+Dog and cat workspaces skip the PON (no curated canine / feline panel exists yet); the Variant Calling screen shows a muted "No panel-of-normals available for &lt;species&gt;" caption instead.
 
 ## Install
 
@@ -176,6 +182,7 @@ Local overrides live in `.env` — see `.env.example` for the full list. The com
 - `CANCERSTUDIO_DATA_ROOT` — where workspace artifacts and references live (default `~/cancerstudio-data`)
 - `CANCERSTUDIO_NETMHC_DIR` — where the DTU binaries live (default `${CANCERSTUDIO_DATA_ROOT}/netmhc`)
 - `REFERENCE_*_FASTA` — hand-built reference FASTAs per species
+- `CANCERSTUDIO_PON_GRCH38_VCF` — panel-of-normals override (default `${CANCERSTUDIO_DATA_ROOT}/references/pon/grch38/1000g_pon.ensembl.vcf.gz`; set empty to disable)
 - `CANCERSTUDIO_PVACSEQ_THREADS` — pvacseq parallelism (default `min(cpu_count, 8)`)
 
 Alignment compute knobs (chunk size, per-chunk aligner threads, samtools sort memory, parallel chunks) are tunable from the UI's Compute Settings drawer on the alignment stage — no env file edit needed. They persist to `${CANCERSTUDIO_DATA_ROOT}/settings.json`.
