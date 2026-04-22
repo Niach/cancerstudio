@@ -1,5 +1,7 @@
 # cancerstudio
 
+> **DISCLAIMER:** This software is provided for research and educational purposes only. Not intended for clinical or veterinary use. No warranty of fitness for any particular purpose.
+
 > Cure your cancer. *Today.*
 
 Sample your DNA. Compute your cure. cancerstudio designs a personalized mRNA vaccine from the mutations in *your* tumor — for dogs, cats, and humans.
