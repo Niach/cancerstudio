@@ -1872,7 +1872,7 @@ function mapInboxEntry(dto: InboxEntryDto): InboxEntry {
   };
 }
 
-export const api = {
+const realApi = {
   health: () => request<{ status: string }>("/health"),
 
   listInbox: async (): Promise<InboxListing> => {
@@ -2277,3 +2277,11 @@ export const api = {
     ),
   resolveDownloadUrl: (downloadPath: string) => `${PUBLIC_API_BASE}${downloadPath}`,
 };
+
+import { demoApi } from "@/lib/demo-api";
+
+const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO === "1";
+
+export const api: typeof realApi = DEMO_MODE
+  ? ({ ...realApi, ...demoApi } as typeof realApi)
+  : realApi;

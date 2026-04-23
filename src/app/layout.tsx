@@ -1,5 +1,5 @@
-import type { Metadata } from "next";
-import { Fraunces, Inter, JetBrains_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Fraunces, Inter, Instrument_Serif, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
 import { TweaksProvider } from "@/components/dev/TweaksProvider";
@@ -17,6 +17,14 @@ const inter = Inter({
   display: "swap",
 });
 
+const instrumentSerif = Instrument_Serif({
+  subsets: ["latin"],
+  weight: "400",
+  style: ["normal", "italic"],
+  variable: "--font-instrument",
+  display: "swap",
+});
+
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-jbm",
@@ -29,6 +37,11 @@ export const metadata: Metadata = {
     "Personalized oncology tooling from sequencing intake through experimental vaccine design",
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -37,7 +50,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`h-full antialiased ${fraunces.variable} ${inter.variable} ${jetbrainsMono.variable}`}
+      className={`h-full antialiased ${fraunces.variable} ${inter.variable} ${instrumentSerif.variable} ${jetbrainsMono.variable}`}
     >
       <body className="min-h-full flex flex-col">
         <TweaksProvider>{children}</TweaksProvider>
