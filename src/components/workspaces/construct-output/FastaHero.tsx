@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 
-import { Card, MonoLabel } from "@/components/ui-kit";
+import { Btn, Card, MonoLabel, Spinner } from "@/components/ui-kit";
 import type { ConstructOutputStageSummary } from "@/lib/types";
 
 import FastaLine from "./FastaLine";
@@ -14,9 +14,18 @@ const LINE_WIDTH = 60;
 interface FastaHeroProps {
   summary: ConstructOutputStageSummary;
   onDownload: (format: "fasta" | "genbank" | "json") => void;
+  onRelease: () => void;
+  submitting: boolean;
+  released: boolean;
 }
 
-export default function FastaHero({ summary, onDownload }: FastaHeroProps) {
+export default function FastaHero({
+  summary,
+  onDownload,
+  onRelease,
+  submitting,
+  released,
+}: FastaHeroProps) {
   const { runs, fullNt, constructId, species, totalNt, checksum, releasedAt, releasedBy } =
     summary;
 
@@ -86,10 +95,44 @@ export default function FastaHero({ summary, onDownload }: FastaHeroProps) {
               {releasedBy ? ` · by ${releasedBy}` : ""}
             </p>
           </div>
-          <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+          <div className="cs-hero-actions">
             <DownloadBtn label="FASTA" onClick={() => onDownload("fasta")} />
             <DownloadBtn label="GenBank" onClick={() => onDownload("genbank")} />
             <DownloadBtn label="JSON" onClick={() => onDownload("json")} />
+            {released ? (
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  height: 32,
+                  padding: "0 12px",
+                  borderRadius: 999,
+                  background:
+                    "color-mix(in oklch, var(--accent) 14%, var(--surface-sunk))",
+                  color: "var(--accent-ink)",
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 11,
+                  letterSpacing: "0.14em",
+                  textTransform: "uppercase",
+                  fontWeight: 600,
+                  border:
+                    "1px solid color-mix(in oklch, var(--accent) 35%, transparent)",
+                }}
+              >
+                ✓ Locked
+              </span>
+            ) : (
+              <Btn
+                variant="primary"
+                size="sm"
+                onClick={onRelease}
+                disabled={submitting}
+              >
+                {submitting ? <Spinner /> : null}
+                {submitting ? "Locking…" : "Lock & release"}
+              </Btn>
+            )}
           </div>
         </div>
 

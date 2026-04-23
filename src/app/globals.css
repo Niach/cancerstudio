@@ -1029,6 +1029,58 @@ input[type="range"].cs-tweak-range { width: 100%; accent-color: var(--accent); }
   .cs-landing-helix { transform: scale(0.6); margin-bottom: -90px; }
 }
 
+/* ── Stage 08 — construct output (responsive) ── */
+.cs-stage8-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 22px;
+}
+
+.cs-hero-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+@media (max-width: 700px) {
+  .cs-hero-actions { width: 100%; }
+  .cs-hero-actions > * { flex: 1 1 auto; }
+}
+
+.cs-cmo-ghost-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+@media (max-width: 1100px) {
+  .cs-cmo-ghost-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 700px) {
+  .cs-cmo-ghost-grid { grid-template-columns: 1fr; }
+}
+
+.cs-dose-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+}
+@media (max-width: 1100px) {
+  .cs-dose-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 700px) {
+  .cs-dose-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.cs-dose-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+@media (max-width: 900px) {
+  .cs-dose-meta { grid-template-columns: 1fr; }
+}
+
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
   .cs-theme *, .cs-theme *::before, .cs-theme *::after {

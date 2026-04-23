@@ -35,21 +35,6 @@ export default function ConstructOutputStagePanel({
     [onSummaryChange]
   );
 
-  const handleSelectCmo = useCallback(
-    async (cmoId: string) => {
-      try {
-        const next = await api.updateConstructOutput(workspace.id, {
-          action: "select_cmo",
-          cmoId,
-        });
-        push(next);
-      } catch {
-        // silent — GET will reconcile
-      }
-    },
-    [workspace.id, push]
-  );
-
   const handleRelease = useCallback(async () => {
     setSubmitting(true);
     try {
@@ -154,24 +139,18 @@ export default function ConstructOutputStagePanel({
     <>
       {header}
 
-      <FastaHero summary={summary} onDownload={handleDownload} />
+      <FastaHero
+        summary={summary}
+        onDownload={handleDownload}
+        onRelease={handleRelease}
+        submitting={submitting}
+        released={summary.status === "released"}
+      />
 
-      <div
-        style={{
-          marginTop: 22,
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1fr)",
-          gap: 16,
-        }}
-      >
+      <div className="cs-stage8-stack">
         <CmoCard
-          options={summary.cmoOptions}
-          selectedCmo={summary.selectedCmo ?? null}
           order={summary.order ?? null}
           released={summary.status === "released"}
-          submitting={submitting}
-          onSelect={handleSelectCmo}
-          onRelease={handleRelease}
         />
         <VetCard dosing={summary.dosing} />
         <AuditCard trail={summary.auditTrail} onExport={() => handleDownload("json")} />

@@ -29,26 +29,17 @@ export default function VetCard({ dosing }: VetCardProps) {
 
       <div
         style={{
-          padding: "14px 18px 16px",
+          padding: "16px 22px 22px",
           flex: 1,
           display: "flex",
           flexDirection: "column",
-          gap: 12,
+          gap: 16,
         }}
       >
-        <div
-          style={{
-            padding: "10px 12px",
-            borderRadius: 10,
-            background: "var(--surface-sunk)",
-            border: "1px solid var(--line)",
-            display: "grid",
-            gap: 4,
-          }}
-        >
-          <DoseRow k="Formulation" v={dosing.formulation} />
-          <DoseRow k="Route" v={dosing.route} />
-          <DoseRow k="Dose" v={dosing.dose} />
+        <div className="cs-dose-meta">
+          <DoseMeta k="Formulation" v={dosing.formulation} />
+          <DoseMeta k="Route" v={dosing.route} />
+          <DoseMeta k="Dose" v={dosing.dose} />
         </div>
 
         <div>
@@ -59,40 +50,63 @@ export default function VetCard({ dosing }: VetCardProps) {
               color: "var(--muted-2)",
               textTransform: "uppercase",
               letterSpacing: "0.14em",
-              marginBottom: 8,
+              marginBottom: 10,
             }}
           >
             Schedule
           </div>
-          <div style={{ display: "flex", flexDirection: "column" }}>
+          <div className="cs-dose-grid">
             {dosing.schedule.map((s, i) => (
               <div
                 key={i}
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: "72px 82px 1fr",
-                  gap: 8,
-                  padding: "6px 0",
-                  borderBottom:
-                    i < dosing.schedule.length - 1 ? "1px solid var(--line)" : "none",
-                  fontSize: 12,
-                  alignItems: "baseline",
+                  padding: "12px 14px",
+                  borderRadius: 12,
+                  background:
+                    i === 0
+                      ? "color-mix(in oklch, var(--accent) 10%, var(--surface-strong))"
+                      : "var(--surface-sunk)",
+                  border:
+                    i === 0
+                      ? "1px solid color-mix(in oklch, var(--accent) 35%, transparent)"
+                      : "1px solid var(--line)",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 4,
+                  minHeight: 86,
                 }}
               >
-                <span
+                <div
                   style={{
                     fontFamily: "var(--font-mono)",
-                    color: "var(--muted)",
-                    fontSize: 11,
-                    letterSpacing: "0.04em",
+                    fontSize: 10,
+                    letterSpacing: "0.14em",
+                    textTransform: "uppercase",
+                    color: "var(--muted-2)",
                   }}
                 >
                   {s.when}
-                </span>
-                <span style={{ fontWeight: 600, color: "var(--ink-2)" }}>
+                </div>
+                <div
+                  style={{
+                    fontFamily: "var(--font-display)",
+                    fontSize: 15,
+                    fontWeight: 500,
+                    color: "var(--ink)",
+                    letterSpacing: "-0.01em",
+                  }}
+                >
                   {s.label}
-                </span>
-                <span style={{ color: "var(--muted)", lineHeight: 1.4 }}>{s.what}</span>
+                </div>
+                <div
+                  style={{
+                    fontSize: 11.5,
+                    color: "var(--muted)",
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {s.what}
+                </div>
               </div>
             ))}
           </div>
@@ -100,13 +114,13 @@ export default function VetCard({ dosing }: VetCardProps) {
 
         <div
           style={{
-            padding: "10px 12px",
-            borderRadius: 10,
+            padding: "12px 14px",
+            borderRadius: 12,
             background: "color-mix(in oklch, var(--warm) 6%, var(--surface-sunk))",
             border: "1px solid color-mix(in oklch, var(--warm) 18%, var(--line))",
-            fontSize: 12,
+            fontSize: 13,
             color: "var(--ink-2)",
-            lineHeight: 1.5,
+            lineHeight: 1.55,
           }}
         >
           <div
@@ -122,7 +136,15 @@ export default function VetCard({ dosing }: VetCardProps) {
           >
             Watch for
           </div>
-          <ul style={{ margin: 0, paddingLeft: 14, display: "flex", flexDirection: "column", gap: 3 }}>
+          <ul
+            style={{
+              margin: 0,
+              paddingLeft: 16,
+              display: "flex",
+              flexDirection: "column",
+              gap: 3,
+            }}
+          >
             {dosing.watchFor.map((w, i) => (
               <li key={i}>{w}</li>
             ))}
@@ -133,22 +155,32 @@ export default function VetCard({ dosing }: VetCardProps) {
   );
 }
 
-function DoseRow({ k, v }: { k: string; v: string }) {
+function DoseMeta({ k, v }: { k: string; v: string }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "90px 1fr", gap: 10, fontSize: 12, lineHeight: 1.5 }}>
+    <div
+      style={{
+        padding: "10px 12px",
+        borderRadius: 10,
+        background: "var(--surface-sunk)",
+        border: "1px solid var(--line)",
+        display: "flex",
+        flexDirection: "column",
+        gap: 2,
+        minWidth: 0,
+      }}
+    >
       <span
         style={{
           fontFamily: "var(--font-mono)",
           color: "var(--muted-2)",
           fontSize: 10.5,
           textTransform: "uppercase",
-          letterSpacing: "0.1em",
-          paddingTop: 2,
+          letterSpacing: "0.12em",
         }}
       >
         {k}
       </span>
-      <span style={{ color: "var(--ink-2)" }}>{v}</span>
+      <span style={{ color: "var(--ink-2)", fontSize: 13, lineHeight: 1.45 }}>{v}</span>
     </div>
   );
 }

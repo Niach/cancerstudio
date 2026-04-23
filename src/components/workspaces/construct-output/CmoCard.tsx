@@ -1,153 +1,80 @@
 "use client";
 
-import { Btn, Card, MonoLabel, Spinner } from "@/components/ui-kit";
-import type { CmoOption, ConstructOutputOrder } from "@/lib/types";
+import { Card, MonoLabel } from "@/components/ui-kit";
+import type { ConstructOutputOrder } from "@/lib/types";
 
 interface CmoCardProps {
-  options: CmoOption[];
-  selectedCmo: string | null;
   order: ConstructOutputOrder | null;
   released: boolean;
-  submitting: boolean;
-  onSelect: (cmoId: string) => void;
-  onRelease: () => void;
 }
 
-export default function CmoCard({
-  options,
-  selectedCmo,
-  order,
-  released,
-  submitting,
-  onSelect,
-  onRelease,
-}: CmoCardProps) {
-  const picked = options.find((o) => o.id === (selectedCmo ?? options[0]?.id));
-
+export default function CmoCard({ order, released }: CmoCardProps) {
   return (
-    <Card style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
-      <div style={{ padding: "18px 20px 14px", borderBottom: "1px solid var(--line)" }}>
+    <Card style={{ overflow: "hidden" }}>
+      <div style={{ padding: "18px 22px 14px", borderBottom: "1px solid var(--line)" }}>
         <div style={{ marginBottom: 6 }}>
-          <MonoLabel>For the manufacturer</MonoLabel>
+          <MonoLabel>Manufacturing handoff</MonoLabel>
         </div>
-        <h3
+        <div
           style={{
-            margin: 0,
-            fontFamily: "var(--font-display)",
-            fontSize: 20,
-            fontWeight: 500,
-            letterSpacing: "-0.01em",
+            display: "flex",
+            gap: 12,
+            alignItems: "baseline",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
           }}
         >
-          Send for synthesis
-        </h3>
-      </div>
-
-      <div style={{ padding: "14px 18px 16px", flex: 1 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {options.map((o) => {
-            const active = o.id === (selectedCmo ?? options[0]?.id);
-            return (
-              <button
-                key={o.id}
-                onClick={() => onSelect(o.id)}
-                disabled={released || submitting}
-                style={{
-                  textAlign: "left",
-                  padding: "12px 14px",
-                  borderRadius: 12,
-                  border: active
-                    ? "1.5px solid var(--accent)"
-                    : "1px solid var(--line)",
-                  background: active
-                    ? "color-mix(in oklch, var(--accent) 6%, var(--surface-strong))"
-                    : "var(--surface-strong)",
-                  cursor: released || submitting ? "default" : "pointer",
-                  opacity: released && !active ? 0.6 : 1,
-                  transition: "border-color 0.15s, background 0.15s",
-                  fontFamily: "inherit",
-                  color: "var(--ink)",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "baseline",
-                    gap: 10,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <div style={{ fontSize: 13.5, fontWeight: 500, minWidth: 0 }}>
-                    {o.name}
-                  </div>
-                  <div
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      fontSize: 13,
-                      color: active ? "var(--accent-ink)" : "var(--ink-2)",
-                      fontWeight: 600,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {o.cost}
-                  </div>
-                </div>
-                <div
-                  style={{
-                    fontSize: 11,
-                    color: "var(--muted)",
-                    marginTop: 4,
-                    display: "flex",
-                    gap: 6,
-                    fontFamily: "var(--font-mono)",
-                    letterSpacing: "0.02em",
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <span>{o.type}</span>
-                  <span>·</span>
-                  <span>{o.tat}</span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-        {picked ? (
-          <div
+          <h3
             style={{
-              marginTop: 12,
-              padding: "10px 12px",
-              borderRadius: 10,
-              background: "var(--surface-sunk)",
-              border: "1px solid var(--line)",
-              fontSize: 12,
-              color: "var(--muted)",
-              lineHeight: 1.5,
+              margin: 0,
+              fontFamily: "var(--font-display)",
+              fontSize: 22,
+              fontWeight: 500,
+              letterSpacing: "-0.015em",
             }}
           >
-            <div
-              style={{
-                fontSize: 11,
-                fontFamily: "var(--font-mono)",
-                color: "var(--muted-2)",
-                textTransform: "uppercase",
-                letterSpacing: "0.12em",
-                marginBottom: 4,
-              }}
-            >
-              Why
-            </div>
-            {picked.good.join(" · ")}
-          </div>
-        ) : null}
+            CMO partners — coming soon
+          </h3>
+          <span
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 10.5,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              color: "var(--muted-2)",
+              padding: "3px 8px",
+              borderRadius: 999,
+              border: "1px solid var(--line-strong)",
+              background: "var(--surface-sunk)",
+            }}
+          >
+            Soon
+          </span>
+        </div>
+        <p
+          style={{
+            margin: "8px 0 0",
+            maxWidth: "68ch",
+            fontSize: 14,
+            color: "var(--muted)",
+            lineHeight: 1.6,
+          }}
+        >
+          The FASTA above is synthesis-ready for any IVT-capable contract manufacturer today — download it and email the file, just like Paul did for Rosie. One-click ordering with preferred partners (template synthesis, GMP-grade mRNA, capped IVT) will ship in a later release.
+        </p>
       </div>
 
-      <div style={{ padding: "0 18px 18px" }}>
+      <div style={{ padding: "18px 22px 22px" }}>
+        <div className="cs-cmo-ghost-grid">
+          {[0, 1, 2].map((i) => (
+            <GhostTile key={i} index={i} />
+          ))}
+        </div>
+
         {released && order ? (
           <div
             style={{
+              marginTop: 16,
               padding: "12px 14px",
               borderRadius: 12,
               background: "color-mix(in oklch, var(--accent) 10%, var(--surface-sunk))",
@@ -168,22 +95,77 @@ export default function CmoCard({
                 fontWeight: 600,
               }}
             >
-              ✓ Ordered
+              ✓ Construct locked
             </div>
-            PO #{order.poNumber} · ETA {picked?.tat} · {picked?.cost}
+            Reference #{order.poNumber} · handoff recorded to the audit trail.
           </div>
-        ) : (
-          <Btn
-            variant="primary"
-            onClick={onRelease}
-            disabled={submitting || !picked}
-            style={{ width: "100%" }}
-          >
-            {submitting ? <Spinner /> : null}
-            {submitting ? "Releasing…" : `Send ${picked?.name ?? ""}`}
-          </Btn>
-        )}
+        ) : null}
       </div>
     </Card>
+  );
+}
+
+function GhostTile({ index }: { index: number }) {
+  return (
+    <div
+      aria-hidden
+      style={{
+        padding: "18px 18px 20px",
+        borderRadius: "var(--radius-cs-lg, 16px)",
+        background: "var(--surface-sunk)",
+        border: "1px dashed var(--line-strong)",
+        opacity: 0.75,
+        minHeight: 132,
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+      }}
+    >
+      <div
+        style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: 10.5,
+          letterSpacing: "0.14em",
+          textTransform: "uppercase",
+          color: "var(--muted-2)",
+        }}
+      >
+        Partner {String(index + 1).padStart(2, "0")}
+      </div>
+      <div
+        style={{
+          height: 14,
+          width: "62%",
+          borderRadius: 4,
+          background: "color-mix(in oklch, var(--ink) 8%, transparent)",
+        }}
+      />
+      <div
+        style={{
+          height: 10,
+          width: "42%",
+          borderRadius: 4,
+          background: "color-mix(in oklch, var(--ink) 6%, transparent)",
+        }}
+      />
+      <div style={{ marginTop: "auto", display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <Pill />
+        <Pill width={54} />
+      </div>
+    </div>
+  );
+}
+
+function Pill({ width = 68 }: { width?: number }) {
+  return (
+    <div
+      style={{
+        height: 16,
+        width,
+        borderRadius: 999,
+        background: "color-mix(in oklch, var(--ink) 5%, transparent)",
+        border: "1px solid var(--line)",
+      }}
+    />
   );
 }
