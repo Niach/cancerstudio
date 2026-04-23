@@ -63,17 +63,16 @@ export default function Hero() {
       <div className="hero-inner">
         <h1>
           <span className="line">
-            <span className="red">Cure</span> your pet&apos;s cancer.
+            <span className="red">Design</span> your own mRNA
           </span>
           <span className="line">
-            <span className="highlight">Today.</span>
+            cancer <span className="highlight">vaccine.</span>
           </span>
         </h1>
         <p className="hero-sub">
-          Sequence the tumor. Compute the cure. cancerstudio designs a personalised
-          mRNA vaccine from the mutations in <em>your pet&apos;s</em> tumor — built
-          on an open archive of reference genomes so every call is read against a
-          real baseline.
+          An open studio for personalized mRNA cancer vaccines.
+          Sequence the tumor, run the studio on <em>your</em> machine,
+          hand the design to a manufacturer — for dogs, cats, and humans.
         </p>
         <div className="hero-cta-row">
           <a className="btn-primary" href="https://github.com/Niach/cancerstudio" target="_blank" rel="noreferrer">

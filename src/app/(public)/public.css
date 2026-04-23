@@ -250,7 +250,7 @@ h2.big em { font-style: italic; }
 .acgt-G { color: var(--g); font-style: italic; }
 .acgt-T { color: var(--t); font-style: italic; }
 
-/* ── Sample → Compute → Cure ─────────────────────── */
+/* ── Sample → Compute → Design ───────────────────── */
 .steps {
   display: grid; grid-template-columns: repeat(3, 1fr);
   gap: 24px;

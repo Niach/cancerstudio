@@ -103,10 +103,10 @@ export default function AppShowcase() {
         <div className="section-label">The app</div>
         <div className="showcase-head">
           <h2 className="big">
-            Pipeline runs <em className="acgt-C">on your machine</em>.
+            The studio runs <em className="acgt-C">on your machine</em>.
           </h2>
           <p className="subhead">
-            Nine stages, six hours, one molecule. No cloud, no data leaves your lab —
+            Eight stages, twelve hours, one vaccine. No cloud, no data leaves your lab —
             step through every stage below, or let it play.
           </p>
         </div>

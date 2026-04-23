@@ -5,9 +5,9 @@ import SiteFooter from "@/components/public/SiteFooter";
 import "./public.css";
 
 export const metadata: Metadata = {
-  title: "cancerstudio — cure your pet's cancer. today.",
+  title: "cancerstudio — design your own mRNA cancer vaccine",
   description:
-    "Sequence the tumor. Compute the cure. An open archive of reference pet genomes, and a pipeline that turns a biopsy into a personalised mRNA vaccine.",
+    "An open studio for designing personalized mRNA cancer vaccines — for dogs, cats, and humans, on your own machine.",
 };
 
 export default function PublicLayout({

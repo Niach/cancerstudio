@@ -1,15 +1,15 @@
 const ITEMS = [
   {
     k: "A" as const, num: "01", word: "Sample", sub: "Sequence the tumor.",
-    body: "A biopsy plus a matched healthy sample. Two FASTQ files from any veterinary lab.",
+    body: "A biopsy plus a matched healthy sample. Two sequencing files from any veterinary lab.",
   },
   {
     k: "C" as const, num: "02", word: "Compute", sub: "Find the mutations.",
-    body: "Nine pipeline stages compare tumor against healthy and design the molecule. ~6 hours on your workstation.",
+    body: "Eight pipeline stages compare tumor against healthy and design the vaccine. ~12 hours on your workstation.",
   },
   {
-    k: "G" as const, num: "03", word: "Cure", sub: "Print the vaccine.",
-    body: "One FASTA file to a GMP partner. A personalised mRNA vial arrives within ten days.",
+    k: "G" as const, num: "03", word: "Design", sub: "Make the vaccine.",
+    body: "One finished design, sent to a GMP partner. A personalized mRNA vial arrives within ten days.",
   },
 ];
 
@@ -21,10 +21,10 @@ export default function Triptych() {
         <h2 className="big triptych-title">
           <span className="acgt-A">Sample.</span>
           &nbsp;<span className="acgt-C">Compute.</span>
-          &nbsp;<span className="acgt-G">Cure.</span>
+          &nbsp;<span className="acgt-G">Design.</span>
         </h2>
         <p className="subhead">
-          Three steps between a biopsy and a vial — for dogs and cats first, humans next.
+          Three steps from a biopsy to a vaccine — for dogs and cats first, humans next.
         </p>
 
         <ol className="triptych">

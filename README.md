@@ -2,9 +2,9 @@
 
 > **DISCLAIMER:** This software is provided for research and educational purposes only. Not intended for clinical or veterinary use. No warranty of fitness for any particular purpose.
 
-> Cure your cancer. *Today.*
+> Design your own mRNA cancer vaccine.
 
-Sample your DNA. Compute your cure. cancerstudio designs a personalized mRNA vaccine from the mutations in *your* tumor — for dogs, cats, and humans.
+cancerstudio is an open studio for designing personalized mRNA cancer vaccines — for dogs, cats, and humans. Sequence a tumor and a healthy sample, run the studio on your own machine, hand the design to a manufacturer.
 
 [![Release](https://img.shields.io/github/v/release/niach/cancerstudio?color=22c55e&label=release)](https://github.com/niach/cancerstudio/releases)
 [![CI](https://github.com/niach/cancerstudio/actions/workflows/ci.yml/badge.svg)](https://github.com/niach/cancerstudio/actions/workflows/ci.yml)
@@ -20,15 +20,15 @@ Sample your DNA. Compute your cure. cancerstudio designs a personalized mRNA vac
 | --- | --- | --- | --- | --- |
 | ![neoantigen prediction](docs/screenshots/neoantigen.png) | ![epitope selection](docs/screenshots/epitope-selection.png) | ![mRNA construct design](docs/screenshots/construct-design.png) | ![construct output](docs/screenshots/construct-output.png) | |
 
-## Sample. Compute. Cure.
+## Sample. Compute. Design.
 
-**Sample.** Sequence the tumor and a matched healthy sample at any standard lab. Two FASTQ files.
+**Sample.** Sequence a tumor and a matched healthy sample at any standard lab. Two sequencing files — that's the whole input.
 
-**Compute.** Run cancerstudio on *your* machine. Eight guided stages compare tumor vs. healthy, find the cancer-specific *mutations*, and design the molecule. ≈12 hours on a workstation.
+**Compute.** Run cancerstudio on *your* machine. Eight guided stages compare tumor vs. healthy, find the cancer-specific *mutations*, and design the vaccine. ≈12 hours on a workstation.
 
-**Cure.** Send the resulting FASTA to a GMP manufacturer. A vial arrives roughly ten days later.
+**Design.** Send the finished design to a GMP manufacturer. A vial arrives roughly ten days later.
 
-## Eight stages. Twelve hours. One molecule.
+## Eight stages. Twelve hours. One vaccine.
 
 | # | Stage | State | Tools |
 | --- | --- | --- | --- |

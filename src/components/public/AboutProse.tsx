@@ -5,13 +5,14 @@ export default function AboutProse({ stats }: { stats: CatalogStats }) {
     <div className="prose">
       <div className="section-label">Mission</div>
       <h1>
-        You can&apos;t cure a cancer you can&apos;t <em>read</em>.
+        You can&apos;t fight a cancer you can&apos;t <em>read</em>.
       </h1>
       <p className="lede">
-        A tumour genome only means something when you have a healthy one to
-        compare it against. Humans have gnomAD, 1000 Genomes, and biobanks. For dogs
-        and cats, there was almost nothing. We are building that missing baseline —
-        then using it to design vaccines, one tumour at a time.
+        A tumor genome only means something when you have a healthy one to compare
+        it against. Humans have gnomAD, 1000 Genomes, and biobanks. For dogs and
+        cats, there was almost nothing. We&apos;re building that missing baseline —
+        and an open studio that uses it to design personalized mRNA cancer
+        vaccines, one tumor at a time.
       </p>
 
       <h2>Why this exists</h2>
@@ -38,11 +39,11 @@ export default function AboutProse({ stats }: { stats: CatalogStats }) {
         baselines. CC-BY, CC0, or CC-BY-NC at the contributor&apos;s choice.
       </p>
 
-      <h2>How it cures cancer</h2>
+      <h2>How the archive sharpens every design</h2>
       <p>
         Every oncologist who runs cancerstudio downloads a matched baseline from this
         archive as their reference. Every new healthy genome sharpens every future
-        tumour call — for every pet, everywhere.
+        vaccine design — for every pet, everywhere.
       </p>
     </div>
   );
