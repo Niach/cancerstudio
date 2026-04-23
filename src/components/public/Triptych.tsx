@@ -17,16 +17,6 @@ export default function Triptych() {
   return (
     <section className="block paper" id="three">
       <div className="inner">
-        <div className="section-label">Three words</div>
-        <h2 className="big triptych-title">
-          <span className="acgt-A">Sample.</span>
-          &nbsp;<span className="acgt-C">Compute.</span>
-          &nbsp;<span className="acgt-G">Design.</span>
-        </h2>
-        <p className="subhead">
-          Three steps from a biopsy to a vaccine — for dogs and cats first, humans next.
-        </p>
-
         <ol className="triptych">
           {ITEMS.map(it => (
             <li key={it.k} className={"trip trip-" + it.k.toLowerCase()}>
