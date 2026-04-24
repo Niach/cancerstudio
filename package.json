@@ -4,11 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "public": "CANCERSTUDIO_MODE=public next dev -p 3001",
     "build": "next build",
     "start": "next start",
     "backend": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up",
     "backend:detached": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d && docker compose logs -f cancerstudio",
     "backend:down": "docker compose down",
+    "prod": "docker compose up",
     "dev:all": "concurrently -k -n next,backend \"npm run dev\" \"npm run backend\"",
     "lint": "eslint",
     "test:fast": "npm run lint && npx tsc --noEmit && npm run test:backend:fast",

@@ -1,13 +1,7 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Cancerstudio (dev all)" type="js.build_tools.npm">
-    <package-json value="$PROJECT_DIR$/package.json" />
-    <command value="run" />
-    <scripts>
-      <script value="dev:all" />
-    </scripts>
-    <node-interpreter value="project" />
-    <package-manager value="npm" />
-    <envs />
+  <configuration default="false" name="Cancerstudio (dev all)" type="CompoundRunConfigurationType">
+    <toRun name="Frontend (next dev)" type="js.build_tools.npm" />
+    <toRun name="Backend (docker compose)" type="js.build_tools.npm" />
     <method v="2" />
   </configuration>
 </component>
