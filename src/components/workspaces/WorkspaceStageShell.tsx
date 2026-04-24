@@ -172,7 +172,7 @@ export default function WorkspaceStageShell({
                 className="cs-mono-label"
                 style={{ fontSize: 9, letterSpacing: "0.18em" }}
               >
-                v0.4
+                v0.6
               </span>
             </div>
           </Link>

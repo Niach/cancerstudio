@@ -119,7 +119,7 @@ export default function AppShowcase() {
                 <span className="cs-url-lock">●</span>
                 localhost:3000 <span className="cs-url-sub">— cancerstudio / {stage.crumb}</span>
               </div>
-              <div className="cs-chrome-meta">v0.4</div>
+              <div className="cs-chrome-meta">v0.6</div>
             </div>
 
             <div
