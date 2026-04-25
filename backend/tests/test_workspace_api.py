@@ -1,5 +1,6 @@
 import gzip
 import io
+import sys
 from contextlib import closing
 import threading
 from pathlib import Path
@@ -55,6 +56,23 @@ def clean_database():
         session.execute(delete(WorkspaceFileRecord))
         session.execute(delete(IngestionBatchRecord))
         session.execute(delete(WorkspaceRecord))
+
+
+@pytest.fixture(autouse=True)
+def inbox_root(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    monkeypatch.setenv("CANCERSTUDIO_INBOX_DIR", str(tmp_path))
+    monkeypatch.setattr(workspace_routes, "verify_tools", lambda _tools: None)
+    fake_pigz = tmp_path / "fake_pigz.py"
+    fake_pigz.write_text(
+        "import gzip, sys\n"
+        "sys.stdout.buffer.write(gzip.compress(sys.stdin.buffer.read()))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        workspace_store,
+        "resolve_pigz_command",
+        lambda: [sys.executable, str(fake_pigz)],
+    )
 
 
 @pytest.fixture
@@ -347,6 +365,30 @@ async def test_local_file_registration_requires_real_paths(client: httpx.AsyncCl
 
 
 @pytest.mark.anyio
+async def test_local_file_registration_rejects_paths_outside_inbox(
+    client: httpx.AsyncClient,
+    queued_batches: list[tuple[str, str]],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    workspace = await create_workspace(client)
+    inbox = tmp_path / "inbox"
+    outside_path = write_gz_fastq(
+        tmp_path / "outside_R1.fastq.gz", "outside-r1", "ACGT"
+    )
+    monkeypatch.setenv("CANCERSTUDIO_INBOX_DIR", str(inbox))
+
+    response = await client.post(
+        f"/api/workspaces/{workspace['id']}/ingestion/local-files",
+        json={"sample_lane": "tumor", "paths": [str(outside_path)]},
+    )
+
+    assert response.status_code == 400
+    assert "inbox" in response.text
+    assert queued_batches == []
+
+
+@pytest.mark.anyio
 async def test_local_ingestion_reaches_alignment_ready(
     client: httpx.AsyncClient,
     queued_batches: list[tuple[str, str]],
@@ -390,6 +432,28 @@ async def test_local_ingestion_reaches_alignment_ready(
     preview = preview_response.json()
     assert preview["reads"]["R1"]
     assert preview["reads"]["R2"]
+
+
+@pytest.mark.anyio
+async def test_fastq_lane_splits_require_matching_r1_r2_mates(
+    client: httpx.AsyncClient,
+    queued_batches: list[tuple[str, str]],
+    tmp_path: Path,
+):
+    workspace = await create_workspace(client)
+    lane_paths = [
+        write_gz_fastq(tmp_path / "tumor_L001_R1.fastq.gz", "tumor-r1-a", "ACGT"),
+        write_gz_fastq(tmp_path / "tumor_L002_R2.fastq.gz", "tumor-r2-b", "TGCA"),
+    ]
+
+    response = await client.post(
+        f"/api/workspaces/{workspace['id']}/ingestion/local-files",
+        json={"sample_lane": "tumor", "paths": [str(path) for path in lane_paths]},
+    )
+
+    assert response.status_code == 400
+    assert "lane split" in response.text
+    assert queued_batches == []
 
 
 @pytest.mark.anyio
@@ -806,6 +870,10 @@ async def test_variant_calling_pause_preserves_shards_and_resume_restores_pendin
 
 
 @pytest.mark.anyio
+@pytest.mark.skipif(
+    not Path("/proc").exists(),
+    reason="/proc cmdline inspection is Linux-only",
+)
 async def test_variant_calling_pause_kills_orphaned_subprocesses_via_pid_file(
     client: httpx.AsyncClient,
     queued_batches: list[tuple[str, str]],

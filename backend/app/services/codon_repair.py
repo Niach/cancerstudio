@@ -14,9 +14,14 @@ UTR redesign).
 """
 from __future__ import annotations
 
+import hashlib
+from functools import lru_cache
+
 import dnachisel as dc
+import numpy as np
 
 
+@lru_cache(maxsize=256)
 def repair(
     orf_dna: str,
     *,
@@ -56,10 +61,15 @@ def repair(
         constraints=constraints,
         logger=None,
     )
+    rng_state = np.random.get_state()
+    seed = int(hashlib.sha256(orf_dna.encode("ascii")).hexdigest()[:8], 16)
+    np.random.seed(seed)
     try:
         problem.resolve_constraints()
     except Exception:
         # Over-constrained — return LinearDesign's output unchanged. The
         # checks will still report what's broken so the user sees the truth.
         return orf_dna
+    finally:
+        np.random.set_state(rng_state)
     return problem.sequence

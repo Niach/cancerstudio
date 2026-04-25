@@ -100,13 +100,13 @@ import type {
 
 // Browser default: same-origin `/backend/*` proxied to the FastAPI container
 // by the Next.js rewrite in next.config.ts. Self-hosters only expose port 3000.
-// SSR default: direct hop to the backend over the Docker network.
-// Host-mode dev (native uvicorn + `next dev`): set NEXT_PUBLIC_API_URL=http://localhost:8000.
+// SSR default: direct hop to the backend in the combined image or host-mode dev.
+// Split-container deployments can set INTERNAL_API_URL to their backend service URL.
 const PUBLIC_API_BASE =
   process.env.NEXT_PUBLIC_API_URL ?? "/backend";
 const API_BASE =
   typeof window === "undefined"
-    ? process.env.INTERNAL_API_URL ?? "http://backend:8000"
+    ? process.env.INTERNAL_API_URL ?? "http://127.0.0.1:8000"
     : PUBLIC_API_BASE;
 
 type WorkspaceFileDto = {

@@ -12,6 +12,7 @@ export type LaneStagingValidationState =
   | "missing-r1"
   | "unclear"
   | "mixed-stems"
+  | "mismatched-pairs"
   | "mixed-marked-unmarked"
   | "mixed-formats"
   | "ready";
@@ -79,6 +80,14 @@ export function normalizeFastqSampleStem(filename: string): string {
     (token) =>
       !READ_PAIR_TOKEN_PATTERN.test(token) && !LANE_SPLIT_TOKEN_PATTERN.test(token)
   );
+  return filtered.join("_").toLowerCase();
+}
+
+export function normalizeFastqPairKey(filename: string): string {
+  let stem = stripKnownSuffix(filename);
+  stem = stem.replace(UNDERSCORE_PAIR_SUFFIX_PATTERN, "");
+  const tokens = stem.split(SEPARATOR_PATTERN).filter(Boolean);
+  const filtered = tokens.filter((token) => !READ_PAIR_TOKEN_PATTERN.test(token));
   return filtered.join("_").toLowerCase();
 }
 
@@ -192,6 +201,34 @@ export function validateStagedFiles(files: File[]): LaneStagingValidation {
       state: "mixed-stems",
       reason: "Files belong to different sample families.",
       sampleStem: null,
+    };
+  }
+
+  const pairsBySplit = new Map<string, Set<DetectedReadPair>>();
+  for (const file of files) {
+    const pair = inferReadPair(file.name);
+    if (pair !== "R1" && pair !== "R2") {
+      continue;
+    }
+    const splitKey = normalizeFastqPairKey(file.name);
+    if (!splitKey) {
+      continue;
+    }
+    const pairs = pairsBySplit.get(splitKey) ?? new Set<DetectedReadPair>();
+    pairs.add(pair);
+    pairsBySplit.set(splitKey, pairs);
+  }
+  const incompleteSplits = [...pairsBySplit.entries()]
+    .filter(([, pairs]) => !(pairs.has("R1") && pairs.has("R2")))
+    .map(([splitKey]) => splitKey)
+    .sort();
+  if (incompleteSplits.length > 0) {
+    return {
+      state: "mismatched-pairs",
+      reason: `Each lane split needs matching R1/R2 files. Missing mate for: ${incompleteSplits
+        .slice(0, 3)
+        .join(", ")}.`,
+      sampleStem,
     };
   }
 

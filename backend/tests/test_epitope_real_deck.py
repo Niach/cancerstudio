@@ -1,7 +1,10 @@
 """Verify stage 6 builds its candidate deck from stage-5's pVACseq top
-candidates when they are available, and falls back to the fixture when
-they aren't (e.g. demo workspaces seeded without a real pipeline run)."""
+candidates when they are available, keeps the fixture fallback only for
+demo workspaces without a real run, and blocks malformed real run output."""
 from __future__ import annotations
+
+from contextlib import contextmanager
+from types import SimpleNamespace
 
 import pytest
 
@@ -20,6 +23,8 @@ from app.services import epitope_selection
 def _stub_neoantigen(
     monkeypatch: pytest.MonkeyPatch,
     top: list[TopCandidate] | None,
+    *,
+    has_run: bool = True,
 ) -> None:
     metrics = (
         NeoantigenMetricsResponse(top=top) if top is not None else None
@@ -33,7 +38,7 @@ def _stub_neoantigen(
             updated_at="2026-04-20T10:30:00Z",
             metrics=metrics,
         )
-        if metrics is not None
+        if has_run
         else None
     )
     summary = NeoantigenStageSummaryResponse(
@@ -45,6 +50,19 @@ def _stub_neoantigen(
     )
     monkeypatch.setattr(
         epitope_selection, "load_neoantigen_stage_summary", lambda _wid: summary
+    )
+
+
+def _stub_workspace(monkeypatch: pytest.MonkeyPatch) -> None:
+    @contextmanager
+    def fake_session_scope():
+        yield object()
+
+    monkeypatch.setattr(epitope_selection, "session_scope", fake_session_scope)
+    monkeypatch.setattr(
+        epitope_selection,
+        "get_workspace_record",
+        lambda _session, _wid: SimpleNamespace(species="dog", epitope_config=None),
     )
 
 
@@ -103,3 +121,36 @@ def test_tier_boundary():
     assert epitope_selection._tier_for(99.0) == "strong"
     assert epitope_selection._tier_for(100.0) == "moderate"
     assert epitope_selection._tier_for(1500.0) == "moderate"
+
+
+def test_stage6_demo_fixture_fallback_requires_no_real_run(monkeypatch):
+    _stub_neoantigen(monkeypatch, top=None, has_run=False)
+    _stub_workspace(monkeypatch)
+
+    summary = epitope_selection.load_epitope_stage_summary("ws-test")
+
+    assert summary.status in {EpitopeStageStatus.SCAFFOLDED, EpitopeStageStatus.COMPLETED}
+    assert summary.candidates
+    assert summary.blocking_reason is None
+
+
+def test_stage6_blocks_completed_run_without_metrics(monkeypatch):
+    _stub_neoantigen(monkeypatch, top=None, has_run=True)
+    _stub_workspace(monkeypatch)
+
+    summary = epitope_selection.load_epitope_stage_summary("ws-test")
+
+    assert summary.status == EpitopeStageStatus.BLOCKED
+    assert summary.candidates == []
+    assert "metrics" in (summary.blocking_reason or "")
+
+
+def test_stage6_blocks_completed_run_with_empty_top_candidates(monkeypatch):
+    _stub_neoantigen(monkeypatch, top=[], has_run=True)
+    _stub_workspace(monkeypatch)
+
+    summary = epitope_selection.load_epitope_stage_summary("ws-test")
+
+    assert summary.status == EpitopeStageStatus.BLOCKED
+    assert summary.candidates == []
+    assert "candidate peptides" in (summary.blocking_reason or "")

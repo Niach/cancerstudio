@@ -201,6 +201,73 @@ def test_summary_scaffolded_names_openai_key_when_model_overridden(monkeypatch):
     assert "openai/gpt-4o" in (summary.blocking_reason or "")
 
 
+def test_build_case_brief_reads_variant_metrics_from_latest_run(monkeypatch):
+    _create_workspace()
+    variant_metrics = SimpleNamespace(
+        total_variants=12,
+        pass_count=9,
+        snv_count=7,
+        indel_count=2,
+        median_vaf=0.31,
+        tumor_mean_depth=84.0,
+        normal_mean_depth=77.0,
+    )
+    monkeypatch.setattr(
+        ai_review,
+        "load_variant_calling_stage_summary",
+        lambda _wid: SimpleNamespace(
+            latest_run=SimpleNamespace(metrics=variant_metrics)
+        ),
+    )
+    peptide = SimpleNamespace(
+        id="p1",
+        seq="KITYASNII",
+        gene="KIT",
+        mutation="p.N816I",
+        mhc_class="I",
+        allele_id="DLA-88*034:01",
+        ic50_nm=14.0,
+        vaf=0.47,
+        cancer_gene=True,
+        driver_context="canonical driver",
+    )
+    monkeypatch.setattr(
+        ai_review,
+        "load_epitope_stage_summary",
+        lambda _wid: SimpleNamespace(
+            candidates=[peptide], selection=["p1"], default_picks=["p1"]
+        ),
+    )
+    monkeypatch.setattr(
+        ai_review,
+        "load_construct_stage_summary",
+        lambda _wid: SimpleNamespace(
+            metrics=SimpleNamespace(
+                aa_len=89,
+                nt_len=267,
+                cai=0.85,
+                gc=58.0,
+                mfe=-123,
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        ai_review,
+        "load_construct_output_summary",
+        lambda _wid: SimpleNamespace(
+            construct_id="ROSIE-MCT-001",
+            version="v1",
+            checksum="sha256:test",
+        ),
+    )
+
+    brief = ai_review._build_case_brief(WORKSPACE_ID)
+
+    assert brief.variants.total == 12
+    assert brief.variants.pass_count == 9
+    assert brief.shortlist[0].gene == "KIT"
+
+
 # ── run / retry ───────────────────────────────────────────────────────────
 
 

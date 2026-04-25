@@ -7,9 +7,10 @@ candidates to choose from.
 
 When stage 5 has completed for a workspace, the candidate deck is built
 from pVACseq's ``top`` candidates (via ``load_neoantigen_stage_summary``).
-For demo workspaces seeded without a real stage-5 run, or when the latest
-run has no parseable metrics yet, the service falls back to the fixture
-deck in ``backend/app/data/epitope_fixture.json``. The stage is gated on
+For demo workspaces seeded without a real stage-5 run, the service falls
+back to the fixture deck in ``backend/app/data/epitope_fixture.json``. A
+real completed stage-5 run with missing metrics or no top candidates blocks
+Stage 6 instead of substituting demo peptides. The stage is gated on
 ``readyForEpitopeSelection`` from the neoantigen summary.
 """
 from __future__ import annotations
@@ -290,15 +291,38 @@ def _real_deck_from_summary(
 ) -> Optional[tuple[
     list[EpitopeCandidateResponse], list[EpitopeAlleleResponse], list[str]
 ]]:
-    """Return (candidates, alleles, default_picks) built from stage-5 output,
-    or ``None`` when no parseable top-candidate data is available (e.g. a demo
-    workspace seeded without a real stage-5 run)."""
+    """Return (candidates, alleles, default_picks) built from stage-5 output.
+
+    Callers must check ``_real_deck_blocking_reason`` first so missing metrics
+    or empty real candidate lists block instead of falling through to fixtures.
+    ``None`` means there is no real stage-5 run, which is the demo fallback.
+    """
     if summary.latest_run is None or summary.latest_run.metrics is None:
         return None
     top = summary.latest_run.metrics.top
     if not top:
         return None
     return _deck_from_top(list(top))
+
+
+def _real_deck_blocking_reason(
+    summary: NeoantigenStageSummaryResponse,
+) -> Optional[str]:
+    latest = summary.latest_run
+    if latest is None:
+        return None
+    if latest.metrics is None:
+        return (
+            "Neoantigen prediction completed, but no parseable peptide metrics "
+            "were produced. Rerun neoantigen prediction before curating epitopes."
+        )
+    if not latest.metrics.top:
+        return (
+            "Neoantigen prediction completed without any top candidate peptides. "
+            "Adjust the allele set or rerun neoantigen prediction before curating "
+            "epitopes."
+        )
+    return None
 
 
 def load_epitope_stage_summary(workspace_id: str) -> EpitopeStageSummaryResponse:
@@ -314,6 +338,10 @@ def load_epitope_stage_summary(workspace_id: str) -> EpitopeStageSummaryResponse
         workspace = get_workspace_record(session, workspace_id)
         config = load_workspace_epitope_config(workspace)
         workspace_species = workspace.species
+
+    real_deck_issue = _real_deck_blocking_reason(neoantigen_summary)
+    if real_deck_issue is not None:
+        return _blocked_summary(workspace_id, real_deck_issue)
 
     real = _real_deck_from_summary(neoantigen_summary)
     if real is not None:
@@ -359,16 +387,12 @@ def load_epitope_stage_summary(workspace_id: str) -> EpitopeStageSummaryResponse
 def update_epitope_selection(
     workspace_id: str, payload: EpitopeSelectionUpdate
 ) -> EpitopeStageSummaryResponse:
-    # Use whatever deck is currently active (real data from stage 5 output if
-    # available, else fixture) so selections are validated against the deck
-    # the user actually saw.
-    summary = load_neoantigen_stage_summary(workspace_id)
-    real = (
-        _real_deck_from_summary(summary)
-        if summary.ready_for_epitope_selection
-        else None
-    )
-    candidates = real[0] if real is not None else _build_candidates()
+    # Validate against the same deck the user sees. This also preserves the
+    # blocked state for real stage-5 runs with missing or empty metrics.
+    current = load_epitope_stage_summary(workspace_id)
+    if current.status == EpitopeStageStatus.BLOCKED:
+        return current
+    candidates = current.candidates
     selection = _filtered_selection(payload.peptide_ids, candidates)
 
     with session_scope() as session:

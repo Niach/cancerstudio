@@ -341,6 +341,36 @@ def _build_audit_trail(
     return trail
 
 
+_RELEASE_METADATA_KEYS = (
+    "released",
+    "released_at",
+    "released_by",
+    "released_checksum",
+    "released_construct_id",
+    "released_total_nt",
+    "released_version",
+    "po_number",
+)
+
+
+def _release_matches_current_output(
+    output_config: dict, *, checksum: str, construct_id: str
+) -> bool:
+    if not output_config.get("released"):
+        return False
+    return (
+        output_config.get("released_checksum") == checksum
+        and output_config.get("released_construct_id") == construct_id
+    )
+
+
+def _without_release_metadata(output_config: dict) -> dict:
+    sanitized = dict(output_config)
+    for key in _RELEASE_METADATA_KEYS:
+        sanitized.pop(key, None)
+    return sanitized
+
+
 def _po_number(workspace_id: str) -> str:
     seed = int(hashlib.sha256(workspace_id.encode()).hexdigest()[:6], 16)
     rnd = random.Random(seed)
@@ -396,11 +426,14 @@ def load_construct_output_summary(
     species_label = _species_label(species)
     genbank = _build_genbank(construct_summary, runs, construct_id, species_label)
 
-    released = bool(output_config.get("released"))
+    released = _release_matches_current_output(
+        output_config, checksum=checksum, construct_id=construct_id
+    )
     selected_cmo = output_config.get("selected_cmo")
     status = (
         ConstructOutputStatus.RELEASED if released else ConstructOutputStatus.READY
     )
+    audit_config = output_config if released else _without_release_metadata(output_config)
 
     order: Optional[ConstructOutputOrder] = None
     if released and selected_cmo:
@@ -428,7 +461,7 @@ def load_construct_output_summary(
         selected_cmo=selected_cmo,
         order=order,
         dosing=_dosing_protocol(),
-        audit_trail=_build_audit_trail(workspace_id, construct_summary, output_config),
+        audit_trail=_build_audit_trail(workspace_id, construct_summary, audit_config),
     )
 
 
@@ -450,7 +483,11 @@ def update_construct_output(
         if payload.action == "select_cmo":
             if payload.cmo_id not in valid_cmo_ids:
                 raise ValueError(f"Unknown CMO: {payload.cmo_id}")
+            previous_cmo = existing.get("selected_cmo")
             existing["selected_cmo"] = payload.cmo_id
+            if existing.get("released") and payload.cmo_id != previous_cmo:
+                existing = _without_release_metadata(existing)
+                existing["selected_cmo"] = payload.cmo_id
 
         elif payload.action == "release":
             cmo_id = payload.cmo_id or existing.get("selected_cmo")
@@ -462,6 +499,10 @@ def update_construct_output(
             existing["released"] = True
             existing["released_at"] = utc_now().strftime("%Y-%m-%d %H:%M UTC")
             existing["released_by"] = "operator@cancerstudio.org"
+            existing["released_checksum"] = summary.checksum
+            existing["released_construct_id"] = summary.construct_id
+            existing["released_total_nt"] = summary.total_nt
+            existing["released_version"] = summary.version
             existing["po_number"] = _po_number(workspace_id)
 
         else:  # pragma: no cover - pydantic restricts the literal

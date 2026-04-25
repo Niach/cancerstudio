@@ -215,7 +215,13 @@ def _build_case_brief(workspace_id: str) -> AiReviewCaseBrief:
         reference = workspace.reference_preset or ""
 
     variant_summary = load_variant_calling_stage_summary(workspace_id)
-    vm = variant_summary.metrics
+    variant_run = variant_summary.latest_run
+    vm = variant_run.metrics if variant_run is not None else None
+    if vm is None:
+        raise ValueError(
+            "Variant calling metrics are missing. Rerun variant calling before "
+            "requesting the AI review."
+        )
 
     epitope_summary = load_epitope_stage_summary(workspace_id)
     candidate_by_id = {c.id: c for c in epitope_summary.candidates}

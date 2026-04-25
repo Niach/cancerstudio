@@ -50,7 +50,12 @@ from app.models.schemas import (
     WorkspaceAnalysisProfileUpdateRequest,
     WorkspaceResponse,
 )
-from app.runtime import get_alignment_run_root, get_batch_canonical_root, is_path_within_app_data
+from app.runtime import (
+    get_alignment_run_root,
+    get_batch_canonical_root,
+    get_inbox_root,
+    is_path_within_app_data,
+)
 
 READ_PAIR_PATTERN = re.compile(
     r"(?:^|[_\-.])(R[12])(?:[_\-.]|$)"
@@ -424,6 +429,18 @@ def normalize_fastq_sample_stem(filename: str) -> str:
     return "_".join(filtered_tokens).lower()
 
 
+def normalize_fastq_pair_key(filename: str) -> str:
+    stem = strip_known_suffix(filename)
+    stem = UNDERSCORE_PAIR_SUFFIX_PATTERN.sub("", stem)
+    tokens = [token for token in SEPARATOR_PATTERN.split(stem) if token]
+    filtered_tokens = [
+        token
+        for token in tokens
+        if not READ_PAIR_PATTERN.fullmatch(token)
+    ]
+    return "_".join(filtered_tokens).lower()
+
+
 def build_canonical_filename(sample_lane: SampleLane, read_pair: ReadPair) -> str:
     return f"{sample_lane.value}_{read_pair.value}.normalized.fastq.gz"
 
@@ -647,6 +664,29 @@ def validate_lane_files(files: Iterable[WorkspaceFileRecord]) -> LaneValidationR
         blocking_issues.append(
             "FASTQ files in a lane must resolve to exactly one sample family."
         )
+
+    if has_r1 and has_r2 and not has_unknown:
+        pairs_by_split: dict[str, set[ReadPair]] = {}
+        for file in file_list:
+            read_pair = ReadPair(file.read_pair)
+            if read_pair not in {ReadPair.R1, ReadPair.R2}:
+                continue
+            split_key = normalize_fastq_pair_key(file.filename)
+            if not split_key:
+                continue
+            pairs_by_split.setdefault(split_key, set()).add(read_pair)
+
+        incomplete_splits = sorted(
+            split_key
+            for split_key, pairs in pairs_by_split.items()
+            if pairs != {ReadPair.R1, ReadPair.R2}
+        )
+        if incomplete_splits:
+            preview = ", ".join(incomplete_splits[:3])
+            blocking_issues.append(
+                "Each FASTQ lane split must include matching R1 and R2 files. "
+                f"Missing mate for: {preview}."
+            )
 
     return LaneValidationResult(
         file_format=file_format,
@@ -1118,6 +1158,24 @@ def update_workspace_analysis_profile(
         return serialize_workspace(workspace)
 
 
+def _env_flag_enabled(name: str) -> bool:
+    return (os.getenv(name) or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _allows_arbitrary_local_paths() -> bool:
+    return _env_flag_enabled("CANCERSTUDIO_ALLOW_LOCAL_FILE_PATHS") or _env_flag_enabled(
+        "CANCERSTUDIO_ALLOW_LOCAL_PATHS"
+    )
+
+
+def _path_is_within(path: Path, root: Path) -> bool:
+    try:
+        path.resolve().relative_to(root.resolve())
+        return True
+    except ValueError:
+        return False
+
+
 def register_local_lane_files(
     workspace_id: str,
     request: LocalFileRegistrationRequest,
@@ -1127,13 +1185,22 @@ def register_local_lane_files(
 
     timestamp = utc_now()
     normalized_paths: list[Path] = []
+    inbox_root = get_inbox_root()
+    allow_arbitrary_paths = _allows_arbitrary_local_paths()
     for raw_path in request.paths:
         candidate = Path(raw_path).expanduser()
         if not candidate.exists():
             raise ValueError(f"Local file does not exist: {candidate}")
         if not candidate.is_file():
             raise ValueError(f"Expected a file path, but got: {candidate}")
-        normalized_paths.append(candidate.resolve())
+        resolved = candidate.resolve()
+        if not allow_arbitrary_paths and not _path_is_within(resolved, inbox_root):
+            raise ValueError(
+                "Local sequencing files must come from the inbox "
+                f"({inbox_root}). Move the file into the inbox, then pick it "
+                "from there."
+            )
+        normalized_paths.append(resolved)
 
     created_batch_id: Optional[str] = None
     with session_scope() as session:

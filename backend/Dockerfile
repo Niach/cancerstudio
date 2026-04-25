@@ -10,7 +10,8 @@
 # (glibc matches the Parabricks/Ubuntu final stage).
 FROM node:22-bookworm-slim AS web-builder
 WORKDIR /app
-ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    INTERNAL_API_URL=http://127.0.0.1:8000
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY next.config.ts tsconfig.json postcss.config.mjs ./

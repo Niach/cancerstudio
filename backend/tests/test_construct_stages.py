@@ -197,6 +197,36 @@ def test_stage8_ready_and_release_flow(monkeypatch):
     assert released.released_at
 
 
+def test_stage8_release_is_invalidated_when_sequence_changes(monkeypatch):
+    _stub_epitope(monkeypatch, ready=True)
+    workspace_id = _create_workspace("Mutable Release Dog")
+
+    update_construct_options(
+        workspace_id,
+        ConstructDesignUpdate.model_validate(
+            {"lambda": 0.65, "signal": True, "mitd": True, "confirmed": True}
+        ),
+    )
+    released = update_construct_output(
+        workspace_id, ConstructOutputAction(action="release", cmo_id="trilink")
+    )
+    assert released.status == ConstructOutputStatus.RELEASED
+
+    update_construct_options(
+        workspace_id,
+        ConstructDesignUpdate.model_validate(
+            {"lambda": 0.65, "signal": False, "mitd": True, "confirmed": True}
+        ),
+    )
+    changed = load_construct_output_summary(workspace_id)
+
+    assert changed.checksum != released.checksum
+    assert changed.status == ConstructOutputStatus.READY
+    assert changed.released_at is None
+    assert changed.order is None
+    assert all(entry.stage != "08" for entry in changed.audit_trail)
+
+
 def test_stage8_release_requires_cmo(monkeypatch):
     _stub_epitope(monkeypatch, ready=True)
     workspace_id = _create_workspace("No-CMO Dog")

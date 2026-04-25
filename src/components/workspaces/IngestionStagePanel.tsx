@@ -368,6 +368,8 @@ function LaneCard({
   const accent = lane === "tumor" ? "tumor" : "normal";
   const ready = summary.readyForAlignment;
   const status = summary.status;
+  const progressPercent = Math.max(0, Math.min(100, summary.progress?.percent ?? 0));
+  const progressWidth = Math.max(2, Math.round(progressPercent));
   const statusLabel =
     status === "ready"
       ? "Ready"
@@ -568,14 +570,14 @@ function LaneCard({
                 color: "var(--muted)",
               }}
             >
-              {Math.round((summary.progress.percent ?? 0) * 100)}%
+              {Math.round(progressPercent)}%
             </span>
           </div>
           <div className="cs-progress" style={{ height: 6 }}>
             <div
               className="cs-progress-fill"
               style={{
-                width: `${Math.max(2, Math.round((summary.progress.percent ?? 0) * 100))}%`,
+                width: `${progressWidth}%`,
               }}
             />
           </div>
