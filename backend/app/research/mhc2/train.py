@@ -42,6 +42,8 @@ class TrainConfig:
     device: str = "auto"
     num_workers: int = 0
     log_every: int = 200
+    save_every_epoch: bool = True
+    early_stopping_patience: int = 0  # 0 disables; otherwise stop after N epochs without val_auc improvement
 
 
 def _resolve_device(requested: str) -> str:
@@ -198,7 +200,22 @@ def train(config: TrainConfig) -> Path:
         else None
     )
 
+    def _save(path: Path, epoch: int) -> None:
+        torch.save(
+            {
+                "model_state": model.state_dict(),
+                "model_config": model_config,
+                "train_config": {key: str(value) for key, value in asdict(config).items()},
+                "history": history,
+                "decoy_stats": asdict(decoy_stats) if decoy_stats else None,
+                "epoch": epoch,
+            },
+            path,
+        )
+
     history: list[dict[str, float | dict[str, float]]] = []
+    best_val_auc = float("-inf")
+    epochs_without_improvement = 0
     for epoch in range(1, config.epochs + 1):
         model.train()
         total_loss = 0.0
@@ -250,20 +267,28 @@ def train(config: TrainConfig) -> Path:
             json.dumps(history, indent=2, default=float) + "\n",
             encoding="utf-8",
         )
+        if config.save_every_epoch:
+            _save(config.output_dir / f"{config.checkpoint_track}.epoch{epoch}.pt", epoch)
+        _save(config.output_dir / f"{config.checkpoint_track}.pt", epoch)
 
-    config.output_dir.mkdir(parents=True, exist_ok=True)
-    checkpoint_path = config.output_dir / f"{config.checkpoint_track}.pt"
-    torch.save(
-        {
-            "model_state": model.state_dict(),
-            "model_config": model_config,
-            "train_config": {key: str(value) for key, value in asdict(config).items()},
-            "history": history,
-            "decoy_stats": asdict(decoy_stats) if decoy_stats else None,
-        },
-        checkpoint_path,
-    )
-    return checkpoint_path
+        val_auc = record.get("val_auc")
+        if isinstance(val_auc, float):
+            if val_auc > best_val_auc:
+                best_val_auc = val_auc
+                _save(config.output_dir / f"{config.checkpoint_track}.best.pt", epoch)
+                epochs_without_improvement = 0
+                print(f"[train] new best val_auc={val_auc:.4f} at epoch {epoch}", flush=True)
+            else:
+                epochs_without_improvement += 1
+                if config.early_stopping_patience and epochs_without_improvement >= config.early_stopping_patience:
+                    print(
+                        f"[train] early stop: no val_auc improvement for "
+                        f"{epochs_without_improvement} epoch(s)",
+                        flush=True,
+                    )
+                    break
+
+    return config.output_dir / f"{config.checkpoint_track}.pt"
 
 
 def _evaluate(model, loader, loss_fn, device, pin) -> dict[str, float | dict[str, float]]:

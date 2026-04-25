@@ -31,6 +31,10 @@ def main() -> None:
     parser.add_argument("--device", default="auto", help="auto|cuda|cpu (default: auto)")
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--log-every", type=int, default=200)
+    parser.add_argument("--early-stopping-patience", type=int, default=0,
+                        help="Stop after N epochs with no val_auc improvement (0 disables)")
+    parser.add_argument("--no-save-every-epoch", action="store_true",
+                        help="Skip per-epoch checkpoints (only keep .pt and .best.pt)")
     args = parser.parse_args()
 
     checkpoint = train(
@@ -48,6 +52,8 @@ def main() -> None:
             device=args.device,
             num_workers=args.num_workers,
             log_every=args.log_every,
+            early_stopping_patience=args.early_stopping_patience,
+            save_every_epoch=not args.no_save_every_epoch,
         )
     )
     print(checkpoint)
