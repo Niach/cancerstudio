@@ -42,8 +42,10 @@ from app.research.mhc2.data import read_jsonl
 from app.research.mhc2.decoys import (
     positive_9mer_index,
     read_fasta_sequences,
+    sample_frank_candidates,
     sample_length_matched_decoys,
 )
+from app.research.mhc2.data import peptide_9mers
 
 
 def _build_test_records(
@@ -87,30 +89,50 @@ def _build_test_records(
 def _score_polyallelic(
     adapter: BaselineModel,
     records: list,
-) -> tuple[list[float], int]:
+    extra_pairs: list[tuple[str, str, int]] | None = None,
+) -> tuple[list[float], int, list[float]]:
     """Score each record against all alleles in its sample, return per-record
-    max-score. Also returns the count of NaN scores from the adapter."""
+    max-score. ``extra_pairs`` is an optional list of additional
+    ``(peptide, allele, group_idx)`` tuples (used for FRANK candidates) that
+    are scored in the same call; their max-over-group is returned as a
+    parallel list aligned to the *unique group_idx values* as ``extra_max``.
+    """
     pairs: list[tuple[str, str]] = []
     record_idx_for_pair: list[int] = []
+    extra_group_for_pair: list[int] = []  # 1-aligned to pairs; -1 for record pairs
     for i, record in enumerate(records):
         for allele in record.alleles:
             pairs.append((record.peptide, allele))
             record_idx_for_pair.append(i)
+            extra_group_for_pair.append(-1)
+    if extra_pairs:
+        for peptide, allele, group_idx in extra_pairs:
+            pairs.append((peptide, allele))
+            record_idx_for_pair.append(-1)
+            extra_group_for_pair.append(group_idx)
+
     predictions = adapter.predict(pairs)
     if len(predictions) != len(pairs):
         raise RuntimeError(f"{adapter.name} returned {len(predictions)} of {len(pairs)} predictions")
+
     record_max: list[float] = [float("-inf")] * len(records)
+    extra_max: dict[int, float] = {}
     n_nan = 0
-    for i, prediction in zip(record_idx_for_pair, predictions):
+    for ridx, gidx, prediction in zip(record_idx_for_pair, extra_group_for_pair, predictions):
         score = prediction.score
-        if score != score:  # nan
+        if score != score:
             n_nan += 1
             score = float("-inf")
-        if score > record_max[i]:
-            record_max[i] = score
-    # If a record had only NaN scores, fall back to a sentinel min.
+        if ridx >= 0:
+            if score > record_max[ridx]:
+                record_max[ridx] = score
+        else:
+            cur = extra_max.get(gidx, float("-inf"))
+            if score > cur:
+                extra_max[gidx] = score
     record_max = [s if s > float("-inf") else -1e9 for s in record_max]
-    return record_max, n_nan
+    extra_list = [extra_max.get(g, -1e9) for g in sorted(extra_max)]
+    return record_max, n_nan, extra_list
 
 
 def main() -> None:
@@ -126,6 +148,10 @@ def main() -> None:
                         help="Required when --our-checkpoint is an ESM (Phase B) checkpoint.")
     parser.add_argument("--device", default="auto")
     parser.add_argument("--n-bootstrap", type=int, default=1000)
+    parser.add_argument("--frank-candidates-per-positive", type=int, default=0,
+                        help="When >0, also score N length-matched proteome windows per "
+                             "positive epitope (against the same sample alleles) and "
+                             "report the FRANK metric (fraction of candidates >= epitope).")
     parser.add_argument("--label-type", default="presentation",
                         choices=["presentation", "affinity", "any"],
                         help="Filter test records by label_type. 'any' keeps all.")
@@ -169,25 +195,72 @@ def main() -> None:
     peptides = [r.peptide for r in records]
     primary_alleles = [r.alleles[0] for r in records]  # for per-locus slicing only
 
+    # Pre-build FRANK candidate windows ONCE (deterministic given seed) so
+    # every tool sees the same candidate set. Each candidate inherits the
+    # positive's full sample-allele set so max-over-allele scoring is fair.
+    extra_pairs: list[tuple[str, str, int]] = []
+    frank_groups: list[tuple[int, int]] = []  # (record_idx, group_id)
+    if args.frank_candidates_per_positive > 0:
+        if args.proteome_fasta is None:
+            raise SystemExit("--proteome-fasta required with --frank-candidates-per-positive")
+        proteome = read_fasta_sequences(args.proteome_fasta)
+        next_group = 0
+        for ridx, record in enumerate(records):
+            if labels[ridx] < 0.5:  # only build FRANK candidates per positive
+                continue
+            forbidden = set(peptide_9mers(record.peptide))
+            candidates = sample_frank_candidates(
+                len(record.peptide),
+                proteome,
+                n_candidates=args.frank_candidates_per_positive,
+                seed=args.seed + ridx,
+                forbidden_9mers=forbidden,
+            )
+            for cand in candidates:
+                gid = next_group
+                next_group += 1
+                frank_groups.append((ridx, gid))
+                for allele in record.alleles:
+                    extra_pairs.append((cand, allele, gid))
+        print(
+            f"[bench] FRANK: {len(frank_groups):,} candidates ({len(extra_pairs):,} extra pairs)",
+            flush=True,
+        )
+
     for adapter in adapters:
         ok, msg = adapter.is_available()
         if not ok:
             print(f"[bench] {adapter.name}: SKIP ({msg})", flush=True)
             summary["missing_tools"][adapter.name] = msg
             continue
-        print(f"[bench] {adapter.name}: scoring {n_pairs:,} pairs ({msg})", flush=True)
-        scores, n_nan = _score_polyallelic(adapter, records)
+        total_pairs = n_pairs + len(extra_pairs)
+        print(f"[bench] {adapter.name}: scoring {total_pairs:,} pairs ({msg})", flush=True)
+        scores, n_nan, extra_max_list = _score_polyallelic(adapter, records, extra_pairs)
         if n_nan:
             print(f"[bench] {adapter.name}: {n_nan} NaN scores treated as worst-binder", flush=True)
+
+        frank_inputs = None
+        if args.frank_candidates_per_positive > 0 and frank_groups:
+            # Group candidates back to their parent positive, build
+            # (epitope_score, [candidate_scores]) per positive.
+            by_positive: dict[int, list[float]] = defaultdict(list)
+            for (ridx, gid), cand_score in zip(frank_groups, extra_max_list):
+                by_positive[ridx].append(cand_score)
+            frank_inputs = []
+            for ridx, cand_scores in by_positive.items():
+                frank_inputs.append((scores[ridx], cand_scores))
+
         report = compute_sota_report(
             labels, scores, peptides, primary_alleles,
             n_bootstrap=args.n_bootstrap,
+            frank_inputs=frank_inputs,
             metadata={
                 "title": f"{adapter.name} on {args.test_jsonl.name}",
                 "model": adapter.name,
                 "test_set": str(args.test_jsonl),
                 "n_nan_pair_scores": n_nan,
                 "scoring": "max-over-sample-alleles",
+                "frank_candidates_per_positive": args.frank_candidates_per_positive,
             },
         )
         slug = adapter.name.replace(" ", "_").replace("/", "-")

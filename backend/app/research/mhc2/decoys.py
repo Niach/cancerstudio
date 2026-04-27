@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Sequence
 
-from app.research.mhc2.constants import AMINO_ACIDS
+from app.research.mhc2.constants import AMINO_ACIDS, MAX_PEPTIDE_LENGTH, MIN_PEPTIDE_LENGTH
 from app.research.mhc2.data import MHC2Record, clean_peptide, peptide_9mers
 
 
@@ -40,6 +40,49 @@ def read_fasta_sequences(path: Path) -> list[str]:
 
 def positive_9mer_index(records: Iterable[MHC2Record]) -> set[str]:
     return {core for record in records for core in peptide_9mers(record.peptide)}
+
+
+def sample_frank_candidates(
+    peptide_length: int,
+    proteome_sequences: Sequence[str],
+    *,
+    n_candidates: int = 1000,
+    seed: int = 0,
+    forbidden_9mers: set[str] | None = None,
+    max_attempts_per_candidate: int = 200,
+) -> list[str]:
+    """Sample ``n_candidates`` length-matched human-proteome windows for
+    use as the FRANK candidate set against a true epitope of
+    ``peptide_length``. Optionally rejects candidates whose 9-mer cores
+    overlap any 9-mer in ``forbidden_9mers`` (typically the true epitope's
+    own cores) to avoid trivial self-matches."""
+    if peptide_length < MIN_PEPTIDE_LENGTH or peptide_length > MAX_PEPTIDE_LENGTH:
+        return []
+    rng = random.Random(seed)
+    eligible_indices = [
+        i for i, seq in enumerate(proteome_sequences) if len(seq) >= peptide_length
+    ]
+    if not eligible_indices:
+        return []
+    forbidden = forbidden_9mers or set()
+    out: list[str] = []
+    for _ in range(n_candidates):
+        for _attempt in range(max_attempts_per_candidate):
+            idx = rng.choice(eligible_indices)
+            seq = proteome_sequences[idx]
+            start = rng.randrange(0, len(seq) - peptide_length + 1)
+            cand = seq[start : start + peptide_length].upper()
+            if any(c not in AMINO_ACIDS for c in cand):
+                continue
+            try:
+                cand = clean_peptide(cand)
+            except ValueError:
+                continue
+            if forbidden and (set(peptide_9mers(cand)) & forbidden):
+                continue
+            out.append(cand)
+            break
+    return out
 
 
 def sample_length_matched_decoys(
