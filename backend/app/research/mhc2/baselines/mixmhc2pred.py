@@ -67,7 +67,8 @@ class MixMHC2predAdapter(BaselineModel):
                     self._binary,
                     "--input", str(pep_file),
                     "--output", str(out_file),
-                    "--alleles", ",".join(allele_set),
+                    "--alleles", *allele_set,
+                    "--no_context",
                 ]
                 subprocess.run(cmd, check=True, capture_output=True)
                 rows = _parse_mixmhc2pred_output(out_file)
@@ -76,11 +77,16 @@ class MixMHC2predAdapter(BaselineModel):
                 # column is simply the first one matching ``allele_set[0]``.
                 for idx, row in zip(indices, rows):
                     peptide, allele = pairs[idx]
+                    rank = row.get("rank", float("nan"))
+                    # MixMHC2pred-2.0 only reports %Rank (lower = better
+                    # binder); convert to a "higher = bind" score so the
+                    # benchmark harness can rank-order with one direction.
+                    score = -rank if rank == rank else float("nan")
                     out[idx] = BaselinePrediction(
                         peptide=peptide,
                         allele=allele,
-                        score=row.get("score", float("nan")),
-                        rank_percent=row.get("rank", float("nan")),
+                        score=score,
+                        rank_percent=rank,
                         core=row.get("core"),
                         offset=row.get("offset"),
                     )
@@ -96,24 +102,25 @@ def _to_mixmhc2pred_allele(allele: str) -> str:
 
 
 def _parse_mixmhc2pred_output(path: Path) -> list[dict]:
-    """Parse the TSV MixMHC2pred writes. Columns of interest:
-    ``Peptide``, ``Score_<allele>``, ``%Rank_<allele>``, ``BestAllele``,
-    ``Core_<allele>``."""
+    """Parse the TSV MixMHC2pred-2.0 writes. v2 only emits %Rank (no raw
+    score). Relevant columns: ``Peptide``, ``BestAllele``, ``%Rank_best``,
+    ``Core_best``, ``%Rank_<allele>``, ``CoreP1_<allele>``."""
     rows: list[dict] = []
     with path.open("r", encoding="utf-8") as fh:
-        header_line: str | None = None
+        cols: list[str] | None = None
         for line in fh:
             line = line.rstrip("\n")
             if not line or line.startswith("#"):
                 continue
-            if header_line is None:
-                header_line = line
+            if cols is None:
                 cols = line.split("\t")
                 continue
             cells = line.split("\t")
             row = dict(zip(cols, cells))
-            score = next((float(row[k]) for k in row if k.startswith("Score_")), float("nan"))
-            rank = next((float(row[k]) for k in row if k.startswith("%Rank_")), float("nan"))
-            core = next((row[k] for k in row if k.startswith("Core_")), None)
-            rows.append({"score": score, "rank": rank, "core": core, "offset": None})
+            try:
+                rank = float(row.get("%Rank_best", "nan"))
+            except ValueError:
+                rank = float("nan")
+            core = row.get("Core_best")
+            rows.append({"rank": rank, "core": core, "offset": None})
     return rows

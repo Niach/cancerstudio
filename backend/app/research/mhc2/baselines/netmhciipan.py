@@ -30,19 +30,28 @@ class NetMHCIIpanAdapter(BaselineModel):
     name = "NetMHCIIpan-4.3"
 
     def __init__(self, binary: str | None = None, *, length_default: int = 15) -> None:
-        self._binary = (
+        # The user-facing wrapper is a tcsh script that may not run on
+        # hosts without tcsh; we resolve down to the actual ELF binary
+        # under ``$NMHOME/Linux_x86_64/bin/NetMHCIIpan-4.3`` and call it
+        # directly with NETMHCIIpan + NMHOME set in the env.
+        candidate = (
             binary
             or os.environ.get("NETMHCIIPAN_BIN")
             or shutil.which("netMHCIIpan")
         )
+        self._wrapper_path = candidate
+        self._inner_binary, self._netmhciipan_root = _resolve_inner_binary(candidate)
         self._length_default = length_default
 
     def is_available(self) -> tuple[bool, str]:
-        if not self._binary:
+        if not self._wrapper_path:
             return (False, "NetMHCIIpan binary not found (set $NETMHCIIPAN_BIN or add to PATH)")
-        if not Path(self._binary).is_file():
-            return (False, f"binary {self._binary} not found on disk")
-        return (True, f"using {self._binary}")
+        if self._inner_binary is None:
+            return (False, f"could not resolve ELF binary from {self._wrapper_path}; "
+                           "expected $NMHOME/Linux_x86_64/bin/NetMHCIIpan-4.3 sibling")
+        if not Path(self._inner_binary).is_file():
+            return (False, f"inner binary {self._inner_binary} not found")
+        return (True, f"using {self._inner_binary}")
 
     def predict(
         self,
@@ -65,13 +74,24 @@ class NetMHCIIpanAdapter(BaselineModel):
                     encoding="utf-8",
                 )
                 cmd = [
-                    self._binary,
+                    self._inner_binary,
                     "-a", nm_allele,
                     "-f", str(pep_file),
-                    "-inptype", "1",  # peptide list mode
-                    "-length", str(self._length_default),
+                    "-inptype", "1",  # peptide list mode (no -length filter needed)
                 ]
-                proc = subprocess.run(cmd, check=True, capture_output=True, text=True)
+                env = {
+                    **os.environ,
+                    "NMHOME": str(Path(self._netmhciipan_root).parent),
+                    "NETMHCIIpan": self._netmhciipan_root,
+                    "TMPDIR": os.environ.get("TMPDIR", "/tmp"),
+                }
+                proc = subprocess.run(cmd, capture_output=True, text=True, env=env)
+                if proc.returncode != 0:
+                    raise RuntimeError(
+                        f"NetMHCIIpan failed for allele {nm_allele}: "
+                        f"returncode={proc.returncode}\nstderr:\n{proc.stderr[-2000:]}\n"
+                        f"stdout:\n{proc.stdout[-2000:]}"
+                    )
                 rows = _parse_netmhciipan_output(proc.stdout)
                 if len(rows) != len(indices):
                     raise RuntimeError(
@@ -90,14 +110,56 @@ class NetMHCIIpanAdapter(BaselineModel):
         return [item for item in out if item is not None]
 
 
+def _resolve_inner_binary(wrapper: str | None) -> tuple[str | None, str | None]:
+    """Find the ELF NetMHCIIpan-4.3 binary that the tcsh wrapper would
+    exec. Returns (binary_path, $NETMHCIIpan_root) or (None, None) if it
+    can't be located."""
+    if not wrapper:
+        return (None, None)
+    wrapper_path = Path(wrapper).resolve()
+    if not wrapper_path.exists():
+        return (None, None)
+    # If the user already pointed at the inner binary, keep it.
+    if wrapper_path.name == "NetMHCIIpan-4.3" and wrapper_path.is_file():
+        root = wrapper_path.parent.parent
+        return (str(wrapper_path), str(root))
+    # Otherwise look under $NMHOME/Linux_x86_64/bin/NetMHCIIpan-4.3.
+    home = wrapper_path.parent
+    for arch in ("Linux_x86_64", "Linux_x86", "Darwin_x86_64", "Darwin_arm64"):
+        candidate = home / arch / "bin" / "NetMHCIIpan-4.3"
+        if candidate.is_file():
+            return (str(candidate), str(home / arch))
+    return (None, None)
+
+
 def _to_netmhciipan_allele(allele: str) -> str:
-    """NetMHCIIpan uses e.g. ``DRB1_1501`` and ``HLA-DPA10103-DPB10101``."""
+    """Convert IPD-style ``HLA-DRB1*15:01`` etc. to the names NetMHCIIpan
+    expects:
+
+      * DR/DRB1/DRB3/DRB4/DRB5 monomers -> ``DRB1_1501``
+      * DP / DQ heterodimers            -> ``HLA-DPA10103-DPB10101``
+
+    The dimer formatting is what the DTU pseudoseq file ships, so it
+    matches NetMHCIIpan-4.3 expectations.
+    """
     body = allele.removeprefix("HLA-")
-    if "*" in body:
-        gene, digits = body.split("*", 1)
-        digits = digits.replace(":", "")
-        return f"{gene}_{digits}"
-    return f"HLA-{body}"
+    parts = body.split("-")
+    converted_parts: list[str] = []
+    for part in parts:
+        if "*" in part:
+            gene, digits = part.split("*", 1)
+            digits = digits.replace(":", "")
+            converted_parts.append((gene, digits))
+        else:
+            converted_parts.append((part, ""))
+    if len(converted_parts) == 1:
+        gene, digits = converted_parts[0]
+        if digits:
+            return f"{gene}_{digits}"
+        return f"HLA-{gene}"
+    # Dimer: concatenate as HLA-<gene1><digits1>-<gene2><digits2>.
+    flattened = "-".join(f"{gene}{digits}" for gene, digits in converted_parts)
+    return f"HLA-{flattened}"
 
 
 _HEADER_LINE_RE = re.compile(r"^\s*Pos\s+MHC\s+Peptide", re.IGNORECASE)
@@ -121,7 +183,10 @@ def _parse_netmhciipan_output(stdout: str) -> list[dict]:
         if not line.strip() or line.startswith("---") or line.startswith("Number of"):
             continue
         cells = re.split(r"\s+", line.strip())
-        if len(cells) < len(header):
+        # The trailing BindLevel column is ``NA`` for non-binders and is
+        # often dropped when whitespace-splitting; tolerate one missing
+        # field. Anything shorter than that is a header artefact / blank.
+        if len(cells) < len(header) - 1:
             continue
         row = dict(zip(header, cells))
         try:

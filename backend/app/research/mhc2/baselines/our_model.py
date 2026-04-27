@@ -44,25 +44,39 @@ class OurModelAdapter(BaselineModel):
         ok, msg = self.is_available()
         if not ok:
             raise RuntimeError(msg)
-        from app.research.mhc2.predict import predict_pairs
+        from app.research.mhc2.predict import MHC2Predictor
 
-        results = predict_pairs(
+        device = self._resolve_device()
+        predictor = MHC2Predictor(
             checkpoint_path=self._checkpoint,
-            pseudoseq_path=self._pseudosequences,
-            pairs=list(pairs),
-            device=self._device,
-            batch_size=self._batch_size,
+            pseudosequence_path=self._pseudosequences,
+            device=device,
         )
         out: list[BaselinePrediction] = []
-        for (peptide, allele), prediction in zip(pairs, results):
-            out.append(
-                BaselinePrediction(
-                    peptide=peptide,
-                    allele=allele,
-                    score=float(prediction.score),
-                    rank_percent=float("nan"),  # our model has no calibration yet
-                    core=getattr(prediction, "core", None),
-                    offset=getattr(prediction, "offset", None),
-                )
-            )
+        for peptide, allele in pairs:
+            try:
+                prediction = predictor.predict_one(peptide, allele)
+            except (KeyError, ValueError):
+                out.append(BaselinePrediction(
+                    peptide=peptide, allele=allele,
+                    score=float("nan"), rank_percent=float("nan"),
+                ))
+                continue
+            out.append(BaselinePrediction(
+                peptide=peptide,
+                allele=allele,
+                score=float(prediction.score),
+                rank_percent=float(prediction.percentile_rank or float("nan")),
+                core=prediction.core,
+                offset=prediction.core_offset,
+            ))
         return out
+
+    def _resolve_device(self) -> str:
+        if self._device != "auto":
+            return self._device
+        try:
+            import torch
+            return "cuda" if torch.cuda.is_available() else "cpu"
+        except ModuleNotFoundError:
+            return "cpu"
