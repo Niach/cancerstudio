@@ -33,15 +33,26 @@ class MHC2Record:
     protein_id: str | None = None
     weight: float = 1.0
     peptide_offset: int | None = None  # 0-based start in protein_id (proteome decoys)
+    label_type: str = "presentation"  # "presentation" (EL), "affinity" (BA), or "decoy"
+    ba_value: float | None = None  # log-transformed binding affinity for BA records
+    cluster_id: str | None = None  # connected-component id from splits.py
+    cluster_weight: float = 1.0  # 1 / |cluster| if cluster-weighted loss is used
+    sample_allele_set: tuple[str, ...] | None = None  # original sample-level allele set
+    context_left: str | None = None  # 8-aa flank N-terminal of peptide in source protein
+    context_right: str | None = None  # 8-aa flank C-terminal of peptide in source protein
 
     def to_json(self) -> dict:
         payload = asdict(self)
         payload["alleles"] = list(self.alleles)
+        if self.sample_allele_set is not None:
+            payload["sample_allele_set"] = list(self.sample_allele_set)
         return payload
 
     @classmethod
     def from_json(cls, payload: dict) -> "MHC2Record":
         offset = payload.get("peptide_offset")
+        sample_alleles = payload.get("sample_allele_set")
+        ba_value = payload.get("ba_value")
         return cls(
             peptide=clean_peptide(payload["peptide"]),
             alleles=tuple(payload.get("alleles") or ()),
@@ -52,6 +63,13 @@ class MHC2Record:
             protein_id=payload.get("protein_id"),
             weight=float(payload.get("weight", 1.0)),
             peptide_offset=int(offset) if offset is not None else None,
+            label_type=payload.get("label_type", "presentation"),
+            ba_value=float(ba_value) if ba_value is not None else None,
+            cluster_id=payload.get("cluster_id"),
+            cluster_weight=float(payload.get("cluster_weight", 1.0)),
+            sample_allele_set=tuple(sample_alleles) if sample_alleles else None,
+            context_left=payload.get("context_left"),
+            context_right=payload.get("context_right"),
         )
 
 

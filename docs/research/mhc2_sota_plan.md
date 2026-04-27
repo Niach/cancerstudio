@@ -1,160 +1,187 @@
-# MHC-II open predictor — path from v0 baseline to SOTA
+# MHC-II open predictor — path to a defensibly SOTA result
 
-The v0 baseline (see `mhc2_v0_baseline_log.md`) lands at val ROC-AUC 0.721.
-NetMHCIIpan-4.3, MixMHC2pred-2.0, and HLAIIPred all sit around 0.94-0.95
-on comparable EL benchmarks. This document is the concrete step-by-step
-plan to close the ~0.22 gap, ordered by gain-per-effort ratio so each
-phase can be stopped early without wasting the work that came before.
+This replaces the earlier "Phase A → B → C → D → E hit-AUC-X-by-epoch-Y"
+plan. After running through Phase A (val_auc 0.7632 on cloud) and a leaky
+first cut at Phase B, the right framing is no longer "which AUC do we
+hit." Real SOTA is a **comparative claim against current published tools
+on a leakage-controlled benchmark** — and we don't yet have the harness to
+make that claim defensibly. The plan below puts that harness first, then
+adds the architecture/data levers that close the gap.
 
-## Phase A — quick wins on the existing architecture (target: 0.85)
+## What "SOTA" actually means here
 
-One overnight run, no new architecture, no new data.
+SOTA for MHC-II ligand prediction in 2025-2026 is the cluster of:
 
-1. **Decoys 1× → 10×.** Current 1:1 positive:decoy biases the model toward
-   "everything binds." NetMHCIIpan trains at ~9× decoys.
-   - Code change: `--decoys-per-positive 10`
-   - Memory cost: 10× more train records (27.8M instead of 2.78M); fits on
-     disk easily, may push wall-time per epoch to ~3 hours
-   - Expected gain: +0.04-0.07 AUC
+- NetMHCIIpan-4.3 / 4.3j (DTU, EL+BA, motif-aware MIL)
+- MixMHC2pred-2.0 (Racle et al., Trans-Lab, 2023 data)
+- Graph-pMHC (Genentech, structural / context-aware)
+- HLAIIPred (Nature Comm 2025; soft-EM deconvolution + cluster-weighted)
 
-2. **Add NetMHCIIpan-4.3 EL training partitions.** The DTU tarball already
-   on disk has `c000_el` ... `c004_el` (~750k more EL records, with
-   stronger DP/DQ coverage than HLAIIPred). Need a ~30-line parser; the
-   files are space-separated `peptide allele target binder_or_not` lines.
-   - Code change: new `iter_netmhciipan_partition_file()` in `data.py`,
-     wired into `mhc2_prepare_dataset.py` with `--source netmhciipan_43_el`
-   - Expected gain: +0.02-0.04, especially on DQ
+They report ROC-AUC ≈ 0.94-0.95 on the splits they each published, but
+the splits are not interchangeable, and the MS pipelines that produced the
+labels are not interchangeable either. **A 0.85 number on HLAIIPred's own
+val split tells us nothing about whether we beat them on a shared
+benchmark.** That is the methodological hole this plan closes.
 
-3. **Bigger model.** 96-dim → 192-dim, 2 layers → 4, heads 4 → 8.
-   - Code change: pass through `MHCIIInteractionModel` constructor args
-     in `model_config` from `train.py`; expose as CLI flags
-   - Memory: still fits at batch 32 in 24 GB
-   - Expected gain: +0.03-0.05
+The SOTA bar we want to clear is:
 
-4. **LR schedule.** Currently flat 1e-4 AdamW. Add 1k-step linear warmup
-   then cosine decay to 1e-6 over the run.
-   - Code change: `torch.optim.lr_scheduler.SequentialLR` wrapping
-     `LinearLR` + `CosineAnnealingLR`
-   - Expected gain: +0.01-0.02
+> Beat current published baselines on at least two **independent**
+> benchmark families (NetMHCIIpan-4.3 eval + Racle/HLA Ligand Atlas
+> hold-out) under a **leakage-controlled** split, with no major DR/DP/DQ
+> regression and per-allele percentile-rank calibration.
 
-5. **Run longer.** With 10× decoys + bigger model, plan for 5-7 epochs
-   with patience 2 instead of 1. Best checkpoint will land somewhere mid-run.
+That is the gate; everything below is the path to clearing it.
 
-**Acceptance:** val ROC-AUC ≥ 0.83 on HLAIIPred valid split. If we miss it,
-something is wrong with one of the four levers — bisect before phase B.
+## The previous plan vs. this one
 
-## Phase B — ESM-2 embeddings (target: 0.91)
+The Phase A→E plan was right about *what* to add (ESM features, multi-task
+BA, deconvolution, calibration) but wrong about *order*. It treated the
+benchmark as the last step. Codex's critique made the point: we need the
+benchmark first, because (a) we cannot iterate without measuring against
+real tools, (b) the splits used for those measurements decide everything
+the model learns, and (c) the ESM lever alone is not the gap to SOTA.
 
-The single biggest architectural lever in the current MHC-II literature.
+## Workstreams (parallelizable, ranked by value)
 
-6. **Frozen ESM-2 features.** Use `esm2_t12_35M_UR50D` (smallest, ~35M
-   params) for the first run. Encode peptide cores AND HLA pseudosequences
-   through ESM and concatenate the per-residue features.
-   - One-time embedding extraction: peptide → tensor, pseudoseq → tensor,
-     cached to a `.pt` lookup file (~2 GB for HLAIIPred + NetMHCIIpan)
-   - Training reads from the cache; ESM is never run during training
-   - Adapter: 2 transformer layers + cross-attention on top of frozen ESM
-     features (replaces the from-scratch embedding + 2-layer encoder)
-   - Expected gain: +0.05-0.08
+### 1. Locked benchmark harness — *gate for every later claim*
 
-7. **Optional: bigger ESM (`esm2_t30_150M_UR50D`)** if 35M plateaus.
-   Linear gains diminish past 150M for this task.
+Concretely:
 
-**Acceptance:** val ROC-AUC ≥ 0.89.
+- **Cluster-aware splits.** `splits.py` already implements connected-
+  component splits over 9-mer overlap. Replace the HLAIIPred-shipped
+  splits with a single shared train/valid/test produced by that path.
+  Save under `data/mhc2/curated/cluster/`. Re-run our model + every
+  baseline against the same `test.cluster.jsonl`.
+- **Adapter for each baseline tool** under
+  `backend/app/research/mhc2/baselines/`:
+  * `netmhciipan.py` — wrap the DTU CLI (license required, free for
+    academic use).
+  * `mixmhc2pred.py` — pip-installable; trivial wrapper.
+  * `hlaiipred.py` — open-source on GitHub.
+  * `graph_pmhc.py` — non-commercial license; eval-only.
+  Each adapter takes `(peptide, allele)` pairs and returns
+  `(score, %rank, predicted_core)`.
+- **Metrics.** Extend `metrics.py` with FRANK, bootstrap CIs (1000-iter
+  basic-bootstrap by default), per-locus DR/DP/DQ, per-length 9/12/15/18/
+  21-mer slices, per-allele rare-allele table.
+- **Driver.** `scripts/mhc2_benchmark_baselines.py` runs N models against
+  the locked test set, writes `benchmark_results.json` + a markdown
+  comparison table. CI-friendly subset for fixture-based tests.
+- **Acceptance:** running the harness on a stable corpus reproduces
+  published numbers within ±0.01 AUC for at least one baseline. That
+  proves our adapters are correct before we trust comparison numbers.
 
-## Phase C — multi-task training and more data (target: 0.93)
+### 2. Schema + data extensions — *unlocks everything else*
 
-Each of these adds ~0.01-0.02 AUC; together they meaningfully shrink the
-remaining gap.
+Extend `MHC2Record` (backward-compatible defaults) with:
 
-8. **BA regression head.** Parse `c000_ba` ... `c004_ba` from the DTU
-   tarball (~25k IC50-labeled records). Add a second model output head
-   with MSE loss on `log(IC50/50000)`. Multi-task in this setup is
-   essentially free: the shared encoder benefits the EL classifier.
+- `label_type`: `"presentation"` (EL) or `"affinity"` (BA)
+- `ba_value`: float, log-transformed binding affinity for BA records
+- `cluster_id`, `cluster_weight`: from cluster-aware splits
+- `sample_allele_set`: original sample-level allele set when from a
+  polyallelic sample
+- `context_left`, `context_right`: 8-residue source-protein flanks (when
+  available — NetMHCIIpan EL has them, HLAIIPred CSV does not)
 
-9. **Racle/MixMHC2pred 2023 corpus.** PRIDE accession `PXD034773`,
-   ~627k EL records, 88 allele motifs. Data is in MS-style format; needs
-   a custom parser. Worth the effort because of motif diversity.
+Then plumb through parsers, collator, training loop. Multi-task BA + soft-
+EM both depend on these.
 
-10. **HLA Ligand Atlas.** ~143k benign-tissue EL records, CC-BY licensed,
-    clean TSV download. Cheapest data add — should be one afternoon.
+### 3. Multi-task BA head — *cheap +0.02-0.03*
 
-11. **Skip SysteMHC v2** unless desperate. Its labels are partly
-    predictor-derived, so training on it teaches our model to mimic
-    NetMHCIIpan rather than improve on it.
+`c000_ba … c004_ba` are already on disk from the NetMHCIIpan tarball but
+unused. ~25k records labeled with IC50.
 
-**Acceptance:** val ROC-AUC ≥ 0.92, and per-locus AUC ≥ 0.90 on DR/DP.
+- New parser: `iter_netmhciipan_ba_partition_file()`.
+- New regression head on `MHCIIESMModel`: shares the encoder, predicts
+  `log(IC50 / 50000)`.
+- Multi-task loss: `L = L_el + λ * L_ba` with λ ≈ 0.3 to start.
+- Sample mixing: round-robin batches between EL and BA partitions, or
+  joint-batch with a head-mask.
 
-## Phase D — calibration and honest benchmarking (no AUC gain, defensibility)
+### 4. Cluster-weighted loss — *fairness across motifs*
 
-These don't lift numbers but make claims publishable.
+Per-record weight = `1 / max(1, n_records_in_same_cluster)`. Same data,
+same architecture, just loss weighting. Most directly addresses HLAIIPred's
+observation that motif-redundant clusters overwhelm rare-allele signal.
 
-12. **Per-allele percentile rank calibration.** Score 100k random proteome
-    9-mers per allele, build empirical CDFs; predictions emit `%rank`
-    alongside `score`. Users in the field filter on `%rank < 2%` (binder)
-    and `< 0.5%` (strong binder) — not raw scores.
+### 5. HLAIIPred-style soft-EM deconvolution — *the publication-tier lever*
 
-13. **FRANK metric.** For each true ligand, score all length-matched
-    windows of its source protein and report the rank of the true peptide.
-    NetMHCIIpan-4.3 reports median FRANK ~0.5-2%. This is the metric
-    publications compare on.
+For each polyallelic sample, alternate:
 
-14. **Benchmark adapters for external tools.** Wrap NetMHCIIpan,
-    MixMHC2pred, MHCnuggets binaries (where users have legal access) so
-    we score the *same* held-out set with all of them. Honest comparison
-    in the model card.
+1. E-step: given current scores, infer per-peptide allele responsibility
+   `q(a | x)` via softmax over allele scores within the sample.
+2. M-step: weight each (peptide, allele) loss term by `q(a | x)`.
 
-15. **Per-allele and length-bucket test breakdown.** Already have
-    per-locus; extend to per-allele AUC table and length-bucket AUC for
-    9-, 12-, 15-, 18-, 21-mer peptides.
+This is the architectural change that turns plain max-over-alleles MIL
+into a soft assignment. HLAIIPred reports +0.02-0.04 from this alone.
 
-**Acceptance:** publishable model card with cross-tool comparison on
-HLAIIPred test, NetMHCIIpan eval, and a Racle held-out set.
+### 6. Per-allele %rank calibration — *required for any release*
 
-## Phase E — SOTA refinements (target: 0.94+)
+For each allele:
 
-16. **HLAIIPred-style deconvolution-aware loss.** For each polyallelic
-    sample, use a soft EM step that infers which allele most likely
-    presented each peptide. This is the HLAIIPred paper's main
-    contribution. Substantial code; expect +0.01-0.02.
+- Sample 100k random 9-mer windows from the human proteome.
+- Score them with the trained model.
+- Build the empirical CDF.
+- `%rank(score) = 1 - CDF(score)`.
 
-17. **Cluster-aware splits.** `splits.py` already implements 9-mer
-    connected-component splits. Switch eval to use those — currently we
-    use HLAIIPred's pre-defined splits, which leak somewhat. Will
-    *lower* reported numbers (because honest), but the comparison vs.
-    cluster-split published baselines is what matters.
+Save calibration tables alongside the checkpoint. `predict.py` then emits
+`score_el` + `rank_el` per (peptide, allele). Users in the field filter
+on `rank < 2%` (binder) and `< 0.5%` (strong binder); raw sigmoid scores
+are not interpretable.
 
-18. **Length-aware and allele-frequency-aware loss weighting.** Down-weight
-    common alleles and common lengths; up-weight rare ones. Helps tail
-    performance.
+### 7. ESM adapter — *now: the architecture, not the headline*
 
-19. **Fine-tune ESM weights end-to-end.** Once everything else is stable,
-    unfreeze the top 4 layers of ESM at 1e-5 LR. Expected gain: +0.005-0.01.
-    Last because it's easy to break a working model with this.
+The Phase B v2 leak fix + Phase B v3 packed cache (commits `94c95e8` and
+`ba76e68`) leave us with a working ESM-2 35M frozen-features adapter that
+trains end-to-end. We hit step 49k of epoch 1 with loss 0.20 and a clean
+descent before stopping. Treat this as the **default model architecture**
+that the workstreams above plug into, not as the marquee result.
 
-## What this plan is NOT
+If after workstreams 1-6 we are still ≥0.04 below SOTA, *then* try
+unfreezing the top 4 ESM layers at lr 1e-5, or jumping to
+`esm2_t30_150M_UR50D`. Don't reach for those until the fundamentals
+above are in.
 
-- **Not a multi-source distillation effort.** Training on outputs of
-  NetMHCIIpan / MixMHC2pred would just teach our model to mimic them.
-  We use only experimentally-grounded labels (EL + BA + biochemistry).
-- **Not a license-laundering exercise.** SysteMHC v2 partially predictor-
-  derived labels are excluded from training (allowed only for weak
-  evaluation if explicitly tagged). Graph-pMHC dataset is benchmark-only
-  (Genentech code is non-commercial).
-- **Not a dog/cat extension.** All of this is human HLA-II only.
-  Canine DLA / feline FLA class-II remains scientifically infeasible
-  until enough species-specific peptide-ligand evidence accumulates.
+## Production discipline
 
-## Time + cost estimate
+- This is **research-only** until at least the harness gate is met.
+- Production neoantigen pipeline keeps using pVACseq + NetMHCIIpan/
+  MHCflurry; nothing in this branch lands anywhere close to that
+  pipeline until the benchmark says we beat the current tools.
+- Checkpoints/calibration tables will be Hetzner-S3-hosted with a
+  manifest committed to git; no model weights in git.
 
-| Phase | Engineering | GPU time | Cumulative AUC target |
-|---|---|---|---|
-| A | 1 evening | ~5h overnight | 0.85 |
-| B | 3-5 days | ~10h training | 0.91 |
-| C | ~1 week | ~20h training | 0.93 |
-| D | 3-5 days | ~5h scoring | 0.93 (publishable) |
-| E | 1-2 weeks | ~30h training | 0.94+ |
+## Order of operations
 
-Total: ~3-5 weeks of focused work. Do phases A-C and stop is a
-defensible "good open MHC-II predictor" milestone; D-E is for
-"genuinely SOTA, published model card."
+1. **Cluster splits** (data prep, no GPU). Builds `test.cluster.jsonl`.
+2. **Schema extension** + parser updates for BA + context fields.
+3. **Metrics** (FRANK, bootstrap, per-slice).
+4. **Baseline adapter for MixMHC2pred** (cheapest baseline to install).
+   Confirms the harness reproduces published numbers within ±0.01.
+5. **Cluster-weighted loss** + retrain on cluster splits → first honest
+   internal number.
+6. **Multi-task BA head** → second iteration.
+7. **NetMHCIIpan + HLAIIPred adapters** in the harness.
+8. **Per-allele %rank calibration**.
+9. **Soft-EM deconvolution** (the big architectural lever).
+10. Publishable model card with cross-tool comparison.
+
+Steps 1-4 are gating; once the harness reproduces a baseline, every later
+step is measured against the locked benchmark, not against itself.
+
+## What we do NOT do
+
+- Train more before the harness exists. The cost-benefit on a 30h cloud
+  run with no comparator is bad now that we know the architecture works.
+- Race three architectures in parallel before establishing one good one.
+- Add ESM-2 150M before the smaller model has been honestly benchmarked.
+- Train on predictor-derived labels (SysteMHC v2 partial labels stay out
+  of training, they would teach our model to mimic NetMHCIIpan).
+- Extend to canine DLA / feline FLA. Human HLA-II only.
+
+## References
+
+- NetMHCIIpan-4.3: https://services.healthtech.dtu.dk/services/NetMHCIIpan-4.3/
+- HLAIIPred 2025 (open-source): https://www.nature.com/articles/s42003-025-08500-2
+- MixMHC2pred / Racle 2023 corpus: https://www.sciencedirect.com/science/article/pii/S1074761323001292
+- Reactome 2024 MHC-II benchmark: https://www.frontiersin.org/journals/immunology/articles/10.3389/fimmu.2024.1293706/full
