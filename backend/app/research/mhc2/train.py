@@ -46,14 +46,13 @@ if TORCH_AVAILABLE:  # pragma: no cover
         """Phase B collator that emits pre-computed ESM features instead of
         token IDs. Module-level so DataLoader workers can pickle it.
 
-        Lookup strategy:
-        * Positives (records with no ``protein_id``): peptide string is a
-          key into ``peptide_features`` -> Tensor(peptide_len, esm_dim).
-          9-mer cores are sliced at training time.
-        * Decoys (records with ``protein_id="p<index>"``): the protein-level
-          tensor is in ``protein_features[protein_id]``; the peptide window
-          is ``[peptide_offset : peptide_offset + len(peptide)]``. 9-mer
-          cores are sliced from there.
+        Symmetric embedding policy:
+        * Positives AND decoys are looked up by peptide string in
+          ``peptide_features`` -> Tensor(peptide_len, esm_dim). Both kinds
+          of record are therefore embedded with the *same* ESM context
+          (a standalone peptide of their own length), which avoids the
+          context-asymmetry leak that an earlier protein-level decoy
+          cache produced.
         * Alleles: pseudoseq string from ``pseudosequences[allele]`` looks
           up ``pseudoseq_features``.
         """
@@ -61,32 +60,18 @@ if TORCH_AVAILABLE:  # pragma: no cover
         def __init__(
             self,
             peptide_features: dict,
-            protein_features: dict,
             pseudoseq_features: dict,
             pseudosequences: dict[str, str],
             esm_dim: int,
             max_pseudoseq_length: int,
         ) -> None:
             self.peptide_features = peptide_features
-            self.protein_features = protein_features
             self.pseudoseq_features = pseudoseq_features
             self.pseudosequences = pseudosequences
             self.esm_dim = esm_dim
             self.max_pseudoseq_length = max_pseudoseq_length
 
         def _peptide_features(self, record: MHC2Record) -> "_torch.Tensor":
-            if record.protein_id is not None and record.peptide_offset is not None:
-                protein_feat = self.protein_features.get(record.protein_id)
-                if protein_feat is None:
-                    raise KeyError(f"missing ESM features for protein {record.protein_id!r}")
-                start = record.peptide_offset
-                end = start + len(record.peptide)
-                if end > protein_feat.shape[0]:
-                    raise IndexError(
-                        f"decoy {record.peptide!r} offset={start} exceeds protein "
-                        f"{record.protein_id!r} length={protein_feat.shape[0]}"
-                    )
-                return protein_feat[start:end]
             feat = self.peptide_features.get(record.peptide)
             if feat is None:
                 raise KeyError(f"missing ESM features for peptide {record.peptide!r}")
@@ -322,21 +307,17 @@ def train(config: TrainConfig) -> Path:
         if config.esm_cache_dir is None:
             raise ValueError("esm_cache_dir is required for model_kind=esm2_35m")
         peptide_cache_path = config.esm_cache_dir / "peptides.pt"
-        protein_cache_path = config.esm_cache_dir / "proteins.pt"
         pseudoseq_cache_path = config.esm_cache_dir / "pseudoseqs.pt"
         print(f"[train] loading ESM caches from {config.esm_cache_dir}", flush=True)
         peptide_features = load_embedding_cache(peptide_cache_path)
-        protein_features = load_embedding_cache(protein_cache_path)
         pseudoseq_features = load_embedding_cache(pseudoseq_cache_path)
         print(
             f"[train] esm cache: {len(peptide_features)} peptides, "
-            f"{len(protein_features)} proteins, "
             f"{len(pseudoseq_features)} pseudoseqs",
             flush=True,
         )
         collate = _ESMCollator(
             peptide_features=peptide_features,
-            protein_features=protein_features,
             pseudoseq_features=pseudoseq_features,
             pseudosequences=pseudosequences,
             esm_dim=config.esm_dim,
