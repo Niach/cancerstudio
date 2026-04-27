@@ -242,6 +242,7 @@ class TrainConfig:
     multi_task_ba: bool = False  # add a BA regression head and mix EL + BA loss
     ba_loss_weight: float = 0.3  # lambda on the BA term: total = L_el + lambda * L_ba
     cluster_weighted: bool = False  # use record.cluster_weight in loss
+    allele_aggregation: str = "max"  # "max" or "logsumexp" for soft polyallelic deconvolution
 
 
 def _multi_task_loss(
@@ -394,6 +395,7 @@ def train(config: TrainConfig) -> Path:
             "max_pseudoseq_length": config.max_pseudoseq_length,
             "dropout": config.dropout,
             "with_ba_head": config.multi_task_ba,
+            "allele_aggregation": config.allele_aggregation,
         }
         model = MHCIIESMModel(**model_config).to(device)
         n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)

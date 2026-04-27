@@ -84,11 +84,17 @@ if TORCH_AVAILABLE:  # pragma: no cover
             max_pseudoseq_length: int = 64,
             dropout: float = 0.1,
             with_ba_head: bool = False,
+            allele_aggregation: str = "max",
         ) -> None:
             super().__init__()
             self.esm_dim = esm_dim
             self.max_pseudoseq_length = max_pseudoseq_length
             self.with_ba_head = with_ba_head
+            if allele_aggregation not in {"max", "logsumexp"}:
+                raise ValueError(
+                    f"allele_aggregation must be 'max' or 'logsumexp', got {allele_aggregation!r}"
+                )
+            self.allele_aggregation = allele_aggregation
             self.core_adapter = nn.TransformerEncoder(
                 nn.TransformerEncoderLayer(
                     d_model=esm_dim,
@@ -173,17 +179,34 @@ if TORCH_AVAILABLE:  # pragma: no cover
                 allele_mask = allele_feats.abs().sum(dim=-1).ne(0).any(dim=-1)
             valid = allele_mask[:, :, None] & core_mask[:, None, :]
             masked_grid = grid.masked_fill(~valid, torch.finfo(grid.dtype).min)
-            sample_logits = masked_grid.flatten(start_dim=1).max(dim=1).values
+            # Step 1: max over candidate cores within each allele -> per-allele
+            # logit. Picking the best register is what the literature does and
+            # works well for both aggregation modes below.
+            per_allele_logits = masked_grid.max(dim=2).values  # [batch, n_alleles]
+            if self.allele_aggregation == "logsumexp":
+                # Soft "any-of-these-alleles can present" aggregation. Mask
+                # out absent alleles so they don't contribute mass to the LSE.
+                per_allele_logits = per_allele_logits.masked_fill(
+                    ~allele_mask, torch.finfo(per_allele_logits.dtype).min
+                )
+                sample_logits = torch.logsumexp(per_allele_logits, dim=1)
+            else:
+                sample_logits = per_allele_logits.masked_fill(
+                    ~allele_mask, torch.finfo(per_allele_logits.dtype).min
+                ).max(dim=1).values
 
             if self.with_ba_head:
-                # Per-(core, allele) BA prediction, then max over cores ->
-                # per-(sample, allele) -> max over alleles for the
-                # sample-level BA prediction. We use sigmoid because BA
-                # targets are bounded in [0, 1] (1 - log(IC50)/log(50000)).
+                # Per-(core, allele) BA prediction, then max over cores
+                # within each allele, then max OVER ALLELES for the
+                # sample-level BA prediction (max here is appropriate
+                # even under LSE aggregation: BA records are mono-allelic).
                 ba_logits = self.ba_scorer(fused).squeeze(-1)
                 ba_grid = ba_logits.reshape(batch, n_cores, n_alleles).transpose(1, 2)
                 ba_masked = ba_grid.masked_fill(~valid, torch.finfo(ba_grid.dtype).min)
-                ba_sample_logits = ba_masked.flatten(start_dim=1).max(dim=1).values
+                ba_per_allele = ba_masked.max(dim=2).values
+                ba_sample_logits = ba_per_allele.masked_fill(
+                    ~allele_mask, torch.finfo(ba_per_allele.dtype).min
+                ).max(dim=1).values
                 return sample_logits, grid, ba_sample_logits
             return sample_logits, grid
 

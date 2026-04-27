@@ -58,6 +58,9 @@ def main() -> None:
     parser.add_argument("--ba-loss-weight", type=float, default=0.3)
     parser.add_argument("--cluster-weighted", action="store_true",
                         help="Multiply each per-sample loss by record.cluster_weight.")
+    parser.add_argument("--allele-aggregation", choices=["max", "logsumexp"], default="max",
+                        help="How to combine per-allele logits into a sample logit: "
+                             "'max' (Phase A/B v0) or 'logsumexp' (soft 'any allele can present').")
     args = parser.parse_args()
 
     checkpoint = train(
@@ -93,6 +96,7 @@ def main() -> None:
             multi_task_ba=args.multi_task_ba,
             ba_loss_weight=args.ba_loss_weight,
             cluster_weighted=args.cluster_weighted,
+            allele_aggregation=args.allele_aggregation,
         )
     )
     print(checkpoint)
