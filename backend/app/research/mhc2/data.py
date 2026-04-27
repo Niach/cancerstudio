@@ -207,6 +207,60 @@ def iter_netmhciipan_partition_file(
             )
 
 
+def iter_netmhciipan_ba_partition_file(
+    path: Path,
+    *,
+    source: str = "netmhciipan_43_ba",
+    split: str | None = None,
+    binder_threshold: float = 0.426,
+) -> Iterator[MHC2Record]:
+    """Parse a NetMHCIIpan-4.3 BA partition file (``c000_ba`` ... ``c004_ba``).
+
+    Format: whitespace-separated ``peptide log_affinity allele context`` per
+    line, where ``log_affinity`` is ``1 - log(IC50)/log(50000)`` (NetMHCIIpan
+    convention; higher = stronger binder, 1.0 = ~1 nM, 0.0 = >=50000 nM).
+    The ``binder_threshold`` of 0.426 corresponds to IC50 = 500 nM, the
+    standard MHC-II binder cutoff used by IEDB / NetMHCIIpan.
+
+    Yields ``MHC2Record`` objects with ``label_type="affinity"`` and
+    ``ba_value`` set to the raw log-affinity. ``target`` is set to 1.0/0.0
+    relative to ``binder_threshold`` so the same records can also feed an
+    EL-style binary classifier head.
+    """
+    split_name = split or _split_from_filename(path)
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split()
+            if len(parts) < 3:
+                continue
+            try:
+                peptide = clean_peptide(parts[0])
+            except ValueError:
+                continue
+            try:
+                ba = float(parts[1])
+            except ValueError:
+                continue
+            try:
+                alleles = normalize_many((parts[2],))
+            except ValueError:
+                continue
+            if not alleles:
+                continue
+            yield MHC2Record(
+                peptide=peptide,
+                alleles=alleles,
+                target=1.0 if ba >= binder_threshold else 0.0,
+                source=source,
+                split=split_name,
+                label_type="affinity",
+                ba_value=ba,
+            )
+
+
 def iter_generic_records(
     path: Path, source: str, split: str | None = None
 ) -> Iterator[MHC2Record]:

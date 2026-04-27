@@ -18,6 +18,7 @@ from app.research.mhc2.data import deduplicate_records, load_records, write_json
 from app.research.mhc2.data import (
     iter_generic_records,
     iter_hlaiipred_positive_csv,
+    iter_netmhciipan_ba_partition_file,
     iter_netmhciipan_partition_file,
     load_netmhciipan_allelelist,
     read_jsonl,
@@ -151,6 +152,8 @@ def _iter_records(
             split=split,
             positives_only=not include_netmhciipan_decoys,
         )
+    elif source == "netmhciipan_43_ba":
+        yield from iter_netmhciipan_ba_partition_file(path, split=split)
     elif path.name.endswith("_positive.csv") or "hlaiipred" in (source or ""):
         yield from iter_hlaiipred_positive_csv(path, split=split)
     else:
