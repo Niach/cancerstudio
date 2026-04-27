@@ -34,6 +34,7 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.research.mhc2.baselines.base import BaselineModel
+from app.research.mhc2.baselines.hlaiipred import HLAIIPredAdapter
 from app.research.mhc2.baselines.mixmhc2pred import MixMHC2predAdapter
 from app.research.mhc2.baselines.netmhciipan import NetMHCIIpanAdapter
 from app.research.mhc2.baselines.our_model import OurModelAdapter
@@ -53,7 +54,7 @@ def _build_test_pairs(
     seed: int,
 ) -> tuple[list[tuple[str, str]], list[float]]:
     """Returns (pairs, labels) for the locked test set: positives + decoys."""
-    positives = list(read_jsonl(test_jsonl))
+    positives = [r for r in read_jsonl(test_jsonl) if 9 <= len(r.peptide) <= 25]
     pairs: list[tuple[str, str]] = []
     labels: list[float] = []
     for record in positives:
@@ -106,6 +107,7 @@ def main() -> None:
     adapters: list[BaselineModel] = [
         NetMHCIIpanAdapter(),
         MixMHC2predAdapter(),
+        HLAIIPredAdapter(device=args.device),
     ]
     if args.our_checkpoint is not None:
         if args.pseudosequences is None:
