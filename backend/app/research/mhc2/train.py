@@ -417,6 +417,8 @@ def train(config: TrainConfig) -> Path:
             "attention_heads": config.attention_heads,
             "num_layers": config.num_layers,
             "dropout": config.dropout,
+            "with_ba_head": config.multi_task_ba,
+            "allele_aggregation": config.allele_aggregation,
         }
         model = MHCIIInteractionModel(**model_config).to(device)
         n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -445,6 +447,14 @@ def train(config: TrainConfig) -> Path:
     if config.allele_dropout > 0:
         print(f"[train] allele dropout p={config.allele_dropout} (HLAIIPred protocol)", flush=True)
     if config.dynamic_decoys:
+        if config.model_kind == "esm2_35m":
+            raise ValueError(
+                "--dynamic-decoys is not supported with --model-kind esm2_35m: "
+                "newly regenerated decoys would not be in the precomputed peptide cache, "
+                "so the ESM collator would raise on the first epoch-2 batch. Use the "
+                "scratch model (default --model-kind scratch) for dynamic decoys, or "
+                "leave --dynamic-decoys off and rely on the fixed pre-cached decoy pool."
+            )
         print("[train] dynamic per-epoch decoys enabled", flush=True)
 
     pin = device.type == "cuda"

@@ -220,9 +220,17 @@ if TORCH_AVAILABLE:  # pragma: no cover
             attention_heads: int = 4,
             num_layers: int = 2,
             dropout: float = 0.1,
+            with_ba_head: bool = False,
+            allele_aggregation: str = "max",
         ) -> None:
             super().__init__()
             self.max_pseudoseq_length = max_pseudoseq_length
+            self.with_ba_head = with_ba_head
+            if allele_aggregation not in {"max", "logsumexp"}:
+                raise ValueError(
+                    f"allele_aggregation must be 'max' or 'logsumexp', got {allele_aggregation!r}"
+                )
+            self.allele_aggregation = allele_aggregation
             self.embedding = nn.Embedding(
                 len(VOCAB) + 1, embedding_dim, padding_idx=PAD_INDEX
             )
@@ -258,6 +266,13 @@ if TORCH_AVAILABLE:  # pragma: no cover
                 nn.Dropout(dropout),
                 nn.Linear(hidden_dim, 1),
             )
+            if with_ba_head:
+                self.ba_scorer = nn.Sequential(
+                    nn.Linear(embedding_dim * 3, hidden_dim),
+                    nn.GELU(),
+                    nn.Dropout(dropout),
+                    nn.Linear(hidden_dim, 1),
+                )
 
         def forward(
             self,
@@ -296,9 +311,8 @@ if TORCH_AVAILABLE:  # pragma: no cover
             core_pool = core_pairs.mean(dim=1)
             allele_pool = allele_pairs.mean(dim=1)
             attended_pool = attended.mean(dim=1)
-            logits = self.scorer(
-                torch.cat([core_pool, allele_pool, attended_pool], dim=-1)
-            ).squeeze(-1)
+            fused = torch.cat([core_pool, allele_pool, attended_pool], dim=-1)
+            logits = self.scorer(fused).squeeze(-1)
             grid = logits.reshape(batch, n_cores, n_alleles).transpose(1, 2)
             if core_mask is None:
                 core_mask = core_tokens.ne(PAD_INDEX).any(dim=-1)
@@ -306,7 +320,26 @@ if TORCH_AVAILABLE:  # pragma: no cover
                 allele_mask = allele_tokens.ne(PAD_INDEX).any(dim=-1)
             valid = allele_mask[:, :, None] & core_mask[:, None, :]
             masked_grid = grid.masked_fill(~valid, torch.finfo(grid.dtype).min)
-            sample_logits = masked_grid.flatten(start_dim=1).max(dim=1).values
+            per_allele_logits = masked_grid.max(dim=2).values  # [batch, n_alleles]
+            if self.allele_aggregation == "logsumexp":
+                per_allele_logits = per_allele_logits.masked_fill(
+                    ~allele_mask, torch.finfo(per_allele_logits.dtype).min
+                )
+                sample_logits = torch.logsumexp(per_allele_logits, dim=1)
+            else:
+                sample_logits = per_allele_logits.masked_fill(
+                    ~allele_mask, torch.finfo(per_allele_logits.dtype).min
+                ).max(dim=1).values
+
+            if self.with_ba_head:
+                ba_logits = self.ba_scorer(fused).squeeze(-1)
+                ba_grid = ba_logits.reshape(batch, n_cores, n_alleles).transpose(1, 2)
+                ba_masked = ba_grid.masked_fill(~valid, torch.finfo(ba_grid.dtype).min)
+                ba_per_allele = ba_masked.max(dim=2).values
+                ba_sample_logits = ba_per_allele.masked_fill(
+                    ~allele_mask, torch.finfo(ba_per_allele.dtype).min
+                ).max(dim=1).values
+                return sample_logits, grid, ba_sample_logits
             return sample_logits, grid
 
 else:

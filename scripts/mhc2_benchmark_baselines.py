@@ -57,24 +57,30 @@ def _build_test_records(
 ) -> tuple[list, list[float]]:
     """Returns (records_with_full_allele_sets, labels). Each record keeps
     its complete ``alleles`` tuple so the scoring driver can fan-out."""
-    positives = [
+    loaded = [
         r for r in read_jsonl(test_jsonl)
         if 9 <= len(r.peptide) <= 25
         and (label_type_filter is None or r.label_type == label_type_filter)
     ]
     records: list = []
     labels: list[float] = []
-    for record in positives:
+    # Use record.target so BA records (target = 0/1 vs the binder cutoff)
+    # don't get silently relabeled as positives. For pure-positive EL
+    # files target is already 1.0; passing it through is a no-op there.
+    positive_for_decoy_seed: list = []
+    for record in loaded:
         if not record.alleles:
             continue
         records.append(record)
-        labels.append(1.0)
-    if proteome_fasta is not None and decoys_per_positive > 0:
+        labels.append(float(record.target))
+        if record.target >= 0.5:
+            positive_for_decoy_seed.append(record)
+    if proteome_fasta is not None and decoys_per_positive > 0 and positive_for_decoy_seed:
         proteome = read_fasta_sequences(proteome_fasta)
         decoys, _ = sample_length_matched_decoys(
-            positives,
+            positive_for_decoy_seed,
             proteome,
-            positive_9mers=positive_9mer_index(positives),
+            positive_9mers=positive_9mer_index(positive_for_decoy_seed),
             per_positive=decoys_per_positive,
             seed=seed,
         )

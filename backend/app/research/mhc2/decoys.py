@@ -145,6 +145,13 @@ def sample_length_matched_decoys(
                     protein_id=f"p{protein_idx}",
                     weight=positive.weight,
                     peptide_offset=start,
+                    # Inherit the matched positive's cluster identity so the
+                    # cluster-weighted loss doesn't down-weight the positive
+                    # while leaving the matched negative at 1.0 (HLAIIPred
+                    # protocol: matched pairs share weight).
+                    cluster_id=positive.cluster_id,
+                    cluster_weight=positive.cluster_weight,
+                    sample_allele_set=positive.sample_allele_set,
                 )
                 break
             if decoy is not None:
