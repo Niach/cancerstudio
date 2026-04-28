@@ -24,9 +24,16 @@ def main() -> None:
     parser.add_argument("--input", type=Path, required=True, help="CSV/TSV with peptide and allele columns.")
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--device", default="cpu")
+    parser.add_argument("--esm-cache-dir", type=Path, default=None,
+                        help="Required for ESM-2 (esm2_35m) checkpoints; ignored for scratch.")
     args = parser.parse_args()
 
-    predictor = MHC2Predictor(args.checkpoint, args.pseudosequences, device=args.device)
+    predictor = MHC2Predictor(
+        args.checkpoint,
+        args.pseudosequences,
+        device=args.device,
+        esm_cache_dir=args.esm_cache_dir,
+    )
     delimiter = "\t" if args.input.suffix.lower() in {".tsv", ".txt"} else ","
     args.out.parent.mkdir(parents=True, exist_ok=True)
     with args.input.open("r", encoding="utf-8", newline="") as source:
