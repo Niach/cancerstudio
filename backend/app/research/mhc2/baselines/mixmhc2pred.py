@@ -70,7 +70,23 @@ class MixMHC2predAdapter(BaselineModel):
                     "--alleles", *allele_set,
                     "--no_context",
                 ]
-                subprocess.run(cmd, check=True, capture_output=True)
+                try:
+                    subprocess.run(cmd, check=True, capture_output=True)
+                except subprocess.CalledProcessError as exc:
+                    # MixMHC2pred-2.0 exits non-zero when given an allele
+                    # it doesn't have a model for (e.g. very rare DPB1*10:401).
+                    # Treat the whole batch as NaN so downstream max-over-
+                    # alleles can still try other supported alleles for the
+                    # same record. Mirrors the NetMHCIIpan adapter's policy.
+                    for idx in indices:
+                        peptide, allele = pairs[idx]
+                        out[idx] = BaselinePrediction(
+                            peptide=peptide,
+                            allele=allele,
+                            score=float("nan"),
+                            rank_percent=float("nan"),
+                        )
+                    continue
                 rows = _parse_mixmhc2pred_output(out_file)
                 # Output is per-peptide with one column per allele score;
                 # grouping above set len(allele_set) == 1 so the score
