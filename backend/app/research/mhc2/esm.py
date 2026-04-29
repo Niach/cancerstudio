@@ -20,8 +20,33 @@ from typing import Iterable, Sequence
 
 from app.research.mhc2.constants import MODEL_AMINO_ACIDS
 
-ESM_MODEL_ID = "facebook/esm2_t12_35M_UR50D"
-ESM_FEATURE_DIM = 480
+ESM_MODELS: dict[str, tuple[str, int, int]] = {
+    # short_key: (HF model id, per-residue feature dim, transformer layers)
+    "esm2_8m":   ("facebook/esm2_t6_8M_UR50D",    320,  6),
+    "esm2_35m":  ("facebook/esm2_t12_35M_UR50D",  480, 12),
+    "esm2_150m": ("facebook/esm2_t30_150M_UR50D", 640, 30),
+    "esm2_650m": ("facebook/esm2_t33_650M_UR50D", 1280, 33),
+    "esm2_3b":   ("facebook/esm2_t36_3B_UR50D",   2560, 36),
+}
+
+# Module-level defaults for backward compatibility. New code should pass
+# model_key explicitly to load_esm2 / cache builders.
+ESM_DEFAULT_KEY = "esm2_35m"
+ESM_MODEL_ID = ESM_MODELS[ESM_DEFAULT_KEY][0]
+ESM_FEATURE_DIM = ESM_MODELS[ESM_DEFAULT_KEY][1]
+
+
+def resolve_esm(model_key: str | None = None) -> tuple[str, int]:
+    """Look up an ESM-2 variant by short key. Returns ``(hf_model_id,
+    feature_dim)``. None falls back to the default 35M."""
+    if model_key is None:
+        model_key = ESM_DEFAULT_KEY
+    if model_key not in ESM_MODELS:
+        raise ValueError(
+            f"unknown ESM model key {model_key!r}; valid: {list(ESM_MODELS)}"
+        )
+    hf_id, feat_dim, _layers = ESM_MODELS[model_key]
+    return hf_id, feat_dim
 
 # ESM-2 tokenizer accepts the 20 standard amino acids; X (unknown/gap) is
 # mapped to <unk>. Pseudosequences contain X by design — that's fine, ESM
@@ -74,8 +99,11 @@ def normalize_proteome_sequence(sequence: str) -> str:
     return "".join(c if c in MODEL_AMINO_ACIDS else "X" for c in cleaned)
 
 
-def load_esm2_35m(device: str = "cuda"):
-    """Load the frozen ESM-2 35M model + tokenizer.
+def load_esm2(device: str = "cuda", model_key: str | None = None):
+    """Load a frozen ESM-2 variant + tokenizer.
+
+    ``model_key`` is one of ``ESM_MODELS`` keys (e.g. ``esm2_35m``,
+    ``esm2_150m``). Defaults to the 35M model for backward compatibility.
 
     Returned model is in eval() with requires_grad=False on every parameter.
     Caller still needs to move it to the desired device themselves if they
@@ -91,13 +119,19 @@ def load_esm2_35m(device: str = "cuda"):
             "Install via `pip install transformers` in the research env."
         ) from exc
 
-    tokenizer = AutoTokenizer.from_pretrained(ESM_MODEL_ID)
-    model = AutoModel.from_pretrained(ESM_MODEL_ID)
+    hf_id, _feat_dim = resolve_esm(model_key)
+    tokenizer = AutoTokenizer.from_pretrained(hf_id)
+    model = AutoModel.from_pretrained(hf_id)
     model.eval()
     for param in model.parameters():
         param.requires_grad = False
     model.to(device)
     return model, tokenizer
+
+
+def load_esm2_35m(device: str = "cuda"):
+    """Backward-compatible wrapper for old callers."""
+    return load_esm2(device=device, model_key="esm2_35m")
 
 
 def embed_sequences(
@@ -235,6 +269,7 @@ def cache_embeddings_packed(
     use_bf16: bool = True,
     source_files: Sequence[str] = (),
     reverse_input: bool = False,
+    model_key: str | None = None,
 ) -> ESMCacheManifest:
     """Embed unique sequences and write them as a *packed* memmap-able
     binary file plus a small index, instead of a dict of tensors.
@@ -271,10 +306,12 @@ def cache_embeddings_packed(
     bin_path = cache_dir / f"{name}.bin"
     idx_path = cache_dir / f"{name}.idx.pt"
 
+    hf_id, feat_dim = resolve_esm(model_key)
     storage_dtype = torch.bfloat16 if use_bf16 else torch.float32
-    bytes_per_residue = ESM_FEATURE_DIM * (2 if use_bf16 else 4)
+    bytes_per_residue = feat_dim * (2 if use_bf16 else 4)
 
-    model, tokenizer = load_esm2_35m(device=device)
+    model, tokenizer = load_esm2(device=device, model_key=model_key)
+    print(f"[esm-packed] using {hf_id} (feat_dim={feat_dim})", flush=True)
     print(
         f"[esm-packed] embedding {len(unique)} unique sequences -> {bin_path} "
         f"(storage_dtype={'bf16' if use_bf16 else 'fp32'}, "
@@ -347,7 +384,7 @@ def cache_embeddings_packed(
     total_bytes = cursor * bytes_per_residue
     print(
         f"[esm-packed] {bin_path} = {total_bytes / 1e9:.1f} GB "
-        f"({cursor} residues, dim={ESM_FEATURE_DIM}, dtype="
+        f"({cursor} residues, dim={feat_dim}, dtype="
         f"{'bf16' if use_bf16 else 'fp32'})",
         flush=True,
     )
@@ -356,8 +393,8 @@ def cache_embeddings_packed(
     lengths_t = torch.tensor(lengths, dtype=torch.int64)
     index = {seq: i for i, seq in enumerate(sequences_in_order)}
     manifest = ESMCacheManifest(
-        model_id=ESM_MODEL_ID,
-        feature_dim=ESM_FEATURE_DIM,
+        model_id=hf_id,
+        feature_dim=feat_dim,
         n_sequences=len(unique),
         max_length=int(lengths_t.max().item()),
         source_files=tuple(source_files),
@@ -368,7 +405,7 @@ def cache_embeddings_packed(
             "starts": starts_t,
             "lengths": lengths_t,
             "index": index,
-            "feature_dim": ESM_FEATURE_DIM,
+            "feature_dim": feat_dim,
             "dtype": "bfloat16" if use_bf16 else "float32",
             "manifest": manifest.to_json(),
             "total_residues": cursor,

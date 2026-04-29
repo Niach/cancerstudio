@@ -507,9 +507,23 @@ def train(config: TrainConfig) -> Path:
                     "scripts/mhc2_build_esm_cache.py --build-reversed. Missing in "
                     f"{config.esm_cache_dir}."
                 ) from exc
+        # Auto-detect ESM feature dim from the cache index so callers don't
+        # have to keep TrainConfig.esm_dim in sync with the cache they
+        # actually point at. Override only if the user explicitly set a
+        # non-default esm_dim and it disagrees (we prefer cache truth).
+        cache_esm_dim = getattr(peptide_features, "feature_dim", None)
+        if cache_esm_dim is not None and cache_esm_dim != config.esm_dim:
+            print(
+                f"[train] esm_dim from cache ({cache_esm_dim}) overrides "
+                f"TrainConfig.esm_dim ({config.esm_dim}) — using cache value.",
+                flush=True,
+            )
+            # ``config`` is a frozen dataclass; replace via dataclasses.replace.
+            from dataclasses import replace
+            config = replace(config, esm_dim=cache_esm_dim)
         print(
             f"[train] esm cache: {len(peptide_features)} peptides "
-            f"({type(peptide_features).__name__}), "
+            f"({type(peptide_features).__name__}, dim={config.esm_dim}), "
             f"{len(pseudoseq_features)} pseudoseqs "
             f"({type(pseudoseq_features).__name__})",
             flush=True,

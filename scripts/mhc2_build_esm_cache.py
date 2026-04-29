@@ -48,9 +48,11 @@ from app.research.mhc2.decoys import (
 )
 from app.research.mhc2.esm import (
     ESM_MODEL_ID,
+    ESM_MODELS,
     cache_embeddings_packed,
     cache_embeddings_to_disk,
     normalize_for_esm,
+    resolve_esm,
 )
 
 
@@ -148,6 +150,13 @@ def main() -> None:
                              "peptide embedded *as if reversed* (C->N) for inverted-DP "
                              "scoring. Indexed by the original forward sequence so train/predict "
                              "can do `reversed_cache[peptide]` to get the reversed embedding.")
+    parser.add_argument("--esm-model", default="esm2_35m",
+                        choices=list(ESM_MODELS),
+                        help="Which ESM-2 variant to embed with. Larger = stronger features "
+                             "and bigger cache. esm2_35m (default, 480 dim) → esm2_150m (640) "
+                             "→ esm2_650m (1280). All cache lookups are keyed by peptide "
+                             "string; just point the trainer at this directory and it picks "
+                             "up the right feature_dim from the saved index.")
     args = parser.parse_args()
 
     args.out.mkdir(parents=True, exist_ok=True)
@@ -158,7 +167,11 @@ def main() -> None:
     if args.test_jsonl is not None:
         extras.append(args.test_jsonl)
 
-    print(f"[esm-cache] using {ESM_MODEL_ID} on {args.device}", flush=True)
+    hf_id, feat_dim = resolve_esm(args.esm_model)
+    print(
+        f"[esm-cache] using {args.esm_model} ({hf_id}, dim={feat_dim}) on {args.device}",
+        flush=True,
+    )
 
     peptides = None
     if not args.skip_peptides or args.build_reversed:
@@ -185,6 +198,7 @@ def main() -> None:
                 batch_size=args.batch_size,
                 use_bf16=args.bf16,
                 source_files=tuple(str(p) for p in [args.train_jsonl, *extras, args.proteome_fasta]),
+                model_key=args.esm_model,
             )
         else:
             cache_embeddings_packed(
@@ -195,6 +209,7 @@ def main() -> None:
                 batch_size=args.batch_size,
                 use_bf16=args.bf16,
                 source_files=tuple(str(p) for p in [args.train_jsonl, *extras, args.proteome_fasta]),
+                model_key=args.esm_model,
             )
 
     if args.build_reversed:
@@ -208,6 +223,7 @@ def main() -> None:
             use_bf16=args.bf16,
             source_files=tuple(str(p) for p in [args.train_jsonl, *extras, args.proteome_fasta]),
             reverse_input=True,
+            model_key=args.esm_model,
         )
 
     if not args.skip_pseudoseqs:
@@ -231,6 +247,7 @@ def main() -> None:
                 batch_size=args.batch_size,
                 use_bf16=args.bf16,
                 source_files=(str(args.pseudosequences),),
+                model_key=args.esm_model,
             )
 
     print(f"[esm-cache] done; outputs in {args.out}", flush=True)
