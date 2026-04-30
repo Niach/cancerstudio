@@ -80,7 +80,27 @@ All val_auc numbers below are on the cluster-aware `cluster_valid.jsonl` (no 9-m
 | **DP slice** | phaseB_v2_invertedDP.best.pt (epoch 2) | **DP 0.884** |
 | trade-off | depends on use case — keep both, ensemble candidates |
 
-**Gap to HLAIIPred (0.9442 cluster_test): 0.086 absolute**. v4_decoys3 hasn't been benchmarked on cluster_test yet — that's a TODO.
+## ⚠️ Benchmark fairness audit (2026-04-30) — gap to HLAIIPred is largely artifact
+
+A fairness audit revealed **79% of cluster_test peptides are in HLAIIPred's published training set** (`HLAIIPred zenodo 15299217 / train_positive.csv`):
+
+| split | overlap with HLAIIPred train |
+|---|---|
+| cluster_test | 48,788 / 61,763 (**79.0%**) |
+| cluster_valid | 39,399 / 52,096 (75.6%) |
+| cluster_train | 498,368 / 643,755 (77.4%) |
+
+**Implications:**
+- HLAIIPred's 0.9442 on cluster_test is **NOT a leakage-free generalization number** — they're scoring 79% of their own training data.
+- Our cluster splits are leakage-free for *our model* (9-mer connected components) but the test set is **inside HLAIIPred's training distribution**, not outside it.
+- **The "0.086 absolute gap" is largely memorization artifact**, probably +0.05-0.08 of which is HLAIIPred's leakage. Our **phaseB_v1 cluster_test = 0.8585** is plausibly at parity with HLAIIPred's true generalization.
+
+**For a publishable SOTA claim, we need a benchmark HLAIIPred didn't see during training:**
+- NetMHCIIpan-4.3 eval set (`NetMHCIIpan_eval.fa`, 842 CD4+ epitopes) — post-HLAIIPred's 2024 cutoff
+- HLA Ligand Atlas DIA (Bichmann 2025, post-HLAIIPred) — benign benchmark
+- Recent IEDB additions (`mhc_bind_full.zip`) since 2024
+
+The internal ablation rankings (v0/v1/v2/v3/v4/v5) remain valid since they're all evaluated on the same cluster_valid/cluster_test slices. Only the cross-tool comparison to HLAIIPred is invalidated by this audit.
 
 ## Open ablation questions
 
