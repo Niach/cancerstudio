@@ -277,11 +277,13 @@ def main() -> None:
         franks.append(f)
         alleles.append(allele_norm)
         lengths.append(len(entry["epitope"]))
-        if (i + 1) % 100 == 0:
+        if (i + 1) % 25 == 0 or i < 5:
             valid_so_far = [x for x in franks if not math.isnan(x)]
             med = sorted(valid_so_far)[len(valid_so_far) // 2] if valid_so_far else float("nan")
             print(
-                f"[eval-fa] {i+1}/{len(entries)} entries, running median_frank={med:.4f}",
+                f"[eval-fa] {i+1}/{len(entries)} entries, "
+                f"len(score_pairs)={len(score_pairs)}, "
+                f"running median_frank={med:.4f}",
                 flush=True,
             )
 
