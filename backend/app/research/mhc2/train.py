@@ -780,6 +780,7 @@ def train(config: TrainConfig) -> Path:
                 loss = _multi_task_loss(
                     out, labels, label_types, ba_values, sample_weights,
                     loss_fn, ba_loss_fn, config,
+                    locus_weights=locus_weights,
                 )
             logits = out[0]
             loss.backward()
