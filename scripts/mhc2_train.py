@@ -106,6 +106,17 @@ def main() -> None:
                         help="Sentinel subset size (default 100, deterministic).")
     parser.add_argument("--eval-fa-sentinel-seed", type=int, default=13)
     parser.add_argument("--eval-fa-sentinel-batch-size", type=int, default=64)
+    parser.add_argument("--early-stop-metric",
+                        choices=["val_auc", "sentinel_frank"], default="val_auc",
+                        help="Metric to gate early stopping. 'sentinel_frank' uses the "
+                             "per-epoch eval.fa median FRANK (lower-is-better); requires "
+                             "--eval-fa-sentinel.")
+    parser.add_argument("--grad-clip", type=float, default=0.0,
+                        help="Clip grad-norm to this value. 0 disables. Recommended 1.0 "
+                             "for FRANK-aligned ranking-loss training.")
+    parser.add_argument("--grad-accum-steps", type=int, default=1,
+                        help="Gradient-accumulation steps. Effective batch size = "
+                             "--batch-size * --grad-accum-steps.")
     args = parser.parse_args()
 
     checkpoint = train(
@@ -154,6 +165,9 @@ def main() -> None:
             eval_fa_sentinel_n=args.eval_fa_sentinel_n,
             eval_fa_sentinel_seed=args.eval_fa_sentinel_seed,
             eval_fa_sentinel_batch_size=args.eval_fa_sentinel_batch_size,
+            early_stop_metric=args.early_stop_metric,
+            grad_clip=args.grad_clip,
+            grad_accum_steps=args.grad_accum_steps,
         )
     )
     print(checkpoint)

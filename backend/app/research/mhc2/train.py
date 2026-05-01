@@ -285,6 +285,9 @@ class TrainConfig:
     log_every: int = 200
     save_every_epoch: bool = True
     early_stopping_patience: int = 0  # 0 disables; otherwise stop after N epochs without val_auc improvement
+    early_stop_metric: str = "val_auc"  # "val_auc" (legacy) or "sentinel_frank" (lower is better; requires --eval-fa-sentinel)
+    grad_clip: float = 0.0  # if > 0, clip grad-norm to this value (recipe-mandated stability for FRANK-aligned training)
+    grad_accum_steps: int = 1  # >1 enables gradient accumulation: effective batch = batch_size * grad_accum_steps
     embedding_dim: int = 96
     hidden_dim: int = 128
     attention_heads: int = 4
@@ -784,7 +787,18 @@ def train(config: TrainConfig) -> Path:
         )
 
     history: list[dict[str, float | dict[str, float]]] = []
-    best_val_auc = float("-inf")
+    if config.early_stop_metric not in {"val_auc", "sentinel_frank"}:
+        raise ValueError(
+            f"early_stop_metric must be 'val_auc' or 'sentinel_frank', "
+            f"got {config.early_stop_metric!r}"
+        )
+    if config.early_stop_metric == "sentinel_frank" and config.eval_fa_sentinel_path is None:
+        raise ValueError(
+            "early_stop_metric='sentinel_frank' requires --eval-fa-sentinel"
+        )
+    # Track the better-is-... best so far. AUC is higher-is-better; FRANK is
+    # lower-is-better so we negate it before comparing.
+    best_metric = float("-inf")
     epochs_without_improvement = 0
     for epoch in range(1, config.epochs + 1):
         if config.dynamic_decoys and proteome is not None and epoch > 1:
@@ -838,7 +852,10 @@ def train(config: TrainConfig) -> Path:
                     rescue = first_valid & allele_mask
                     proposed = torch.where(empty[:, None], rescue, proposed)
                 allele_mask = proposed
-            optimizer.zero_grad(set_to_none=True)
+            accum_steps = max(1, config.grad_accum_steps)
+            is_accum_boundary = (step % accum_steps == 0) or (step == len(train_loader))
+            if (step - 1) % accum_steps == 0:
+                optimizer.zero_grad(set_to_none=True)
             if use_bf16:
                 with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
                     out = model(
@@ -861,10 +878,13 @@ def train(config: TrainConfig) -> Path:
                     locus_weights=locus_weights,
                 )
             logits = out[0]
-            loss.backward()
-            optimizer.step()
-            if scheduler is not None:
-                scheduler.step()
+            (loss / accum_steps).backward()
+            if is_accum_boundary:
+                if config.grad_clip and config.grad_clip > 0:
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), config.grad_clip)
+                optimizer.step()
+                if scheduler is not None:
+                    scheduler.step()
             total_loss += float(loss.detach()) * len(labels)
             total_items += len(labels)
             if config.log_every and step % config.log_every == 0:
@@ -927,18 +947,29 @@ def train(config: TrainConfig) -> Path:
             encoding="utf-8",
         )
 
-        val_auc = record.get("val_auc")
-        if isinstance(val_auc, float):
-            if val_auc > best_val_auc:
-                best_val_auc = val_auc
+        if config.early_stop_metric == "val_auc":
+            raw = record.get("val_auc")
+            metric = raw if isinstance(raw, float) else None
+            metric_label = "val_auc"
+        else:
+            raw = record.get("sentinel_median_frank")
+            metric = -raw if isinstance(raw, float) else None  # FRANK is lower-is-better
+            metric_label = "sentinel_frank"
+        if metric is not None:
+            display = metric if config.early_stop_metric == "val_auc" else -metric
+            if metric > best_metric:
+                best_metric = metric
                 _save(config.output_dir / f"{config.checkpoint_track}.best.pt", epoch)
                 epochs_without_improvement = 0
-                print(f"[train] new best val_auc={val_auc:.4f} at epoch {epoch}", flush=True)
+                print(
+                    f"[train] new best {metric_label}={display:.4f} at epoch {epoch}",
+                    flush=True,
+                )
             else:
                 epochs_without_improvement += 1
                 if config.early_stopping_patience and epochs_without_improvement >= config.early_stopping_patience:
                     print(
-                        f"[train] early stop: no val_auc improvement for "
+                        f"[train] early stop: no {metric_label} improvement for "
                         f"{epochs_without_improvement} epoch(s)",
                         flush=True,
                     )
