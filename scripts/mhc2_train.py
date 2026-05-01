@@ -83,6 +83,14 @@ def main() -> None:
                              "pick the best orientation. Recipe-mandated for 2026 SOTA on "
                              "DP. Requires a peptides_rev.bin cache built with "
                              "scripts/mhc2_build_esm_cache.py --build-reversed.")
+    parser.add_argument("--eval-fa-sentinel", type=Path, default=None,
+                        help="Path to NetMHCIIpan_eval.fa. If set, a stratified subset is "
+                             "scored after each epoch and merged into history.json under "
+                             "sentinel_* keys. Doesn't gate early stopping yet.")
+    parser.add_argument("--eval-fa-sentinel-n", type=int, default=100,
+                        help="Sentinel subset size (default 100, deterministic).")
+    parser.add_argument("--eval-fa-sentinel-seed", type=int, default=13)
+    parser.add_argument("--eval-fa-sentinel-batch-size", type=int, default=64)
     args = parser.parse_args()
 
     checkpoint = train(
@@ -124,6 +132,10 @@ def main() -> None:
             dynamic_decoys=args.dynamic_decoys,
             locus_upweight=args.locus_upweight,
             inverted_dp=args.inverted_dp,
+            eval_fa_sentinel_path=args.eval_fa_sentinel,
+            eval_fa_sentinel_n=args.eval_fa_sentinel_n,
+            eval_fa_sentinel_seed=args.eval_fa_sentinel_seed,
+            eval_fa_sentinel_batch_size=args.eval_fa_sentinel_batch_size,
         )
     )
     print(checkpoint)

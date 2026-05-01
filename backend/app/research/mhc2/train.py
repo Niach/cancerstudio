@@ -308,6 +308,14 @@ class TrainConfig:
     dynamic_decoys: bool = False  # regenerate decoys at the start of each epoch (HLAIIPred protocol)
     locus_upweight: str = "none"  # "none" | "balanced" | "inverse_frequency" | "sqrt_inverse"
     inverted_dp: bool = False  # also score reversed peptides for DP records (recipe-mandated for HLA-DP)
+    # NetMHCIIpan_eval.fa FRANK sentinel — if set, a stratified subset of the
+    # 842 published CD4+ epitopes is scored after each epoch's checkpoint
+    # write. The result lands in history.json under sentinel_* keys; it does
+    # not gate early stopping yet (val_auc still does that).
+    eval_fa_sentinel_path: Path | None = None
+    eval_fa_sentinel_n: int = 100
+    eval_fa_sentinel_seed: int = 13
+    eval_fa_sentinel_batch_size: int = 64
 
 
 def _multi_task_loss(
@@ -363,6 +371,67 @@ def _resolve_device(requested: str) -> str:
     if requested != "auto":
         return requested
     return "cuda" if torch.cuda.is_available() else "cpu"
+
+
+def _run_eval_fa_sentinel(
+    *,
+    ckpt_path: Path,
+    eval_fa_path: Path,
+    pseudosequence_path: Path,
+    esm_cache_dir: Path | None,
+    n: int,
+    seed: int,
+    device: str,
+    batch_size: int,
+) -> dict:
+    """Score a deterministic stratified subset of NetMHCIIpan_eval.fa with the
+    just-saved checkpoint. Returns a small dict of sentinel_* metrics suitable
+    for merging into the epoch's history record. On any failure we log and
+    return an empty dict so a sentinel error never aborts training.
+    """
+    try:
+        from app.research.mhc2.eval_fa import (
+            parse_eval_fa,
+            score_eval_fa,
+            stratified_subset,
+        )
+        from app.research.mhc2.predict import MHC2Predictor
+        import torch
+
+        entries = parse_eval_fa(eval_fa_path)
+        sub = stratified_subset(entries, n=n, seed=seed)
+        predictor = MHC2Predictor(
+            checkpoint_path=ckpt_path,
+            pseudosequence_path=pseudosequence_path,
+            device=device,
+            esm_cache_dir=esm_cache_dir,
+        )
+
+        def score_fn(pairs: list[tuple[str, str]]) -> dict[str, float]:
+            preds = predictor.predict_many(pairs, batch_size=batch_size)
+            return {p.peptide: float(p.score) for p in preds}
+
+        summary = score_eval_fa(
+            score_fn, sub, supported_alleles=set(predictor.pseudosequences)
+        )
+        rand = summary.get("by_tie_policy", {}).get("random", {})
+        out = {
+            "sentinel_n": len(sub),
+            "sentinel_n_evaluated": rand.get("n_evaluated"),
+            "sentinel_median_frank": rand.get("median_frank"),
+            "sentinel_mean_frank": rand.get("mean_frank"),
+            "sentinel_p95_frank": rand.get("p95_frank"),
+            "sentinel_top5_pct": rand.get("frac_top5_pct"),
+            "sentinel_frank_by_locus": rand.get("by_locus"),
+            "sentinel_frank_by_length": rand.get("by_length"),
+        }
+        del predictor
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        return out
+    except Exception as exc:  # pragma: no cover — sentinel must never fail training
+        print(f"[sentinel] skipped: {exc!r}", flush=True)
+        return {}
 
 
 def _locus_for(allele: str) -> str:
@@ -809,17 +878,45 @@ def train(config: TrainConfig) -> Path:
             val = _evaluate(model, valid_loader, loss_fn, device, pin, use_bf16=use_bf16)
             record.update(val)
 
+        config.output_dir.mkdir(parents=True, exist_ok=True)
+        if config.save_every_epoch:
+            _save(config.output_dir / f"{config.checkpoint_track}.epoch{epoch}.pt", epoch)
+        latest_ckpt = config.output_dir / f"{config.checkpoint_track}.pt"
+        _save(latest_ckpt, epoch)
+
+        # FRANK sentinel: score a deterministic eval.fa subset against the
+        # checkpoint we just wrote. Result is merged into the same epoch's
+        # history record, so history.json carries it from the start.
+        if config.eval_fa_sentinel_path is not None:
+            print(f"[sentinel] running on {config.eval_fa_sentinel_n} eval.fa entries...",
+                  flush=True)
+            sent_t0 = time.time()
+            sent = _run_eval_fa_sentinel(
+                ckpt_path=latest_ckpt,
+                eval_fa_path=config.eval_fa_sentinel_path,
+                pseudosequence_path=config.pseudosequences,
+                esm_cache_dir=config.esm_cache_dir,
+                n=config.eval_fa_sentinel_n,
+                seed=config.eval_fa_sentinel_seed,
+                device=device,
+                batch_size=config.eval_fa_sentinel_batch_size,
+            )
+            record.update(sent)
+            med = sent.get("sentinel_median_frank")
+            if isinstance(med, float):
+                print(
+                    f"[sentinel] median FRANK={med:.4f} "
+                    f"(top5%={sent.get('sentinel_top5_pct', 0)*100:.1f}%, "
+                    f"{time.time() - sent_t0:.1f}s)",
+                    flush=True,
+                )
+
         history.append(record)
         print(f"[train] epoch={epoch} done in {epoch_dt:.1f}s :: {record}", flush=True)
-
-        config.output_dir.mkdir(parents=True, exist_ok=True)
         (config.output_dir / f"{config.checkpoint_track}.history.json").write_text(
             json.dumps(history, indent=2, default=float) + "\n",
             encoding="utf-8",
         )
-        if config.save_every_epoch:
-            _save(config.output_dir / f"{config.checkpoint_track}.epoch{epoch}.pt", epoch)
-        _save(config.output_dir / f"{config.checkpoint_track}.pt", epoch)
 
         val_auc = record.get("val_auc")
         if isinstance(val_auc, float):
