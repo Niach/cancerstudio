@@ -4,7 +4,7 @@ Exercises three surfaces in isolation (no Mutect2 invocation):
 
 1. ``resolve_pon_config`` returns a config for GRCh38 when the packaged
    VCF exists, and ``None`` for species with no PON (dog, cat).
-2. The ``CANCERSTUDIO_PON_GRCH38_VCF`` env var overrides the packaged
+2. The ``MUTAVAX_PON_GRCH38_VCF`` env var overrides the packaged
    path and disables the PON entirely when set to an empty string.
 3. When ``VariantCallingInputs.pon_vcf`` is set, Mutect2 (GATK path)
    and Parabricks (GPU path) both gain the appropriate flag.
@@ -41,7 +41,7 @@ def fake_bundle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         lambda: bundle,
     )
     # Clear any host env override so the test runs deterministically.
-    monkeypatch.delenv("CANCERSTUDIO_PON_GRCH38_VCF", raising=False)
+    monkeypatch.delenv("MUTAVAX_PON_GRCH38_VCF", raising=False)
     return bundle
 
 
@@ -76,7 +76,7 @@ def test_missing_file_returns_none(tmp_path: Path, monkeypatch: pytest.MonkeyPat
         "app.services.variant_calling.get_reference_bundle_root",
         lambda: tmp_path,
     )
-    monkeypatch.delenv("CANCERSTUDIO_PON_GRCH38_VCF", raising=False)
+    monkeypatch.delenv("MUTAVAX_PON_GRCH38_VCF", raising=False)
     assert resolve_pon_config(ReferencePreset.GRCH38) is None
 
 
@@ -84,14 +84,14 @@ def test_env_var_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> No
     override = tmp_path / "custom_pon.vcf.gz"
     override.write_bytes(b"x")
     (tmp_path / "custom_pon.vcf.gz.tbi").write_bytes(b"x")
-    monkeypatch.setenv("CANCERSTUDIO_PON_GRCH38_VCF", str(override))
+    monkeypatch.setenv("MUTAVAX_PON_GRCH38_VCF", str(override))
     cfg = resolve_pon_config(ReferencePreset.GRCH38)
     assert cfg is not None
     assert cfg.vcf_path == override
 
 
 def test_env_var_empty_string_disables(fake_bundle: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("CANCERSTUDIO_PON_GRCH38_VCF", "")
+    monkeypatch.setenv("MUTAVAX_PON_GRCH38_VCF", "")
     assert resolve_pon_config(ReferencePreset.GRCH38) is None
 
 
@@ -124,7 +124,7 @@ def test_ensure_pon_env_override_skips_bootstrap(
     override = tmp_path / "custom.vcf.gz"
     override.write_bytes(b"x")
     (tmp_path / "custom.vcf.gz.tbi").write_bytes(b"x")
-    monkeypatch.setenv("CANCERSTUDIO_PON_GRCH38_VCF", str(override))
+    monkeypatch.setenv("MUTAVAX_PON_GRCH38_VCF", str(override))
     cfg = ensure_pon_ready(ReferencePreset.GRCH38, tmp_path / "x.fa")
     assert cfg is not None
     assert cfg.vcf_path == override

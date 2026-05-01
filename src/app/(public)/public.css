@@ -1,4 +1,4 @@
-/* ─── cancerstudio public — merged landing + genome archive ─── */
+/* ─── mutavax public — merged landing + genome archive ─── */
 :root {
   --ink: #0f1214;
   --ink-2: #4a4d52;
@@ -18,20 +18,20 @@
   --g-soft: #d4f4e2;
   --t-soft: #ffeccd;
 }
-.cs-public, .cs-public * { box-sizing: border-box; }
-.cs-public {
+.mvx-public, .mvx-public * { box-sizing: border-box; }
+.mvx-public {
   background: var(--paper);
   color: var(--ink);
   font-family: var(--font-inter), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
 }
-body:has(.cs-public) { background: var(--paper); margin: 0; overflow-x: hidden; }
+body:has(.mvx-public) { background: var(--paper); margin: 0; overflow-x: hidden; }
 /* Plain links inside the public layout inherit the surrounding text color,
-   but anchor-shaped buttons (.cs-btn from the design system, .btn-primary /
+   but anchor-shaped buttons (.mvx-btn from the design system, .btn-primary /
    .btn-ghost from the public site) carry their own color and must not be
    flattened to inherit — otherwise they render as black-on-black blobs. */
-.cs-public :where(a):not([class*="btn"]) { color: inherit; text-decoration: none; }
+.mvx-public :where(a):not([class*="btn"]) { color: inherit; text-decoration: none; }
 
 /* ── Nav ─────────────────────────────────────────── */
 nav.top {
@@ -2033,7 +2033,7 @@ section.partners h2.big { font-size: clamp(36px, 4.2vw, 56px); }
 }
 
 
-/* ─── cs-showcase (real-app iframe) ──────────────── */
+/* ─── mvx-showcase (real-app iframe) ──────────────── */
 .app-showcase { padding-top: 60px; padding-bottom: 40px; }
 .app-showcase .showcase-head { max-width: 780px; margin-bottom: 40px; }
 .app-showcase .showcase-head .big {
@@ -2054,14 +2054,14 @@ section.partners h2.big { font-size: clamp(36px, 4.2vw, 56px); }
   max-width: 620px;
 }
 
-.cs-showcase {
+.mvx-showcase {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
 /* ── Control strip (above the window) ── */
-.cs-strip {
+.mvx-strip {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 20px;
@@ -2071,7 +2071,7 @@ section.partners h2.big { font-size: clamp(36px, 4.2vw, 56px); }
   border: 1px solid var(--line);
   border-radius: 14px;
 }
-.cs-strip-left {
+.mvx-strip-left {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -2080,16 +2080,16 @@ section.partners h2.big { font-size: clamp(36px, 4.2vw, 56px); }
   font-size: 12px;
   color: var(--ink-2);
 }
-.cs-strip-eye {
+.mvx-strip-eye {
   text-transform: uppercase;
   letter-spacing: 0.12em;
   font-size: 11px;
   color: var(--ink-3);
 }
-.cs-strip-sep { opacity: 0.4; }
-.cs-strip-case { color: var(--ink); font-weight: 500; }
-.cs-strip-prog { color: var(--ink-2); }
-.cs-strip-bar {
+.mvx-strip-sep { opacity: 0.4; }
+.mvx-strip-case { color: var(--ink); font-weight: 500; }
+.mvx-strip-prog { color: var(--ink-2); }
+.mvx-strip-bar {
   flex: 1;
   min-width: 140px;
   height: 4px;
@@ -2097,18 +2097,18 @@ section.partners h2.big { font-size: clamp(36px, 4.2vw, 56px); }
   border-radius: 999px;
   overflow: hidden;
 }
-.cs-strip-bar span {
+.mvx-strip-bar span {
   display: block;
   height: 100%;
   background: var(--ink);
   border-radius: 999px;
   transition: width 0.5s ease;
 }
-.cs-strip-right {
+.mvx-strip-right {
   display: flex;
   gap: 8px;
 }
-.cs-strip-btn {
+.mvx-strip-btn {
   padding: 8px 14px;
   border-radius: 999px;
   border: 1px solid var(--line-strong);
@@ -2125,16 +2125,16 @@ section.partners h2.big { font-size: clamp(36px, 4.2vw, 56px); }
   align-items: center;
   transition: background 0.15s, border-color 0.15s;
 }
-.cs-strip-btn:hover { background: rgba(15,18,20,0.04); }
-.cs-strip-btn.primary {
+.mvx-strip-btn:hover { background: rgba(15,18,20,0.04); }
+.mvx-strip-btn.primary {
   background: var(--ink);
   color: var(--paper);
   border-color: var(--ink);
 }
-.cs-strip-btn.primary:hover { opacity: 0.9; background: var(--ink); }
+.mvx-strip-btn.primary:hover { opacity: 0.9; background: var(--ink); }
 
 /* ── Left rail ── */
-.cs-rail {
+.mvx-rail {
   background: var(--paper-2);
   border: 1px solid var(--line);
   border-radius: 16px;
@@ -2144,11 +2144,11 @@ section.partners h2.big { font-size: clamp(36px, 4.2vw, 56px); }
   gap: 16px;
   min-height: 620px;
 }
-.cs-rail-head {
+.mvx-rail-head {
   padding-bottom: 16px;
   border-bottom: 1px solid var(--line);
 }
-.cs-rail-eye {
+.mvx-rail-eye {
   font-family: var(--font-jbm), ui-monospace, monospace;
   font-size: 11px;
   letter-spacing: 0.08em;
@@ -2156,43 +2156,43 @@ section.partners h2.big { font-size: clamp(36px, 4.2vw, 56px); }
   color: var(--ink-3);
   margin-bottom: 6px;
 }
-.cs-rail-title {
+.mvx-rail-title {
   font-family: var(--font-instrument), serif;
   font-size: 22px;
   line-height: 1.1;
   margin-bottom: 10px;
 }
-.cs-rail-meta {
+.mvx-rail-meta {
   display: flex; align-items: center; gap: 8px;
   font-family: var(--font-jbm), ui-monospace, monospace;
   font-size: 12px;
   color: var(--ink-2);
   margin-bottom: 8px;
 }
-.cs-rail-dot {
+.mvx-rail-dot {
   width: 8px; height: 8px; border-radius: 999px;
   background: var(--g);
   box-shadow: 0 0 0 3px var(--g-soft);
-  animation: cs-pulse 1.8s ease-in-out infinite;
+  animation: mvx-pulse 1.8s ease-in-out infinite;
 }
-@keyframes cs-pulse {
+@keyframes mvx-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
 }
-.cs-rail-bar {
+.mvx-rail-bar {
   height: 4px;
   background: rgba(15,18,20,0.06);
   border-radius: 999px;
   overflow: hidden;
 }
-.cs-rail-bar span {
+.mvx-rail-bar span {
   display: block; height: 100%;
   background: var(--ink);
   border-radius: 999px;
   transition: width 0.5s ease;
 }
 
-.cs-rail-nav {
+.mvx-rail-nav {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -2201,7 +2201,7 @@ section.partners h2.big { font-size: clamp(36px, 4.2vw, 56px); }
   gap: 2px;
   flex: 1;
 }
-.cs-rail-item {
+.mvx-rail-item {
   display: grid;
   grid-template-columns: 32px 1fr 14px;
   align-items: center;
@@ -2212,69 +2212,69 @@ section.partners h2.big { font-size: clamp(36px, 4.2vw, 56px); }
   font-size: 13px;
   transition: background 0.15s;
 }
-.cs-rail-item:hover {
+.mvx-rail-item:hover {
   background: rgba(15,18,20,0.04);
 }
-.cs-rail-item.running {
+.mvx-rail-item.running {
   background: var(--ink);
   color: var(--paper);
 }
-.cs-rail-item.done {
+.mvx-rail-item.done {
   color: var(--ink-3);
 }
-.cs-rail-n {
+.mvx-rail-n {
   font-family: var(--font-jbm), ui-monospace, monospace;
   font-size: 11px;
   opacity: 0.65;
   font-weight: 500;
   letter-spacing: 0.04em;
 }
-.cs-rail-item.running .cs-rail-n { opacity: 0.85; color: var(--paper); }
-.cs-rail-l {
+.mvx-rail-item.running .mvx-rail-n { opacity: 0.85; color: var(--paper); }
+.mvx-rail-l {
   display: flex;
   flex-direction: column;
   gap: 1px;
   min-width: 0;
 }
-.cs-rail-label {
+.mvx-rail-label {
   font-weight: 500;
   letter-spacing: -0.005em;
 }
-.cs-rail-sub {
+.mvx-rail-sub {
   font-family: var(--font-jbm), ui-monospace, monospace;
   font-size: 10px;
   opacity: 0.55;
   letter-spacing: 0.02em;
 }
-.cs-rail-item.running .cs-rail-sub { opacity: 0.75; }
-.cs-rail-status {
+.mvx-rail-item.running .mvx-rail-sub { opacity: 0.75; }
+.mvx-rail-status {
   width: 8px; height: 8px; border-radius: 999px;
   background: transparent;
   border: 1.5px solid rgba(15,18,20,0.25);
   justify-self: end;
 }
-.cs-rail-status-done {
+.mvx-rail-status-done {
   background: var(--g);
   border-color: var(--g);
 }
-.cs-rail-status-running {
+.mvx-rail-status-running {
   background: var(--paper);
   border-color: var(--paper);
   box-shadow: 0 0 0 2px rgba(251,248,241,0.35);
 }
-.cs-rail-item.done .cs-rail-status {
+.mvx-rail-item.done .mvx-rail-status {
   background: var(--g);
   border-color: var(--g);
   opacity: 0.6;
 }
 
-.cs-rail-actions {
+.mvx-rail-actions {
   display: flex;
   gap: 8px;
   padding-top: 14px;
   border-top: 1px solid var(--line);
 }
-.cs-rail-btn {
+.mvx-rail-btn {
   flex: 1;
   padding: 10px 12px;
   border-radius: 999px;
@@ -2290,10 +2290,10 @@ section.partners h2.big { font-size: clamp(36px, 4.2vw, 56px); }
   text-align: center;
   transition: background 0.15s, border-color 0.15s;
 }
-.cs-rail-btn:hover {
+.mvx-rail-btn:hover {
   background: rgba(15,18,20,0.04);
 }
-.cs-rail-btn.primary {
+.mvx-rail-btn.primary {
   background: var(--ink);
   color: var(--paper);
   border-color: var(--ink);
@@ -2302,13 +2302,13 @@ section.partners h2.big { font-size: clamp(36px, 4.2vw, 56px); }
   align-items: center;
   justify-content: center;
 }
-.cs-rail-btn.primary:hover {
+.mvx-rail-btn.primary:hover {
   opacity: 0.9;
   background: var(--ink);
 }
 
 /* ── Window (browser chrome + iframe) ── */
-.cs-window {
+.mvx-window {
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 16px;
@@ -2318,7 +2318,7 @@ section.partners h2.big { font-size: clamp(36px, 4.2vw, 56px); }
   box-shadow: 0 24px 60px -20px rgba(15,18,20,0.18),
               0 8px 20px -10px rgba(15,18,20,0.08);
 }
-.cs-chrome {
+.mvx-chrome {
   display: flex;
   align-items: center;
   padding: 11px 14px;
@@ -2326,18 +2326,18 @@ section.partners h2.big { font-size: clamp(36px, 4.2vw, 56px); }
   background: #efeae0;
   border-bottom: 1px solid var(--line);
 }
-.cs-dots {
+.mvx-dots {
   display: flex;
   gap: 6px;
 }
-.cs-dots span {
+.mvx-dots span {
   width: 11px; height: 11px;
   border-radius: 999px;
 }
-.cs-dots span:nth-child(1) { background: #ff5f57; }
-.cs-dots span:nth-child(2) { background: #febc2e; }
-.cs-dots span:nth-child(3) { background: #28c840; }
-.cs-url {
+.mvx-dots span:nth-child(1) { background: #ff5f57; }
+.mvx-dots span:nth-child(2) { background: #febc2e; }
+.mvx-dots span:nth-child(3) { background: #28c840; }
+.mvx-url {
   flex: 1;
   min-width: 0;
   background: rgba(255,255,255,0.7);
@@ -2355,19 +2355,19 @@ section.partners h2.big { font-size: clamp(36px, 4.2vw, 56px); }
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.cs-url-lock {
+.mvx-url-lock {
   color: var(--g);
   font-size: 9px;
   flex: 0 0 auto;
 }
-.cs-url-sub {
+.mvx-url-sub {
   color: var(--ink-3);
   opacity: 0.75;
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
 }
-.cs-chrome-meta {
+.mvx-chrome-meta {
   font-family: var(--font-jbm), ui-monospace, monospace;
   font-size: 10px;
   color: var(--ink-3);
@@ -2375,22 +2375,22 @@ section.partners h2.big { font-size: clamp(36px, 4.2vw, 56px); }
   text-transform: uppercase;
 }
 
-.cs-viewport {
+.mvx-viewport {
   position: relative;
   overflow: hidden;
   height: 720px;
   display: flex;
   background: var(--bg, #eff3ee);
 }
-.cs-viewport .csa-root { flex: 1; display: flex; min-width: 0; width: 100%; min-height: 0 !important; height: 720px; }
-.cs-viewport .csa-root .app {
+.mvx-viewport .csa-root { flex: 1; display: flex; min-width: 0; width: 100%; min-height: 0 !important; height: 720px; }
+.mvx-viewport .csa-root .app {
   min-height: 0 !important;
   height: 720px !important;
   width: 100%;
   overflow: hidden;
   grid-template-columns: 210px 1fr !important;
 }
-.cs-viewport .csa-root .sidebar {
+.mvx-viewport .csa-root .sidebar {
   height: 720px !important;
   position: relative !important;
   padding: 14px 10px !important;
@@ -2399,9 +2399,9 @@ section.partners h2.big { font-size: clamp(36px, 4.2vw, 56px); }
   overflow-x: hidden !important;
   scrollbar-width: none !important;
 }
-.cs-viewport .csa-root .sidebar::-webkit-scrollbar { display: none !important; width: 0 !important; }
-.cs-viewport .csa-root .sidebar .nav-item { padding: 7px 9px !important; font-size: 12.5px !important; min-height: 0 !important; }
-.cs-viewport .csa-root .sidebar .nav-item .step {
+.mvx-viewport .csa-root .sidebar::-webkit-scrollbar { display: none !important; width: 0 !important; }
+.mvx-viewport .csa-root .sidebar .nav-item { padding: 7px 9px !important; font-size: 12.5px !important; min-height: 0 !important; }
+.mvx-viewport .csa-root .sidebar .nav-item .step {
   /* Reset global .step card styling from public.css that bleeds in */
   all: unset;
   display: inline-flex !important;
@@ -2421,20 +2421,20 @@ section.partners h2.big { font-size: clamp(36px, 4.2vw, 56px); }
   flex-direction: row !important;
   margin: 0 !important;
 }
-.cs-viewport .csa-root .sidebar .nav-item.active .step { color: var(--accent-ink) !important; }
-.cs-viewport .csa-root .sidebar .nav-sec-label { margin-top: 4px !important; margin-bottom: 2px !important; font-size: 8.5px !important; padding: 0 6px !important; }
-.cs-viewport .csa-root .sidebar .brand { padding: 2px 4px 10px !important; }
-.cs-viewport .csa-root main {
+.mvx-viewport .csa-root .sidebar .nav-item.active .step { color: var(--accent-ink) !important; }
+.mvx-viewport .csa-root .sidebar .nav-sec-label { margin-top: 4px !important; margin-bottom: 2px !important; font-size: 8.5px !important; padding: 0 6px !important; }
+.mvx-viewport .csa-root .sidebar .brand { padding: 2px 4px 10px !important; }
+.mvx-viewport .csa-root main {
   overflow-y: auto;
   overflow-x: hidden;
   height: 720px;
   scrollbar-width: thin;
   scrollbar-color: rgba(21,34,27,0.2) transparent;
 }
-.cs-viewport .csa-root main::-webkit-scrollbar { width: 6px; }
-.cs-viewport .csa-root main::-webkit-scrollbar-thumb { background: rgba(21,34,27,0.2); border-radius: 3px; }
-.cs-viewport .csa-root main::-webkit-scrollbar-track { background: transparent; }
-.cs-viewport .csa-root .view { padding: 20px 26px 24px !important; max-width: none !important; margin: 0 !important; }
+.mvx-viewport .csa-root main::-webkit-scrollbar { width: 6px; }
+.mvx-viewport .csa-root main::-webkit-scrollbar-thumb { background: rgba(21,34,27,0.2); border-radius: 3px; }
+.mvx-viewport .csa-root main::-webkit-scrollbar-track { background: transparent; }
+.mvx-viewport .csa-root .view { padding: 20px 26px 24px !important; max-width: none !important; margin: 0 !important; }
 
 /* ── Inline app mock — mirrors index.html's paper theme ── */
 .csa-app {
@@ -2720,7 +2720,7 @@ section.partners h2.big { font-size: clamp(36px, 4.2vw, 56px); }
   .csa-stats { grid-template-columns: 1fr; }
 }
 
-.cs-footbar {
+.mvx-footbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -2732,12 +2732,12 @@ section.partners h2.big { font-size: clamp(36px, 4.2vw, 56px); }
   color: var(--ink-3);
   letter-spacing: 0.04em;
 }
-.cs-foot-left, .cs-foot-right {
+.mvx-foot-left, .mvx-foot-right {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.cs-foot-dot {
+.mvx-foot-dot {
   width: 7px; height: 7px;
   border-radius: 999px;
   background: var(--g);
@@ -2745,33 +2745,33 @@ section.partners h2.big { font-size: clamp(36px, 4.2vw, 56px); }
 }
 
 @media (max-width: 960px) {
-  .cs-showcase {
+  .mvx-showcase {
     grid-template-columns: 1fr;
   }
-  .cs-rail { min-height: auto; }
-  .cs-viewport { height: 520px; }
+  .mvx-rail { min-height: auto; }
+  .mvx-viewport { height: 520px; }
 }
 
 /* ── Showcase layout — sidebar rail + panel canvas ───────────── */
-.cs-showcase-layout {
+.mvx-showcase-layout {
   display: grid;
   grid-template-columns: 260px 1fr;
   height: 720px;
-  /* The parent .cs-viewport is display: flex — without flex: 1 here the grid
+  /* The parent .mvx-viewport is display: flex — without flex: 1 here the grid
      sizes to its intrinsic content width, and the 1fr panel column collapses
      to whatever the cards inside are naturally wide, leaving a wide empty
      gutter on the right. Force the grid to fill the flex parent. */
   flex: 1;
   min-width: 0;
 }
-.cs-showcase-rail {
+.mvx-showcase-rail {
   border-right: 1px solid var(--line);
   background: #fcfaf3;
   overflow-y: auto;
   padding: 16px 10px;
   display: flex; flex-direction: column; gap: 4px;
 }
-.cs-showcase-pill {
+.mvx-showcase-pill {
   display: grid;
   grid-template-columns: 34px 1fr;
   align-items: center;
@@ -2786,23 +2786,23 @@ section.partners h2.big { font-size: clamp(36px, 4.2vw, 56px); }
   font: inherit;
   transition: background 0.15s;
 }
-.cs-showcase-pill:hover { background: color-mix(in oklab, var(--paper-2), #fff 40%); }
-.cs-showcase-pill.on    { background: #fff; box-shadow: inset 0 0 0 1px var(--line); }
-.cs-showcase-n {
+.mvx-showcase-pill:hover { background: color-mix(in oklab, var(--paper-2), #fff 40%); }
+.mvx-showcase-pill.on    { background: #fff; box-shadow: inset 0 0 0 1px var(--line); }
+.mvx-showcase-n {
   font-family: var(--font-jbm), ui-monospace, monospace;
   font-size: 11px; font-weight: 700;
   letter-spacing: 0.1em;
   color: var(--ink-3);
 }
-.cs-showcase-pill.on .cs-showcase-n { color: var(--g); }
-.cs-showcase-lbl {
+.mvx-showcase-pill.on .mvx-showcase-n { color: var(--g); }
+.mvx-showcase-lbl {
   display: block;
   font-family: var(--font-instrument), serif;
   font-size: 18px;
   letter-spacing: -0.01em;
   line-height: 1.1;
 }
-.cs-showcase-sub {
+.mvx-showcase-sub {
   display: block;
   font-family: var(--font-jbm), ui-monospace, monospace;
   font-size: 10.5px;
@@ -2810,33 +2810,33 @@ section.partners h2.big { font-size: clamp(36px, 4.2vw, 56px); }
   letter-spacing: 0.04em;
   margin-top: 2px;
 }
-.cs-showcase-main {
+.mvx-showcase-main {
   overflow: auto;
   background: var(--paper);
   scrollbar-width: thin;
   scrollbar-color: rgba(21, 34, 27, 0.2) transparent;
 }
-.cs-showcase-main::-webkit-scrollbar { width: 6px; }
-.cs-showcase-main::-webkit-scrollbar-thumb { background: rgba(21, 34, 27, 0.2); border-radius: 3px; }
-.cs-showcase-main::-webkit-scrollbar-track { background: transparent; }
-.cs-showcase-scope {
+.mvx-showcase-main::-webkit-scrollbar { width: 6px; }
+.mvx-showcase-main::-webkit-scrollbar-thumb { background: rgba(21, 34, 27, 0.2); border-radius: 3px; }
+.mvx-showcase-main::-webkit-scrollbar-track { background: transparent; }
+.mvx-showcase-scope {
   min-height: 100%;
   padding: 16px 20px;
 }
 
 @media (max-width: 960px) {
-  .cs-showcase-layout {
+  .mvx-showcase-layout {
     grid-template-columns: 1fr;
     height: auto;
   }
-  .cs-showcase-rail {
+  .mvx-showcase-rail {
     flex-direction: row;
     overflow-x: auto;
     overflow-y: hidden;
     border-right: none;
     border-bottom: 1px solid var(--line);
   }
-  .cs-showcase-main {
+  .mvx-showcase-main {
     max-height: 640px;
   }
 }
@@ -2860,42 +2860,42 @@ section.partners h2.big { font-size: clamp(36px, 4.2vw, 56px); }
      the whole layout down so the entire app is visible on a phone without
      horizontal scrolling. The scale factor is computed against the container
      width via a CSS custom property so every phone size fits cleanly. */
-  .cs-strip { flex-direction: column; align-items: stretch; gap: 14px; padding: 14px 16px; }
-  .cs-strip-left, .cs-strip-right { flex-wrap: wrap; }
-  .cs-window { border-radius: 18px; }
-  .cs-chrome { padding: 13px 12px; }
-  .cs-url { font-size: 10.5px; padding: 6px 12px; }
+  .mvx-strip { flex-direction: column; align-items: stretch; gap: 14px; padding: 14px 16px; }
+  .mvx-strip-left, .mvx-strip-right { flex-wrap: wrap; }
+  .mvx-window { border-radius: 18px; }
+  .mvx-chrome { padding: 13px 12px; }
+  .mvx-url { font-size: 10.5px; padding: 6px 12px; }
   /* Scale down the 1200×780 desktop layout to fit the phone viewport.
      Use vw math (block has 20px padding each side) — container queries don't
      resolve reliably mid-transform on all mobile browsers. */
-  .cs-viewport {
-    --cs-inner-w: 1200px;
-    --cs-inner-h: 780px;
-    --cs-scale: calc((100vw - 40px) / var(--cs-inner-w));
+  .mvx-viewport {
+    --mvx-inner-w: 1200px;
+    --mvx-inner-h: 780px;
+    --mvx-scale: calc((100vw - 40px) / var(--mvx-inner-w));
     position: relative;
     overflow: hidden;
     width: 100%;
-    height: calc(var(--cs-inner-h) * var(--cs-scale));
+    height: calc(var(--mvx-inner-h) * var(--mvx-scale));
     -webkit-overflow-scrolling: touch;
   }
-  .cs-showcase-layout {
+  .mvx-showcase-layout {
     position: absolute;
     top: 0; left: 0;
-    width: var(--cs-inner-w);
-    height: var(--cs-inner-h);
+    width: var(--mvx-inner-w);
+    height: var(--mvx-inner-h);
     grid-template-columns: 240px 1fr;
     min-width: 0;
-    transform: scale(var(--cs-scale));
+    transform: scale(var(--mvx-scale));
     transform-origin: top left;
   }
-  .cs-showcase-rail {
+  .mvx-showcase-rail {
     flex-direction: column;
     overflow-x: hidden;
     overflow-y: auto;
     border-right: 1px solid var(--line);
     border-bottom: none;
   }
-  .cs-showcase-main { max-height: none; }
+  .mvx-showcase-main { max-height: none; }
 }
 
 @media (max-width: 480px) {

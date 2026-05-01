@@ -100,7 +100,7 @@ export default function CandidatesTable({ rows }: { rows: TopCandidate[] }) {
 
       <div style={{ padding: "0 8px 10px" }}>
         <div
-          className="cs-data-row cs-data-head"
+          className="mvx-data-row mvx-data-head"
           style={{
             gridTemplateColumns: "1.7fr 1fr 1fr 0.9fr 0.9fr 0.9fr 0.7fr",
           }}
@@ -127,7 +127,7 @@ export default function CandidatesTable({ rows }: { rows: TopCandidate[] }) {
         {filtered.map((r, i) => (
           <div
             key={`${r.seq}-${i}`}
-            className="cs-data-row"
+            className="mvx-data-row"
             style={{
               gridTemplateColumns: "1.7fr 1fr 1fr 0.9fr 0.9fr 0.9fr 0.7fr",
             }}

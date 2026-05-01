@@ -58,7 +58,7 @@ export default function HandoffBar({
               : `Hand off ${fullMrnaNt.toLocaleString()} nt to the manufacturer.`}
           </h3>
           <p
-            className="cs-tiny"
+            className="mvx-tiny"
             style={{ margin: 0, fontSize: 13.5, color: "var(--ink-2)" }}
           >
             Export a FASTA + GenBank bundle. {peptideCount} peptides · 1 molecule · ready

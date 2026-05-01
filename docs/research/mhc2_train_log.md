@@ -1,6 +1,6 @@
 # MHC-II training log
 
-Cumulative record of every cancerstudio MHC-II training run. New runs append at the bottom. Keep this in sync with the actual checkpoints — don't claim a result that hasn't landed.
+Cumulative record of every mutavax MHC-II training run. New runs append at the bottom. Keep this in sync with the actual checkpoints — don't claim a result that hasn't landed.
 
 ## Validation set
 
@@ -57,7 +57,7 @@ All val_auc numbers below are on the cluster-aware `cluster_valid.jsonl` (no 9-m
 - **Reversed cache:** DP-filtered (1.665M peptides, 23 GB) due to disk on the 80 GB Vast box.
 - **Best result (epoch 2):** **val_auc = 0.8445** (vs v1 best 0.8469: **−0.0024 ≈ tied**).
 - **Per-locus epoch 2:** DR 0.840 / **DP 0.884 (+0.022 vs v1)** ✨ / DQ 0.829.
-- **Takeaway:** Inverted DP delivers exactly what literature predicts for DP. Epoch 2 best aggregate is essentially tied with v1, **but DP is +0.022 absolute** — the strongest DP we've achieved. Epoch 3 began overfitting (per ES policy). **Best for DP-specific use cases. Best ckpt on S3: `htz:cancerstudio/checkpoints/phaseB_v2_invertedDP.best.pt`.**
+- **Takeaway:** Inverted DP delivers exactly what literature predicts for DP. Epoch 2 best aggregate is essentially tied with v1, **but DP is +0.022 absolute** — the strongest DP we've achieved. Epoch 3 began overfitting (per ES policy). **Best for DP-specific use cases. Best ckpt on S3: `htz:mutavax/checkpoints/phaseB_v2_invertedDP.best.pt`.**
 - **Box A killed after epoch 2 to save money.**
 
 ### phaseB_v4_decoys3 (Phase B + invertedDP + decoys=3, 2026-04-29 → 2026-04-30, Vast 35828305)
@@ -69,7 +69,7 @@ All val_auc numbers below are on the cluster-aware `cluster_valid.jsonl` (no 9-m
 - **Epoch 2:** val_auc = **0.8488** (DR **0.853** / DP 0.851 / DQ **0.841**).
 - **Per-locus deltas (vs v2_invertedDP epoch 2):** DR +0.013, DP **−0.033** ⚠, DQ +0.012.
 - **Takeaway:** **decoys=3 helps DR and DQ but HURTS DP.** Extra random-proteome decoys dilute the inverted-DP signal even with `--inverted-dp` on. Net aggregate gain is small (+0.0019) — not the universal "more decoys = better" the recipe assumed.
-- **Best ckpt on S3:** `htz:cancerstudio/checkpoints/phaseB_v4_decoys3.best.pt`.
+- **Best ckpt on S3:** `htz:mutavax/checkpoints/phaseB_v4_decoys3.best.pt`.
 - **Box B kept alive after kill** for next phase (ESM-2 150M).
 
 ## Current SOTA candidates

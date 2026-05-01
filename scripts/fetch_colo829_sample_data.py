@@ -56,7 +56,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Download the COLO829/COLO829BL matched human melanoma whole-genome "
-            "pair (PRJEB27698, Illumina HiSeq X Ten) with cancerstudio-friendly "
+            "pair (PRJEB27698, Illumina HiSeq X Ten) with mutavax-friendly "
             "FASTQ names."
         )
     )
@@ -150,7 +150,7 @@ def metadata_text(mode: str, line_limit: int | None) -> str:
         "Coverage note: tumor is ~2.6x deeper than normal. Acceptable for Mutect2; surface in downstream QC.",
         "Full-mode footprint: ~174 GB compressed (tumor ~125 GB + normal ~49 GB).",
         "Truth set: Hartwig COLO829 somatic SNV/indel/SV truth set — https://zenodo.org/records/4716169",
-        "Naming note: cancerstudio requires R1/R2 in FASTQ filenames, so the ENA _1/_2 files are renamed here.",
+        "Naming note: mutavax requires R1/R2 in FASTQ filenames, so the ENA _1/_2 files are renamed here.",
         f"Mode: {mode}",
     ]
     if line_limit is not None:
@@ -168,7 +168,7 @@ def metadata_text(mode: str, line_limit: int | None) -> str:
 
 
 def open_remote(url: str, timeout: int):
-    request = Request(url, headers={"User-Agent": "cancerstudio-sample-data/1.0"})
+    request = Request(url, headers={"User-Agent": "mutavax-sample-data/1.0"})
     return urlopen(request, timeout=timeout)
 
 

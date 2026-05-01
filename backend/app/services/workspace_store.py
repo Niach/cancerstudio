@@ -1163,8 +1163,8 @@ def _env_flag_enabled(name: str) -> bool:
 
 
 def _allows_arbitrary_local_paths() -> bool:
-    return _env_flag_enabled("CANCERSTUDIO_ALLOW_LOCAL_FILE_PATHS") or _env_flag_enabled(
-        "CANCERSTUDIO_ALLOW_LOCAL_PATHS"
+    return _env_flag_enabled("MUTAVAX_ALLOW_LOCAL_FILE_PATHS") or _env_flag_enabled(
+        "MUTAVAX_ALLOW_LOCAL_PATHS"
     )
 
 

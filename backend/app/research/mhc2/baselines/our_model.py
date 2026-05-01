@@ -14,7 +14,7 @@ from app.research.mhc2.baselines.base import BaselineModel, BaselinePrediction
 
 
 class OurModelAdapter(BaselineModel):
-    name = "cancerstudio-mhc2"
+    name = "mutavax-mhc2"
 
     def __init__(
         self,

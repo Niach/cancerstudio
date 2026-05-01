@@ -65,7 +65,7 @@ export default function CmoCard({ order, released }: CmoCardProps) {
       </div>
 
       <div style={{ padding: "18px 22px 22px" }}>
-        <div className="cs-cmo-ghost-grid">
+        <div className="mvx-cmo-ghost-grid">
           {[0, 1, 2].map((i) => (
             <GhostTile key={i} index={i} />
           ))}
@@ -111,7 +111,7 @@ function GhostTile({ index }: { index: number }) {
       aria-hidden
       style={{
         padding: "18px 18px 20px",
-        borderRadius: "var(--radius-cs-lg, 16px)",
+        borderRadius: "var(--radius-mvx-lg, 16px)",
         background: "var(--surface-sunk)",
         border: "1px dashed var(--line-strong)",
         opacity: 0.75,

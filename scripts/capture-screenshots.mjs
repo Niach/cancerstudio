@@ -157,7 +157,7 @@ function alignmentArtifact(id, kind, sampleLane, filename, sizeBytes) {
     filename,
     size_bytes: sizeBytes,
     download_path: `/api/workspaces/ws-rosie/alignment/artifacts/${id}/download`,
-    local_path: `/Users/danny/cancerstudio/data/app-data/workspaces/ws-rosie/alignment/run-01/${filename}`,
+    local_path: `/Users/danny/mutavax/data/app-data/workspaces/ws-rosie/alignment/run-01/${filename}`,
   };
 }
 
@@ -426,7 +426,7 @@ function variantCallingSummaryCompleted(workspace) {
       filename: "rosie.mutect2.filtered.vcf.gz",
       size_bytes: 148_320_000,
       download_path: "/api/workspaces/ws-rosie/variant-calling/artifacts/vcf/download",
-      local_path: "/Users/danny/cancerstudio/data/app-data/workspaces/ws-rosie/variant-calling/run-01/rosie.mutect2.filtered.vcf.gz",
+      local_path: "/Users/danny/mutavax/data/app-data/workspaces/ws-rosie/variant-calling/run-01/rosie.mutect2.filtered.vcf.gz",
     },
     {
       id: "tbi",
@@ -434,7 +434,7 @@ function variantCallingSummaryCompleted(workspace) {
       filename: "rosie.mutect2.filtered.vcf.gz.tbi",
       size_bytes: 2_800_000,
       download_path: "/api/workspaces/ws-rosie/variant-calling/artifacts/tbi/download",
-      local_path: "/Users/danny/cancerstudio/data/app-data/workspaces/ws-rosie/variant-calling/run-01/rosie.mutect2.filtered.vcf.gz.tbi",
+      local_path: "/Users/danny/mutavax/data/app-data/workspaces/ws-rosie/variant-calling/run-01/rosie.mutect2.filtered.vcf.gz.tbi",
     },
     {
       id: "stats",
@@ -442,7 +442,7 @@ function variantCallingSummaryCompleted(workspace) {
       filename: "rosie.mutect2.stats",
       size_bytes: 412_000,
       download_path: "/api/workspaces/ws-rosie/variant-calling/artifacts/stats/download",
-      local_path: "/Users/danny/cancerstudio/data/app-data/workspaces/ws-rosie/variant-calling/run-01/rosie.mutect2.stats",
+      local_path: "/Users/danny/mutavax/data/app-data/workspaces/ws-rosie/variant-calling/run-01/rosie.mutect2.stats",
     },
   ];
 
@@ -571,7 +571,7 @@ function annotationSummaryCompleted(workspace) {
       filename: "rosie.annotated.vcf.gz",
       size_bytes: 162_480_000,
       download_path: "/api/workspaces/ws-rosie/annotation/artifacts/ann-vcf/download",
-      local_path: "/Users/danny/cancerstudio/data/app-data/workspaces/ws-rosie/annotation/run-01/rosie.annotated.vcf.gz",
+      local_path: "/Users/danny/mutavax/data/app-data/workspaces/ws-rosie/annotation/run-01/rosie.annotated.vcf.gz",
     },
     {
       id: "ann-tbi",
@@ -579,7 +579,7 @@ function annotationSummaryCompleted(workspace) {
       filename: "rosie.annotated.vcf.gz.tbi",
       size_bytes: 2_980_000,
       download_path: "/api/workspaces/ws-rosie/annotation/artifacts/ann-tbi/download",
-      local_path: "/Users/danny/cancerstudio/data/app-data/workspaces/ws-rosie/annotation/run-01/rosie.annotated.vcf.gz.tbi",
+      local_path: "/Users/danny/mutavax/data/app-data/workspaces/ws-rosie/annotation/run-01/rosie.annotated.vcf.gz.tbi",
     },
     {
       id: "ann-html",
@@ -587,7 +587,7 @@ function annotationSummaryCompleted(workspace) {
       filename: "vep_summary.html",
       size_bytes: 84_220,
       download_path: "/api/workspaces/ws-rosie/annotation/artifacts/ann-html/download",
-      local_path: "/Users/danny/cancerstudio/data/app-data/workspaces/ws-rosie/annotation/run-01/vep_summary.html",
+      local_path: "/Users/danny/mutavax/data/app-data/workspaces/ws-rosie/annotation/run-01/vep_summary.html",
     },
   ];
   return {

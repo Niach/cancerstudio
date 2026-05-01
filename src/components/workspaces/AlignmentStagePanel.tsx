@@ -133,9 +133,9 @@ export default function AlignmentStagePanel({
 
   return (
     <>
-      <div className="cs-view-head">
+      <div className="mvx-view-head">
         <div>
-          <div className="cs-crumb">{workspace.displayName} / 02 Alignment</div>
+          <div className="mvx-crumb">{workspace.displayName} / 02 Alignment</div>
           <h1>
             {bannerState === "fresh" && `Align reads to ${referenceCode}.`}
             {bannerState === "running" &&
@@ -381,9 +381,9 @@ export default function AlignmentStagePanel({
                 </div>
               </div>
 
-              <div className="cs-progress" style={{ height: 10, marginBottom: 14 }}>
+              <div className="mvx-progress" style={{ height: 10, marginBottom: 14 }}>
                 <div
-                  className="cs-progress-fill"
+                  className="mvx-progress-fill"
                   style={{
                     width: `${Math.max(2, Math.round((latestRun?.progress ?? 0) * 100))}%`,
                   }}
@@ -445,7 +445,7 @@ export default function AlignmentStagePanel({
                   <>
                     <Link
                       href={`/workspaces/${workspace.id}/variant-calling`}
-                      className="cs-btn cs-btn-primary"
+                      className="mvx-btn mvx-btn-primary"
                     >
                       Find mutations →
                     </Link>
@@ -583,7 +583,7 @@ export default function AlignmentStagePanel({
                   }}
                 >
                   <Spinner />
-                  <span className="cs-tiny">Waiting for alignment to finish…</span>
+                  <span className="mvx-tiny">Waiting for alignment to finish…</span>
                 </div>
               )}
             </div>
@@ -606,8 +606,8 @@ export default function AlignmentStagePanel({
               lineHeight: 1.7,
               color: "var(--muted)",
               background: "var(--surface-sunk)",
-              borderBottomLeftRadius: "var(--radius-cs-lg)",
-              borderBottomRightRadius: "var(--radius-cs-lg)",
+              borderBottomLeftRadius: "var(--radius-mvx-lg)",
+              borderBottomRightRadius: "var(--radius-mvx-lg)",
               overflow: "auto",
               maxHeight: 280,
             }}
@@ -659,9 +659,9 @@ function PhaseSubBars({ run }: { run: AlignmentRun }) {
               {Math.round(p.pct * 100)}%
             </span>
           </div>
-          <div className="cs-progress-sub">
+          <div className="mvx-progress-sub">
             <div
-              className="cs-progress-sub-fill"
+              className="mvx-progress-sub-fill"
               style={{ width: `${Math.round(p.pct * 100)}%` }}
             />
           </div>
@@ -691,7 +691,7 @@ function ChunkGrid({
   if (total === 0) {
     return (
       <div
-        className="cs-tiny"
+        className="mvx-tiny"
         style={{
           padding: "12px 0",
           textAlign: "center",
@@ -731,7 +731,7 @@ function ChunkGrid({
               background: bg,
               animation:
                 state === "running"
-                  ? "cs-chunk-pulse 1.4s ease-in-out infinite"
+                  ? "mvx-chunk-pulse 1.4s ease-in-out infinite"
                   : "none",
             }}
             title={`chunk ${i + 1} · ${state}`}

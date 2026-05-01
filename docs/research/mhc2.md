@@ -1,6 +1,6 @@
 # Open MHC-II Predictor Research Track
 
-This directory documents cancerstudio's in-house MHC class II predictor work.
+This directory documents mutavax's in-house MHC class II predictor work.
 The production neoantigen stage still uses the existing pVACseq path; the code
 under `backend/app/research/mhc2` is a research sandbox for training our own
 public model and benchmarking it against NetMHCIIpan-4.3/4.3j, MixMHC2pred-2.0,
@@ -21,7 +21,7 @@ python3 scripts/mhc2_fetch_data.py hlaiipred_zenodo --out data/mhc2
 python3 scripts/mhc2_fetch_data.py netmhciipan_43 --out data/mhc2
 ```
 
-Normalize HLAIIPred positive CSVs into cancerstudio JSONL:
+Normalize HLAIIPred positive CSVs into mutavax JSONL:
 
 ```bash
 python3 scripts/mhc2_prepare_dataset.py \

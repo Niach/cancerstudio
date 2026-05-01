@@ -106,7 +106,7 @@ export default function Detail({ genome }: { genome: CatalogGenome }) {
               for most breeds.
             </p>
           </div>
-          <a className="btn-dark primary" href="mailto:dennis@straehhuber.com?subject=cancerstudio%20sequencing%20partner">Contact to partner</a>
+          <a className="btn-dark primary" href="mailto:dennis@straehhuber.com?subject=mutavax%20sequencing%20partner">Contact to partner</a>
         </div>
       </div>
       {open && <DownloadDialog genome={genome} onClose={() => setOpen(false)} />}

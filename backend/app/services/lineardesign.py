@@ -28,20 +28,20 @@ from typing import Optional
 
 
 LINEARDESIGN_BIN = os.environ.get(
-    "CANCERSTUDIO_LINEARDESIGN_BIN", "/usr/local/bin/LinearDesign_2D"
+    "MUTAVAX_LINEARDESIGN_BIN", "/usr/local/bin/LinearDesign_2D"
 )
 # Legacy fallback — if set, overrides all per-species lookups.
 LINEARDESIGN_CODON_TABLE_OVERRIDE = os.environ.get(
-    "CANCERSTUDIO_LINEARDESIGN_CODON_TABLE"
+    "MUTAVAX_LINEARDESIGN_CODON_TABLE"
 )
 # Default shipped with the LinearDesign repo. Used for humans and as a
 # last-resort fallback if python_codon_tables is missing.
 LINEARDESIGN_HUMAN_CSV = os.environ.get(
-    "CANCERSTUDIO_LINEARDESIGN_HUMAN_CSV",
+    "MUTAVAX_LINEARDESIGN_HUMAN_CSV",
     "/opt/lineardesign/codon_usage_freq_table_human.csv",
 )
 LINEARDESIGN_TIMEOUT_SEC = float(
-    os.environ.get("CANCERSTUDIO_LINEARDESIGN_TIMEOUT", "300")
+    os.environ.get("MUTAVAX_LINEARDESIGN_TIMEOUT", "300")
 )
 
 # Species → python_codon_tables key. Dog (Canis familiaris) and cat (Felis
@@ -89,7 +89,7 @@ def _codon_table_for(species: str) -> str:
     except ImportError:
         return LINEARDESIGN_HUMAN_CSV
 
-    tmp_dir = Path(tempfile.gettempdir()) / "cancerstudio_codon_tables"
+    tmp_dir = Path(tempfile.gettempdir()) / "mutavax_codon_tables"
     tmp_dir.mkdir(exist_ok=True)
     out_path = tmp_dir / f"{pct_key}.csv"
     if out_path.exists():

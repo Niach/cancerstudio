@@ -30,7 +30,7 @@ async function waitForContent(page: Page, marker: string) {
 test.beforeEach(async ({ page }) => {
   // Silence any page error popups from desktop bridge absence
   await page.addInitScript(() => {
-    (window as unknown as { cancerstudioDesktop?: unknown }).cancerstudioDesktop = {
+    (window as unknown as { mutavaxDesktop?: unknown }).mutavaxDesktop = {
       openPath: async () => {},
       getAppDataPath: async () => "",
       getDataRoot: async () => "",

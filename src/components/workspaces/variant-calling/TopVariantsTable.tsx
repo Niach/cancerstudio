@@ -26,21 +26,21 @@ export default function TopVariantsTable({ variants }: TopVariantsTableProps) {
     "1.1fr 0.9fr 0.9fr 0.9fr 0.9fr 0.9fr";
 
   return (
-    <div className="cs-card">
-      <div className="cs-card-head">
+    <div className="mvx-card">
+      <div className="mvx-card-head">
         <div>
           <div style={{ marginBottom: 6 }}>
-            <span className="cs-mono-label">Top variants</span>
+            <span className="mvx-mono-label">Top variants</span>
           </div>
           <h3>Highest-impact mutations</h3>
-          <p className="cs-tiny" style={{ margin: "2px 0 0" }}>
+          <p className="mvx-tiny" style={{ margin: "2px 0 0" }}>
             Sorted by VAF. PASS calls first.
           </p>
         </div>
       </div>
       <div style={{ padding: "0 8px 10px" }}>
         <div
-          className="cs-data-row cs-data-head"
+          className="mvx-data-row mvx-data-head"
           style={{ gridTemplateColumns: gridTemplate }}
         >
           <span>Chr:Pos</span>
@@ -55,7 +55,7 @@ export default function TopVariantsTable({ variants }: TopVariantsTableProps) {
           return (
             <div
               key={i}
-              className="cs-data-row"
+              className="mvx-data-row"
               style={{ gridTemplateColumns: gridTemplate }}
             >
               <span

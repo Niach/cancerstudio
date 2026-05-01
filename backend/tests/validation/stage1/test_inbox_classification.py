@@ -1,7 +1,7 @@
 """Stage 1 validation — inbox classification + listing invariants.
 
 Stage 1 is a metadata-only stage: the app lists files dropped into
-``${CANCERSTUDIO_INBOX_DIR}`` and classifies them by extension. No
+``${MUTAVAX_INBOX_DIR}`` and classifies them by extension. No
 FASTQ→BAM→FASTQ round-trip happens here (that would be stage 2 if we
 ran strobealign through a BAM input). What *does* need validating is:
 

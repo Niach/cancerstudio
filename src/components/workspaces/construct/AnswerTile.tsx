@@ -74,7 +74,7 @@ export default function AnswerTile({ eyebrow, big, unit, sub, line, good }: Answ
         </div>
       ) : null}
       <p
-        className="cs-tiny"
+        className="mvx-tiny"
         style={{
           fontSize: 13.5,
           marginTop: 14,

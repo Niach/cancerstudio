@@ -1,11 +1,11 @@
-# Handoff Prompt: cancerstudio Open MHC-II Predictor On A Bigger Machine
+# Handoff Prompt: mutavax Open MHC-II Predictor On A Bigger Machine
 
 Paste this prompt into the next agent/session on a machine with enough disk and
 GPU capacity.
 
 ## Prompt
 
-You are taking over cancerstudio's open MHC class II predictor research track.
+You are taking over mutavax's open MHC class II predictor research track.
 The goal is to train and benchmark our own public MHC-II presentation predictor,
 not merely wrap NetMHCIIpan or MixMHC2pred. The desired outcome is a credible
 open research model that can be compared honestly against NetMHCIIpan-4.3/4.3j,
@@ -14,11 +14,11 @@ right to install those tools.
 
 Current repo branch: `codex/mhc2-research-handoff`.
 
-Repository root: `cancerstudio`.
+Repository root: `mutavax`.
 
 Important context:
 
-- The production cancerstudio neoantigen stage still uses the existing
+- The production mutavax neoantigen stage still uses the existing
   pVACseq/NetMHCpan/NetMHCIIpan path. Do not break that path.
 - The new implementation lives under `backend/app/research/mhc2` and is a
   research-only scaffold for data curation, training, prediction, and benchmark
@@ -154,8 +154,8 @@ Important storage guidance:
 Start by setting up the bigger machine:
 
 ```bash
-git clone https://github.com/Niach/cancerstudio.git
-cd cancerstudio
+git clone https://github.com/niach/mutavax.git
+cd mutavax
 git fetch origin
 git switch codex/mhc2-research-handoff
 

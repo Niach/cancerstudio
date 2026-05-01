@@ -1,4 +1,4 @@
-# cancerstudio MHC-II Predictor Model Card
+# mutavax MHC-II Predictor Model Card
 
 ## Intended Use
 
@@ -41,7 +41,7 @@ report.
   depend on existing predictors.
 - MHC-II presentation is only one component of vaccine design. Expression,
   variant clonality, self-similarity, manufacturability, and CD4 response
-  evidence remain downstream requirements in cancerstudio.
+  evidence remain downstream requirements in mutavax.
 
 ## Required Benchmarks Before Release
 

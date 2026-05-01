@@ -5,7 +5,7 @@
 #   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
 
 services:
-  cancerstudio:
+  mutavax:
     deploy:
       resources:
         reservations:

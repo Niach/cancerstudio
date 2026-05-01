@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Predict peptide presentation scores with a cancerstudio MHC-II checkpoint."""
+"""Predict peptide presentation scores with a mutavax MHC-II checkpoint."""
 
 from __future__ import annotations
 

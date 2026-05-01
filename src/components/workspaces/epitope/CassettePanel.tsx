@@ -80,7 +80,7 @@ export default function CassettePanel({
           <button
             type="button"
             onClick={onReset}
-            className="cs-btn cs-btn-ghost cs-btn-sm"
+            className="mvx-btn mvx-btn-ghost mvx-btn-sm"
             style={{ height: 32, minHeight: 32, fontSize: 12 }}
           >
             Auto-pick
@@ -88,7 +88,7 @@ export default function CassettePanel({
           <button
             type="button"
             onClick={onClear}
-            className="cs-btn cs-btn-ghost cs-btn-sm"
+            className="mvx-btn mvx-btn-ghost mvx-btn-sm"
             style={{ height: 32, minHeight: 32, fontSize: 12 }}
           >
             Clear

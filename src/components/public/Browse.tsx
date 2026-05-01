@@ -94,7 +94,7 @@ export default function Browse({ catalog }: { catalog: CatalogGenome[] }) {
         <strong>Showcase only.</strong> The archive is not yet seeded — the entries below are
         demo fixtures to illustrate the metadata, filtering, and download flow. No real genomes
         are hosted here yet. If you run a veterinary lab and want to contribute the first real
-        healthy-pet genomes, <a href="mailto:dennis@straehhuber.com?subject=cancerstudio%20archive%20contribution">reach out</a>.
+        healthy-pet genomes, <a href="mailto:dennis@straehhuber.com?subject=mutavax%20archive%20contribution">reach out</a>.
       </div>
 
       <button

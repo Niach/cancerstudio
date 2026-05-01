@@ -140,7 +140,7 @@ def patched_service(monkeypatch):
     monkeypatch.setattr(ai_review, "_build_case_brief", lambda wid: _fake_brief())
     monkeypatch.setattr(ai_review, "_blocking_reason", lambda wid, model: None)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
-    monkeypatch.delenv("CANCERSTUDIO_REVIEW_MODEL", raising=False)
+    monkeypatch.delenv("MUTAVAX_REVIEW_MODEL", raising=False)
     yield
 
 
@@ -169,7 +169,7 @@ def test_summary_scaffolded_when_provider_key_missing_for_default_model(monkeypa
         ai_review, "load_construct_output_summary", lambda wid: output_summary
     )
     # ensure we're using the anthropic default
-    monkeypatch.delenv("CANCERSTUDIO_REVIEW_MODEL", raising=False)
+    monkeypatch.delenv("MUTAVAX_REVIEW_MODEL", raising=False)
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
 
     # Import the real enum used in _blocking_reason comparison.
@@ -191,7 +191,7 @@ def test_summary_scaffolded_names_openai_key_when_model_overridden(monkeypatch):
     monkeypatch.setattr(
         ai_review, "load_construct_output_summary", lambda wid: output_summary
     )
-    monkeypatch.setenv("CANCERSTUDIO_REVIEW_MODEL", "openai/gpt-4o")
+    monkeypatch.setenv("MUTAVAX_REVIEW_MODEL", "openai/gpt-4o")
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
     summary = ai_review.load_ai_review_summary(WORKSPACE_ID)

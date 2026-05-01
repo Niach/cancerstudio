@@ -115,7 +115,7 @@ export default function AnnotatedVariantsTable({
 
       <div style={{ padding: "0 8px 10px" }}>
         <div
-          className="cs-data-row cs-data-head"
+          className="mvx-data-row mvx-data-head"
           style={{
             gridTemplateColumns: "1.1fr 1.3fr 0.9fr 1.4fr 0.8fr 1fr",
           }}
@@ -132,7 +132,7 @@ export default function AnnotatedVariantsTable({
           return (
             <div
               key={i}
-              className="cs-data-row"
+              className="mvx-data-row"
               style={{
                 gridTemplateColumns: "1.1fr 1.3fr 0.9fr 1.4fr 0.8fr 1fr",
               }}

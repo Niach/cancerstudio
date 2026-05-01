@@ -32,7 +32,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "cancerstudio",
+  title: "mutavax",
   description:
     "Personalized oncology tooling from sequencing intake through experimental vaccine design",
 };

@@ -170,9 +170,9 @@ export default function IngestionStagePanel({
 
   return (
     <>
-      <div className="cs-view-head">
+      <div className="mvx-view-head">
         <div>
-          <div className="cs-crumb">
+          <div className="mvx-crumb">
             {workspace.displayName} / 01 Ingestion
           </div>
           <h1>The tumor sample and the healthy sample.</h1>
@@ -238,7 +238,7 @@ export default function IngestionStagePanel({
           </div>
           <Link
             href={`/workspaces/${workspace.id}/alignment`}
-            className="cs-btn cs-btn-primary"
+            className="mvx-btn mvx-btn-primary"
             data-testid="ingestion-continue-link"
           >
             Align reads →
@@ -319,8 +319,8 @@ export default function IngestionStagePanel({
               lineHeight: 1.7,
               color: "var(--muted)",
               background: "var(--surface-sunk)",
-              borderBottomLeftRadius: "var(--radius-cs-lg)",
-              borderBottomRightRadius: "var(--radius-cs-lg)",
+              borderBottomLeftRadius: "var(--radius-mvx-lg)",
+              borderBottomRightRadius: "var(--radius-mvx-lg)",
               overflow: "auto",
             }}
           >
@@ -382,7 +382,7 @@ function LaneCard({
             : "Awaiting files";
 
   return (
-    <div className={`cs-lane-card cs-lane-accent-${accent}`}>
+    <div className={`mvx-lane-card mvx-lane-accent-${accent}`}>
       <div
         style={{
           display: "flex",
@@ -408,14 +408,14 @@ function LaneCard({
           >
             {lane === "tumor" ? "Tumor" : "Matched normal"}
           </h3>
-          <p className="cs-tiny" style={{ margin: 0, fontSize: 13.5 }}>
+          <p className="mvx-tiny" style={{ margin: 0, fontSize: 13.5 }}>
             {lane === "tumor"
               ? "Biopsy — the cancer."
               : "Healthy reference — what to compare against."}
           </p>
         </div>
         <span
-          className="cs-chip"
+          className="mvx-chip"
           style={{
             background: ready
               ? "color-mix(in oklch, var(--lane) 14%, transparent)"
@@ -518,7 +518,7 @@ function LaneCard({
           }}
         >
           <div
-            className="cs-tiny"
+            className="mvx-tiny"
             style={{ fontSize: 13.5, marginBottom: 12 }}
           >
             No files yet. Pick your {lane === "tumor" ? "tumor" : "healthy"}{" "}
@@ -573,16 +573,16 @@ function LaneCard({
               {Math.round(progressPercent)}%
             </span>
           </div>
-          <div className="cs-progress" style={{ height: 6 }}>
+          <div className="mvx-progress" style={{ height: 6 }}>
             <div
-              className="cs-progress-fill"
+              className="mvx-progress-fill"
               style={{
                 width: `${progressWidth}%`,
               }}
             />
           </div>
           <div
-            className="cs-tiny"
+            className="mvx-tiny"
             style={{
               marginTop: 8,
               fontSize: 12,
@@ -611,8 +611,8 @@ function LaneCard({
             gap: 10,
           }}
         >
-          <span className="cs-spinner" />
-          <span className="cs-tiny">Loading read preview…</span>
+          <span className="mvx-spinner" />
+          <span className="mvx-tiny">Loading read preview…</span>
         </div>
       ) : preview.phase === "failed" ? (
         <div
@@ -631,7 +631,7 @@ function LaneCard({
             <div style={{ fontSize: 13.5, color: "var(--ink-2)" }}>
               Preview unavailable.
             </div>
-            <div className="cs-tiny" style={{ fontSize: 12 }}>
+            <div className="mvx-tiny" style={{ fontSize: 12 }}>
               {preview.error}
             </div>
           </div>
@@ -759,7 +759,7 @@ function MissingToolsCallout({ error }: { error: MissingToolsError }) {
             ? `${error.tools[0]} is not installed locally.`
             : `These tools are not installed locally: ${error.tools.join(", ")}.`}
         </div>
-        <p className="cs-tiny" style={{ margin: "4px 0 8px" }}>
+        <p className="mvx-tiny" style={{ margin: "4px 0 8px" }}>
           Install them and reload, then try again.
         </p>
         <ul

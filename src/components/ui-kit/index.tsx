@@ -14,7 +14,7 @@ export function Eyebrow({
   style?: CSSProperties;
 }) {
   return (
-    <p className="cs-eyebrow" style={style}>
+    <p className="mvx-eyebrow" style={style}>
       {children}
     </p>
   );
@@ -28,7 +28,7 @@ export function MonoLabel({
   style?: CSSProperties;
 }) {
   return (
-    <span className="cs-mono-label" style={style}>
+    <span className="mvx-mono-label" style={style}>
       {children}
     </span>
   );
@@ -59,7 +59,7 @@ export function Chip({
   style?: CSSProperties;
 }) {
   return (
-    <span className={`cs-chip cs-chip-${kind}`} style={style}>
+    <span className={`mvx-chip mvx-chip-${kind}`} style={style}>
       {children}
     </span>
   );
@@ -80,9 +80,9 @@ export function Card({
   className?: string;
 }) {
   const classes = [
-    "cs-card",
-    pad ? "cs-card-pad" : "",
-    sunk ? "cs-card-sunk" : "",
+    "mvx-card",
+    pad ? "mvx-card-pad" : "",
+    sunk ? "mvx-card-sunk" : "",
     className,
   ]
     .filter(Boolean)
@@ -106,7 +106,7 @@ export function CardHead({
   right?: ReactNode;
 }) {
   return (
-    <div className="cs-card-head">
+    <div className="mvx-card-head">
       <div>
         {eyebrow ? (
           <div style={{ marginBottom: 6 }}>
@@ -115,7 +115,7 @@ export function CardHead({
         ) : null}
         <h3>{title}</h3>
         {subtitle ? (
-          <p className="cs-tiny" style={{ margin: "2px 0 0" }}>
+          <p className="mvx-tiny" style={{ margin: "2px 0 0" }}>
             {subtitle}
           </p>
         ) : null}
@@ -140,9 +140,9 @@ export function Btn({
   children: ReactNode;
 }) {
   const classes = [
-    "cs-btn",
-    variant === "primary" ? "cs-btn-primary" : "cs-btn-ghost",
-    size === "sm" ? "cs-btn-sm" : "",
+    "mvx-btn",
+    variant === "primary" ? "mvx-btn-primary" : "mvx-btn-ghost",
+    size === "sm" ? "mvx-btn-sm" : "",
     className,
   ]
     .filter(Boolean)
@@ -166,7 +166,7 @@ export function Callout({
   style?: CSSProperties;
   className?: string;
 }) {
-  const cls = `cs-callout ${tone === "warm" ? "cs-callout-warm" : ""} ${className}`;
+  const cls = `mvx-callout ${tone === "warm" ? "mvx-callout-warm" : ""} ${className}`;
   return (
     <div className={cls} style={style}>
       {children}
@@ -176,10 +176,10 @@ export function Callout({
 
 // ── Dot ───────────────────────────────────────────────────────────
 export function Dot({ style }: { style?: CSSProperties }) {
-  return <span className="cs-dot" style={style} />;
+  return <span className="mvx-dot" style={style} />;
 }
 
 // ── Spinner ───────────────────────────────────────────────────────
 export function Spinner(props: HTMLAttributes<HTMLSpanElement>) {
-  return <span className="cs-spinner" {...props} />;
+  return <span className="mvx-spinner" {...props} />;
 }

@@ -47,9 +47,8 @@ BACKEND_ROOT = ROOT / "backend"
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.research.mhc2.data import MHC2Record, read_jsonl
+from app.research.mhc2.data import MHC2Record, peptide_9mers, read_jsonl
 from app.research.mhc2.decoys import (
-    positive_9mer_index,
     read_fasta_sequences,
     sample_frank_candidates,
 )
@@ -88,8 +87,23 @@ def main() -> None:
             positives.append(record)
     print(f"[mine] kept {len(positives):,} positives", flush=True)
 
-    forbidden_9mers = positive_9mer_index(positives)
-    print(f"[mine] forbidden 9-mers from positives: {len(forbidden_9mers):,}", flush=True)
+    # Per-allele forbidden 9-mer sets: a window is rejected for allele A only
+    # if it overlaps a positive *for that allele*. The global 18M-9-mer set
+    # caused enough memory pressure on hash lookups to dominate runtime; the
+    # per-allele sets are typically 10-50k entries each, fast and more
+    # semantically correct (a sequence that happens to be a B-allele binder
+    # is a perfectly valid hard negative for A).
+    forbidden_by_allele: dict[str, set[str]] = defaultdict(set)
+    for p in positives:
+        cores = list(peptide_9mers(p.peptide))
+        for allele in p.alleles:
+            forbidden_by_allele[allele].update(cores)
+    sizes = sorted(len(s) for s in forbidden_by_allele.values())
+    print(
+        f"[mine] per-allele forbidden 9-mer sets: alleles={len(forbidden_by_allele):,} "
+        f"min={sizes[0]:,} median={sizes[len(sizes)//2]:,} max={sizes[-1]:,}",
+        flush=True,
+    )
 
     print(f"[mine] reading proteome {args.proteome_fasta}", flush=True)
     proteome = read_fasta_sequences(args.proteome_fasta)
@@ -112,6 +126,11 @@ def main() -> None:
         device=args.device,
         esm_cache_dir=args.esm_cache_dir,
     )
+    # Mining doesn't need inverted-DP: the seed score on the forward
+    # orientation is enough to rank novel windows by hardness, and the
+    # reversed-peptide live-embed path isn't batched so it dominates runtime
+    # for DP cells.
+    predictor.inverted_dp = False
     supported = set(predictor.pseudosequences)
     skipped_alleles = {a for (a, _) in cell_to_positives if a not in supported}
     if skipped_alleles:
@@ -119,39 +138,61 @@ def main() -> None:
               f"pseudoseq table — skipping. Sample: {sorted(skipped_alleles)[:5]}",
               flush=True)
 
-    cells = sorted([cell for cell in cell_to_positives if cell[0] in supported])
-    print(f"[mine] mining {len(cells):,} cells", flush=True)
+    # Group cells by allele so each predict_many call amortises model
+    # warmup, peptide-feature pre-embed, and chunk-loop overhead across all
+    # lengths for that allele. Scoring per-cell was 10-30 sec/cell; per-allele
+    # is ~3-5 sec/allele covering all its cells.
+    cells_by_allele: dict[str, list[int]] = defaultdict(list)
+    for (allele, length) in cell_to_positives:
+        if allele in supported:
+            cells_by_allele[allele].append(length)
+    print(f"[mine] mining across {len(cells_by_allele):,} alleles "
+          f"({sum(len(ls) for ls in cells_by_allele.values()):,} cells)",
+          flush=True)
 
-    # Stage 1: build pool of (peptide, allele, score) for every cell.
     cell_pool: dict[tuple[str, int], list[tuple[str, float]]] = {}
-    for i, (allele, length) in enumerate(cells):
-        cell_seed = args.seed ^ (hash((allele, length)) & 0xFFFFFF)
-        windows = sample_frank_candidates(
-            length,
-            proteome,
-            n_candidates=args.pool_per_cell,
-            seed=cell_seed,
-            forbidden_9mers=forbidden_9mers,
-        )
-        if not windows:
-            cell_pool[(allele, length)] = []
+    for ai, allele in enumerate(sorted(cells_by_allele)):
+        lengths = sorted(set(cells_by_allele[allele]))
+        forbidden = forbidden_by_allele[allele]
+        # Sample N_pool windows per length, all for this allele.
+        triples: list[tuple[str, str, int]] = []  # (peptide, allele, length)
+        for length in lengths:
+            cell_seed = args.seed ^ (hash((allele, length)) & 0xFFFFFF)
+            windows = sample_frank_candidates(
+                length,
+                proteome,
+                n_candidates=args.pool_per_cell,
+                seed=cell_seed,
+                forbidden_9mers=forbidden,
+            )
+            for w in windows:
+                triples.append((w, allele, length))
+        if not triples:
+            for length in lengths:
+                cell_pool[(allele, length)] = []
             continue
-        # Score with the seed predictor.
-        pairs = [(w, allele) for w in windows]
+        pairs = [(p, a) for p, a, _ in triples]
         try:
             preds = predictor.predict_many(pairs, batch_size=args.batch_size)
         except (KeyError, ValueError) as exc:
-            print(f"[mine] cell {(allele, length)} predict failed: {exc!r}", flush=True)
-            cell_pool[(allele, length)] = []
+            print(f"[mine] allele {allele} predict failed: {exc!r}", flush=True)
+            for length in lengths:
+                cell_pool[(allele, length)] = []
             continue
-        scored = [(p.peptide, float(p.score)) for p in preds]
-        scored.sort(key=lambda x: -x[1])  # hardest first
-        cell_pool[(allele, length)] = scored[: args.pool_top]
-        if (i + 1) % 100 == 0 or i < 5:
+        # Group by length, sort, keep top.
+        by_length: dict[int, list[tuple[str, float]]] = defaultdict(list)
+        for (peptide, _allele, length), pred in zip(triples, preds):
+            by_length[length].append((peptide, float(pred.score)))
+        top1_summary = {}
+        for length, scored in by_length.items():
+            scored.sort(key=lambda x: -x[1])
+            cell_pool[(allele, length)] = scored[: args.pool_top]
+            top1_summary[length] = scored[0][1] if scored else float("nan")
+        if (ai + 1) % 25 == 0 or ai < 5:
             print(
-                f"[mine] cell {i+1}/{len(cells)} {allele} L={length} "
-                f"pool={len(scored)} top1={scored[0][1]:.3f} "
-                f"topK={scored[args.pool_top - 1][1] if len(scored) >= args.pool_top else scored[-1][1]:.3f}",
+                f"[mine] allele {ai+1}/{len(cells_by_allele)} {allele}: "
+                f"scored {len(pairs):,} pairs across {len(lengths)} lengths, "
+                f"top1 by L: {sorted(top1_summary.items())}",
                 flush=True,
             )
 

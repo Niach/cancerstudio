@@ -60,7 +60,7 @@ export default function ImpactSummary({ metrics }: ImpactSummaryProps) {
             key={tile.tier}
             style={{
               position: "relative",
-              borderRadius: "var(--radius-cs-lg)",
+              borderRadius: "var(--radius-mvx-lg)",
               border: "1px solid var(--line)",
               background: "var(--surface-strong)",
               padding: "16px 18px",

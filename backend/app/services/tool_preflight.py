@@ -116,7 +116,7 @@ VEP_REQUIREMENT = ToolRequirement(
     install_hint=(
         "Install Ensembl VEP: git clone https://github.com/Ensembl/ensembl-vep "
         "&& cd ensembl-vep && perl INSTALL.pl --AUTO a  "
-        "(requires Perl + Bio::DB::HTS). The cancerstudio backend image installs "
+        "(requires Perl + Bio::DB::HTS). The mutavax backend image installs "
         "VEP release 111 automatically — if you see this message you are running "
         "the backend natively outside the container."
     ),
@@ -133,7 +133,7 @@ PVACSEQ_REQUIREMENT = ToolRequirement(
     env_var="PVACSEQ_BINARY",
     default_binary="pvacseq",
     install_hint=(
-        "Install pVACtools: python -m pip install pvactools. The cancerstudio "
+        "Install pVACtools: python -m pip install pvactools. The mutavax "
         "backend image installs it automatically — if you see this message you "
         "are running the backend natively outside the container."
     ),
@@ -142,12 +142,12 @@ PVACSEQ_REQUIREMENT = ToolRequirement(
 
 NETMHCPAN_REQUIREMENT = ToolRequirement(
     name="NetMHCpan 4.2",
-    env_var="CANCERSTUDIO_NETMHCPAN_BIN",
+    env_var="MUTAVAX_NETMHCPAN_BIN",
     default_binary="netMHCpan",
     install_hint=(
         "NetMHCpan 4.2 requires a free academic license from DTU (https://services.healthtech.dtu.dk/). "
         "Download the Linux tarball and extract it as shipped (no script edits needed) into "
-        "${CANCERSTUDIO_NETMHC_DIR} — the host dir is bind-mounted at /tools/src:ro inside the "
+        "${MUTAVAX_NETMHC_DIR} — the host dir is bind-mounted at /tools/src:ro inside the "
         "container, which matches the wrapper's hardcoded NMHOME."
     ),
 )
@@ -155,11 +155,11 @@ NETMHCPAN_REQUIREMENT = ToolRequirement(
 
 NETMHCIIPAN_REQUIREMENT = ToolRequirement(
     name="NetMHCIIpan 4.3",
-    env_var="CANCERSTUDIO_NETMHCIIPAN_BIN",
+    env_var="MUTAVAX_NETMHCIIPAN_BIN",
     default_binary="netMHCIIpan",
     install_hint=(
         "NetMHCIIpan 4.3 requires a free academic license from DTU. Extract the Linux tarball "
-        "as shipped into ${CANCERSTUDIO_NETMHC_DIR} — the host dir lands at /tools/src:ro inside "
+        "as shipped into ${MUTAVAX_NETMHC_DIR} — the host dir lands at /tools/src:ro inside "
         "the container, matching the wrapper's hardcoded NMHOME."
     ),
 )
@@ -248,11 +248,11 @@ AccelerationMode = Literal["gpu_parabricks", "cpu_gatk"]
 def detect_gpu_available() -> bool:
     """Return True iff `nvidia-smi` succeeds and reports at least one GPU.
 
-    Honors ``CANCERSTUDIO_VC_FORCE_CPU=1`` as a hard override for users or
+    Honors ``MUTAVAX_VC_FORCE_CPU=1`` as a hard override for users or
     CI that want to exercise the CPU path from inside a GPU-capable image.
     Cached — GPU presence doesn't change within a process lifetime.
     """
-    if os.getenv("CANCERSTUDIO_VC_FORCE_CPU") == "1":
+    if os.getenv("MUTAVAX_VC_FORCE_CPU") == "1":
         return False
     if shutil.which("nvidia-smi") is None:
         return False

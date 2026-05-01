@@ -49,7 +49,7 @@ import pytest
 FIXTURE = Path(__file__).parent / "fixtures" / "canonical_tumor_antigens.tsv"
 
 NETMHCPAN_BIN = os.environ.get(
-    "CANCERSTUDIO_NETMHCPAN_BIN", "/tools/src/netMHCpan-4.2/netMHCpan"
+    "MUTAVAX_NETMHCPAN_BIN", "/tools/src/netMHCpan-4.2/netMHCpan"
 )
 
 

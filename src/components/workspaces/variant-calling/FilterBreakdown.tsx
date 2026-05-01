@@ -16,11 +16,11 @@ export default function FilterBreakdown({ entries }: FilterBreakdownProps) {
     });
 
   return (
-    <div className="cs-card">
-      <div className="cs-card-head">
+    <div className="mvx-card">
+      <div className="mvx-card-head">
         <div>
           <div style={{ marginBottom: 6 }}>
-            <span className="cs-mono-label">Filter breakdown</span>
+            <span className="mvx-mono-label">Filter breakdown</span>
           </div>
           <h3>Why variants were rejected</h3>
         </div>
@@ -35,7 +35,7 @@ export default function FilterBreakdown({ entries }: FilterBreakdownProps) {
         {sorted.map((f, idx) => (
           <div
             key={f.name}
-            className="cs-spread"
+            className="mvx-spread"
             style={{
               display: "flex",
               justifyContent: "space-between",

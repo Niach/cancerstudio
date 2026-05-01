@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Train a cancerstudio MHC-II checkpoint in an optional PyTorch environment."""
+"""Train a mutavax MHC-II checkpoint in an optional PyTorch environment."""
 
 from __future__ import annotations
 

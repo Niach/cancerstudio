@@ -1,4 +1,4 @@
-# Combined cancerstudio image — FastAPI backend + Next.js frontend in a single
+# Combined mutavax image — FastAPI backend + Next.js frontend in a single
 # container. Only port 3000 is exposed; Next.js rewrites /backend/* to the
 # in-container backend on loopback 127.0.0.1:8000.
 #
@@ -178,7 +178,7 @@ RUN python -m pip install --upgrade pip \
 
 # Mount point for externally-licensed MHC binding predictors (NetMHCpan 4.2 +
 # NetMHCIIpan 4.3). We cannot redistribute these, so the user drops the
-# DTU-shipped install directories into ${CANCERSTUDIO_NETMHC_DIR} on the host;
+# DTU-shipped install directories into ${MUTAVAX_NETMHC_DIR} on the host;
 # docker-compose bind-mounts that dir at /tools/src:ro so the stock DTU wrapper
 # scripts (which hardcode NMHOME=/tools/src/netMHCpan-4.2 etc.) work with no
 # user-side edits. pVACseq invokes the binaries via the env vars below.
@@ -193,15 +193,15 @@ COPY --from=web-builder /app/public /app/web/public
 COPY --from=web-builder /app/.next/standalone /app/web
 COPY --from=web-builder /app/.next/static /app/web/.next/static
 
-COPY backend/entrypoint.sh /usr/local/bin/cancerstudio-entrypoint
-RUN chmod +x /usr/local/bin/cancerstudio-entrypoint
+COPY backend/entrypoint.sh /usr/local/bin/mutavax-entrypoint
+RUN chmod +x /usr/local/bin/mutavax-entrypoint
 
-ENV CANCERSTUDIO_APP_DATA_DIR=/app-data \
-    CANCERSTUDIO_VEP_PLUGINS_DIR=/opt/vep-plugins \
-    CANCERSTUDIO_VEP_RELEASE=111 \
-    CANCERSTUDIO_NETMHC_DIR=/tools/src \
-    CANCERSTUDIO_NETMHCPAN_BIN=/tools/src/netMHCpan-4.2/netMHCpan \
-    CANCERSTUDIO_NETMHCIIPAN_BIN=/tools/src/netMHCIIpan-4.3/netMHCIIpan \
+ENV MUTAVAX_APP_DATA_DIR=/app-data \
+    MUTAVAX_VEP_PLUGINS_DIR=/opt/vep-plugins \
+    MUTAVAX_VEP_RELEASE=111 \
+    MUTAVAX_NETMHC_DIR=/tools/src \
+    MUTAVAX_NETMHCPAN_BIN=/tools/src/netMHCpan-4.2/netMHCpan \
+    MUTAVAX_NETMHCIIPAN_BIN=/tools/src/netMHCIIpan-4.3/netMHCIIpan \
     TF_USE_LEGACY_KERAS=1 \
     PYTHONPATH=/app \
     INTERNAL_API_URL=http://127.0.0.1:8000 \
@@ -210,4 +210,4 @@ ENV CANCERSTUDIO_APP_DATA_DIR=/app-data \
 
 EXPOSE 3000
 
-CMD ["/usr/local/bin/cancerstudio-entrypoint"]
+CMD ["/usr/local/bin/mutavax-entrypoint"]

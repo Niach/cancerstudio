@@ -32,18 +32,18 @@ import pytest
 
 # ---------------------------------------------------------------------------
 # Benchmark data location — configurable, with a sensible default under
-# ${CANCERSTUDIO_DATA_ROOT}/benchmarks/colo829/. Tests skip politely if
+# ${MUTAVAX_DATA_ROOT}/benchmarks/colo829/. Tests skip politely if
 # either the truth VCF or our filtered VCF is missing.
 # ---------------------------------------------------------------------------
 
 _DATA_ROOT = Path(
     os.environ.get(
-        "CANCERSTUDIO_COLO829_BENCH_DIR",
+        "MUTAVAX_COLO829_BENCH_DIR",
         os.path.expandvars(
-            "$CANCERSTUDIO_DATA_ROOT/benchmarks/colo829"
-            if os.environ.get("CANCERSTUDIO_DATA_ROOT")
+            "$MUTAVAX_DATA_ROOT/benchmarks/colo829"
+            if os.environ.get("MUTAVAX_DATA_ROOT")
             else "/media/niach/5c5f06df-56ba-430c-a735-42e1205949f63/"
-            "cancerstudio/benchmarks/colo829"
+            "mutavax/benchmarks/colo829"
         ),
     )
 )

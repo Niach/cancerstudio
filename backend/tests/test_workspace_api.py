@@ -60,7 +60,7 @@ def clean_database():
 
 @pytest.fixture(autouse=True)
 def inbox_root(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
-    monkeypatch.setenv("CANCERSTUDIO_INBOX_DIR", str(tmp_path))
+    monkeypatch.setenv("MUTAVAX_INBOX_DIR", str(tmp_path))
     monkeypatch.setattr(workspace_routes, "verify_tools", lambda _tools: None)
     fake_pigz = tmp_path / "fake_pigz.py"
     fake_pigz.write_text(
@@ -376,7 +376,7 @@ async def test_local_file_registration_rejects_paths_outside_inbox(
     outside_path = write_gz_fastq(
         tmp_path / "outside_R1.fastq.gz", "outside-r1", "ACGT"
     )
-    monkeypatch.setenv("CANCERSTUDIO_INBOX_DIR", str(inbox))
+    monkeypatch.setenv("MUTAVAX_INBOX_DIR", str(inbox))
 
     response = await client.post(
         f"/api/workspaces/{workspace['id']}/ingestion/local-files",

@@ -68,14 +68,14 @@ export default function NewWorkspacePage() {
   }
 
   return (
-    <div className="cs-theme">
+    <div className="mvx-theme">
       <div
-        className="cs-view cs-fade-in"
+        className="mvx-view mvx-fade-in"
         style={{ maxWidth: 900 }}
       >
-        <div className="cs-view-head">
+        <div className="mvx-view-head">
           <div>
-            <div className="cs-crumb">Workspaces / New</div>
+            <div className="mvx-crumb">Workspaces / New</div>
             <h1>Start a new case.</h1>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -98,7 +98,7 @@ export default function NewWorkspacePage() {
             >
               Pick a species.
             </h3>
-            <p className="cs-tiny" style={{ marginBottom: 18, fontSize: 13 }}>
+            <p className="mvx-tiny" style={{ marginBottom: 18, fontSize: 13 }}>
               Species locks the reference genome for this run. Everything
               downstream — alignment, variant calling, HLA/DLA handling — is
               species-aware.
@@ -115,10 +115,10 @@ export default function NewWorkspacePage() {
                 <button
                   key={opt.id}
                   type="button"
-                  className={`cs-species-card ${species === opt.id ? "is-on" : ""}`}
+                  className={`mvx-species-card ${species === opt.id ? "is-on" : ""}`}
                   onClick={() => setSpecies(opt.id)}
                 >
-                  <div className="cs-species-portrait">{opt.emoji}</div>
+                  <div className="mvx-species-portrait">{opt.emoji}</div>
                   <div
                     style={{
                       display: "flex",
@@ -147,7 +147,7 @@ export default function NewWorkspacePage() {
                     >
                       {opt.ref}
                     </span>
-                    <span className="cs-tiny" style={{ fontSize: 11 }}>
+                    <span className="mvx-tiny" style={{ fontSize: 11 }}>
                       {opt.note}
                     </span>
                   </div>
@@ -192,15 +192,15 @@ export default function NewWorkspacePage() {
                 outline: "none",
               }}
             />
-            <p className="cs-tiny" style={{ marginTop: 10, fontSize: 11.5 }}>
+            <p className="mvx-tiny" style={{ marginTop: 10, fontSize: 11.5 }}>
               Workspaces live on your machine under{" "}
               <span style={{ fontFamily: "var(--font-mono)" }}>
-                ~/cancerstudio-data/workspaces/
+                ~/mutavax-data/workspaces/
               </span>
             </p>
             {error ? (
               <p
-                className="cs-tiny"
+                className="mvx-tiny"
                 style={{
                   marginTop: 10,
                   color: "var(--danger)",
@@ -221,7 +221,7 @@ export default function NewWorkspacePage() {
               alignItems: "center",
             }}
           >
-            <span className="cs-tiny">
+            <span className="mvx-tiny">
               Next: register your local FASTQ or BAM files.
             </span>
             <div style={{ display: "flex", gap: 10 }}>

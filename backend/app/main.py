@@ -17,7 +17,7 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(
-    title="cancerstudio",
+    title="mutavax",
     description="Backend API for the mRNA cancer vaccine design pipeline",
     version="0.1.0",
     lifespan=lifespan,
@@ -46,4 +46,4 @@ app.include_router(inbox.router)
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "cancerstudio"}
+    return {"status": "ok", "service": "mutavax"}

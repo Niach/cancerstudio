@@ -1,6 +1,6 @@
 name: Publish image
 
-# Publishes the combined cancerstudio image (FastAPI backend + Next.js frontend
+# Publishes the combined mutavax image (FastAPI backend + Next.js frontend
 # + bioinformatics tool chain on the NVIDIA Parabricks base) to GHCR.
 # Triggered on pushes to main and on semver tags.
 
@@ -35,7 +35,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/cancerstudio
+          images: ghcr.io/${{ github.repository_owner }}/mutavax
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}

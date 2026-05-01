@@ -23,7 +23,7 @@ export default function AboutProse({ stats }: { stats: CatalogStats }) {
         has never been collected. Without it, every somatic variant call is guesswork.
       </p>
 
-      <h2>What cancerstudio is</h2>
+      <h2>What mutavax is</h2>
       <p>
         Two things in one repository. <em>First</em>, an open archive of {fmt(stats.total)}
         {" "}healthy dog and cat genomes, free to browse and download.
@@ -41,7 +41,7 @@ export default function AboutProse({ stats }: { stats: CatalogStats }) {
 
       <h2>How the archive sharpens every design</h2>
       <p>
-        Every oncologist who runs cancerstudio downloads a matched baseline from this
+        Every oncologist who runs mutavax downloads a matched baseline from this
         archive as their reference. Every new healthy genome sharpens every future
         vaccine design — for every pet, everywhere.
       </p>

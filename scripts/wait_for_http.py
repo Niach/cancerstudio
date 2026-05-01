@@ -39,7 +39,7 @@ def main() -> int:
 
     while time.monotonic() < deadline:
         try:
-            request = Request(args.url, headers={"User-Agent": "cancerstudio-wait-for-http/1.0"})
+            request = Request(args.url, headers={"User-Agent": "mutavax-wait-for-http/1.0"})
             with urlopen(request, timeout=args.interval + 5) as response:
                 if response.status == args.expect_status:
                     print(f"{args.url} responded with {response.status}")

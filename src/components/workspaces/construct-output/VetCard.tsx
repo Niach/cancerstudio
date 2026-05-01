@@ -36,7 +36,7 @@ export default function VetCard({ dosing }: VetCardProps) {
           gap: 16,
         }}
       >
-        <div className="cs-dose-meta">
+        <div className="mvx-dose-meta">
           <DoseMeta k="Formulation" v={dosing.formulation} />
           <DoseMeta k="Route" v={dosing.route} />
           <DoseMeta k="Dose" v={dosing.dose} />
@@ -55,7 +55,7 @@ export default function VetCard({ dosing }: VetCardProps) {
           >
             Schedule
           </div>
-          <div className="cs-dose-grid">
+          <div className="mvx-dose-grid">
             {dosing.schedule.map((s, i) => (
               <div
                 key={i}

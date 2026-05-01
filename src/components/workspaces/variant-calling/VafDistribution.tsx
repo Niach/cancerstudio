@@ -17,14 +17,14 @@ export default function VafDistribution({
   const max = Math.max(1, ...bins.map((b) => b.count));
 
   return (
-    <div className="cs-card">
-      <div className="cs-card-head">
+    <div className="mvx-card">
+      <div className="mvx-card-head">
         <div>
           <div style={{ marginBottom: 6 }}>
-            <span className="cs-mono-label">VAF distribution</span>
+            <span className="mvx-mono-label">VAF distribution</span>
           </div>
           <h3>Variant allele frequency</h3>
-          <p className="cs-tiny" style={{ margin: "2px 0 0" }}>
+          <p className="mvx-tiny" style={{ margin: "2px 0 0" }}>
             Most tumor mutations cluster around 20–30% VAF — consistent with a
             mixed-clonality tumor biopsy.
           </p>
@@ -50,11 +50,11 @@ export default function VafDistribution({
         ) : null}
       </div>
       <div style={{ padding: "16px 22px 22px" }}>
-        <div className="cs-vaf-bars">
+        <div className="mvx-vaf-bars">
           {bins.map((b, i) => (
             <div
               key={i}
-              className="cs-vaf-bar"
+              className="mvx-vaf-bar"
               style={{
                 height: `${Math.max(1, Math.round((b.count / max) * 100))}%`,
               }}

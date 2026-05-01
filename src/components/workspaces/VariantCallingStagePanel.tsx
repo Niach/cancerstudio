@@ -102,9 +102,9 @@ export default function VariantCallingStagePanel({
   if (status === "blocked") {
     return (
       <>
-        <div className="cs-view-head">
+        <div className="mvx-view-head">
           <div>
-            <div className="cs-crumb">
+            <div className="mvx-crumb">
               {workspace.displayName} / 03 Variant calling
             </div>
             <h1>Variant calling is locked for now.</h1>
@@ -117,7 +117,7 @@ export default function VariantCallingStagePanel({
             <div style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)" }}>
               {summary.blockingReason ?? "Finish alignment cleanly first."}
             </div>
-            <p className="cs-tiny" style={{ margin: "4px 0 0" }}>
+            <p className="mvx-tiny" style={{ margin: "4px 0 0" }}>
               We&apos;ll unlock this step once the alignment run passes QC.
             </p>
           </div>
@@ -129,9 +129,9 @@ export default function VariantCallingStagePanel({
   if (status === "scaffolded" || (!latestRun && status !== "running")) {
     return (
       <>
-        <div className="cs-view-head">
+        <div className="mvx-view-head">
           <div>
-            <div className="cs-crumb">
+            <div className="mvx-crumb">
               {workspace.displayName} / 03 Variant calling
             </div>
             <h1>Find the cancer-specific mutations.</h1>
@@ -185,14 +185,14 @@ export default function VariantCallingStagePanel({
               </div>
               {actionError ? (
                 <p
-                  className="cs-tiny"
+                  className="mvx-tiny"
                   style={{ marginTop: 10, color: "var(--danger)" }}
                 >
                   {actionError}
                 </p>
               ) : null}
               {missingTools ? (
-                <div className="cs-tiny" style={{ marginTop: 10 }}>
+                <div className="mvx-tiny" style={{ marginTop: 10 }}>
                   Install {missingTools.tools.join(" and ")} first.
                 </div>
               ) : null}
@@ -212,9 +212,9 @@ export default function VariantCallingStagePanel({
       : 0;
     return (
       <>
-        <div className="cs-view-head">
+        <div className="mvx-view-head">
           <div>
-            <div className="cs-crumb">
+            <div className="mvx-crumb">
               {workspace.displayName} / 03 Variant calling
             </div>
             <h1>Searching the cancer sample for mutations…</h1>
@@ -226,15 +226,15 @@ export default function VariantCallingStagePanel({
             <Helix size={220} rungs={20} hue={tweaks.accentHue} speed={16} />
             <div style={{ marginTop: 20 }}>
               <div
-                className="cs-progress"
+                className="mvx-progress"
                 style={{ maxWidth: 420, margin: "0 auto", height: 10 }}
               >
                 <div
-                  className="cs-progress-fill"
+                  className="mvx-progress-fill"
                   style={{ width: `${Math.max(3, Math.round(pct * 100))}%` }}
                 />
               </div>
-              <p className="cs-tiny" style={{ marginTop: 14 }}>
+              <p className="mvx-tiny" style={{ marginTop: 14 }}>
                 {latestRun && latestRun.totalShards > 0
                   ? `${latestRun.completedShards} / ${latestRun.totalShards} chromosomes done`
                   : "Preparing the reference…"}
@@ -277,9 +277,9 @@ export default function VariantCallingStagePanel({
   if (status === "paused" && latestRun) {
     return (
       <>
-        <div className="cs-view-head">
+        <div className="mvx-view-head">
           <div>
-            <div className="cs-crumb">
+            <div className="mvx-crumb">
               {workspace.displayName} / 03 Variant calling
             </div>
             <h1>Paused. Your progress is saved.</h1>
@@ -294,7 +294,7 @@ export default function VariantCallingStagePanel({
                 ? `Paused at ${latestRun.completedShards} / ${latestRun.totalShards} chromosomes.`
                 : "Paused."}
             </div>
-            <p className="cs-tiny" style={{ margin: "4px 0 0" }}>
+            <p className="mvx-tiny" style={{ margin: "4px 0 0" }}>
               Resume picks up from the next chromosome. Discard wipes the
               progress and starts fresh.
             </p>
@@ -316,9 +316,9 @@ export default function VariantCallingStagePanel({
   if (status === "failed") {
     return (
       <>
-        <div className="cs-view-head">
+        <div className="mvx-view-head">
           <div>
-            <div className="cs-crumb">
+            <div className="mvx-crumb">
               {workspace.displayName} / 03 Variant calling
             </div>
             <h1>The search didn&apos;t finish.</h1>
@@ -331,7 +331,7 @@ export default function VariantCallingStagePanel({
             <div style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)" }}>
               The search failed.
             </div>
-            <p className="cs-tiny" style={{ margin: "4px 0 0" }}>
+            <p className="mvx-tiny" style={{ margin: "4px 0 0" }}>
               {latestRun?.error ?? "Try again, or check the command log in expert mode."}
             </p>
           </div>
@@ -353,9 +353,9 @@ export default function VariantCallingStagePanel({
 
   return (
     <>
-      <div className="cs-view-head">
+      <div className="mvx-view-head">
         <div>
-          <div className="cs-crumb">
+          <div className="mvx-crumb">
             {workspace.displayName} / 03 Variant calling
           </div>
           <h1>The tumor&apos;s mutation map.</h1>
@@ -484,8 +484,8 @@ export default function VariantCallingStagePanel({
               lineHeight: 1.7,
               color: "var(--muted)",
               background: "var(--surface-sunk)",
-              borderBottomLeftRadius: "var(--radius-cs-lg)",
-              borderBottomRightRadius: "var(--radius-cs-lg)",
+              borderBottomLeftRadius: "var(--radius-mvx-lg)",
+              borderBottomRightRadius: "var(--radius-mvx-lg)",
               overflow: "auto",
               maxHeight: 320,
             }}
@@ -499,7 +499,7 @@ export default function VariantCallingStagePanel({
         style={{
           marginTop: 24,
           padding: "18px 22px",
-          borderRadius: "var(--radius-cs-lg)",
+          borderRadius: "var(--radius-mvx-lg)",
           border: "1px dashed var(--line-strong)",
           background: "var(--surface-sunk)",
           display: "flex",
@@ -523,7 +523,7 @@ export default function VariantCallingStagePanel({
         </div>
         <Link
           href={`/workspaces/${workspace.id}/annotation`}
-          className="cs-btn cs-btn-primary"
+          className="mvx-btn mvx-btn-primary"
         >
           Open stage 04 →
         </Link>
@@ -545,7 +545,7 @@ function MetricCard({
     <div
       style={{
         padding: "14px 18px",
-        borderRadius: "var(--radius-cs-lg)",
+        borderRadius: "var(--radius-mvx-lg)",
         background: accent
           ? "color-mix(in oklch, var(--accent) 8%, var(--surface-strong))"
           : "var(--surface-strong)",
@@ -556,7 +556,7 @@ function MetricCard({
             : "var(--line)"),
       }}
     >
-      <div className="cs-mono-label">{label}</div>
+      <div className="mvx-mono-label">{label}</div>
       <div
         style={{
           fontFamily: "var(--font-display)",

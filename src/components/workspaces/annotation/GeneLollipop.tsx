@@ -185,7 +185,7 @@ export default function GeneLollipop({ focus }: GeneLollipopProps) {
           style={{ width: "100%", height: "auto", display: "block" }}
         >
           <defs>
-            <linearGradient id="cs-lolli-track" x1="0" x2="1">
+            <linearGradient id="mvx-lolli-track" x1="0" x2="1">
               <stop
                 offset="0%"
                 stopColor="color-mix(in oklch, var(--ink) 22%, transparent)"
@@ -213,7 +213,7 @@ export default function GeneLollipop({ focus }: GeneLollipopProps) {
             ry={8}
             width={trackWidth}
             height={16}
-            fill="url(#cs-lolli-track)"
+            fill="url(#mvx-lolli-track)"
             opacity={0.6}
           />
 

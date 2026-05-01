@@ -19,7 +19,7 @@ fast enough: ~2-3 s per cassette on human Swiss-Prot (20k proteins).
 
 The UniProt Swiss-Prot proteome for the workspace's species is fetched
 once on first use from UniProt, cached under
-``${CANCERSTUDIO_DATA_ROOT}/references/proteome/{species}/``, parsed
+``${MUTAVAX_DATA_ROOT}/references/proteome/{species}/``, parsed
 into memory with an LRU cache, and reused forever after. No external
 binary required.
 
@@ -82,9 +82,9 @@ PROTEOME_BY_PRESET: dict[ReferencePreset, Optional[ProteomeSource]] = {
 }
 
 PROTEOME_ENV_VARS = {
-    ReferencePreset.GRCH38: "CANCERSTUDIO_PROTEOME_HUMAN",
-    ReferencePreset.CANFAM4: "CANCERSTUDIO_PROTEOME_DOG",
-    ReferencePreset.FELCAT9: "CANCERSTUDIO_PROTEOME_CAT",
+    ReferencePreset.GRCH38: "MUTAVAX_PROTEOME_HUMAN",
+    ReferencePreset.CANFAM4: "MUTAVAX_PROTEOME_DOG",
+    ReferencePreset.FELCAT9: "MUTAVAX_PROTEOME_CAT",
 }
 
 

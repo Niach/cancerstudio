@@ -77,7 +77,7 @@ export default function CancerGeneHits({
                 position: "relative",
                 textAlign: "left",
                 padding: "14px 16px",
-                borderRadius: "var(--radius-cs-lg)",
+                borderRadius: "var(--radius-mvx-lg)",
                 border: isSelected
                   ? "1.5px solid var(--accent)"
                   : "1px solid var(--line)",

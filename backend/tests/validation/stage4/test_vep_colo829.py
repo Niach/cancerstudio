@@ -29,8 +29,8 @@ import pytest
 # calling run so its annotation is incomplete — we use 10f68b1c here.
 _WORKSPACE_ROOT = Path(
     os.environ.get(
-        "CANCERSTUDIO_COLO829_FULL_WORKSPACE_DIR",
-        "/media/niach/5c5f06df-56ba-430c-a735-42e1205949f63/cancerstudio/"
+        "MUTAVAX_COLO829_FULL_WORKSPACE_DIR",
+        "/media/niach/5c5f06df-56ba-430c-a735-42e1205949f63/mutavax/"
         "workspaces/10f68b1c-a2fb-4cf9-8401-ad3d10a86a6c",
     )
 )

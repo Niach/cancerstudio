@@ -50,7 +50,7 @@ import pytest
 FIXTURE = Path(__file__).parent / "fixtures" / "iedb_class_i_tcell.tsv"
 
 NETMHCPAN_BIN = os.environ.get(
-    "CANCERSTUDIO_NETMHCPAN_BIN", "/tools/src/netMHCpan-4.2/netMHCpan"
+    "MUTAVAX_NETMHCPAN_BIN", "/tools/src/netMHCpan-4.2/netMHCpan"
 )
 
 # Observed per-allele AUC on the 2026-04-22 fixture. Locked as a

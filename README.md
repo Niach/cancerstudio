@@ -1,16 +1,16 @@
-# cancerstudio
+# mutavax
 
 > **DISCLAIMER:** This software is provided for research and educational purposes only. Not intended for clinical or veterinary use. No warranty of fitness for any particular purpose.
 
 > Design your own mRNA cancer vaccine.
 
-cancerstudio is an open studio for designing personalized mRNA cancer vaccines — for dogs, cats, and humans. Sequence a tumor and a healthy sample, run the studio on your own machine, hand the design to a manufacturer.
+mutavax is an open studio for designing personalized mRNA cancer vaccines — for dogs, cats, and humans. Sequence a tumor and a healthy sample, run the studio on your own machine, hand the design to a manufacturer.
 
-[![Release](https://img.shields.io/github/v/release/niach/cancerstudio?color=22c55e&label=release)](https://github.com/niach/cancerstudio/releases)
-[![CI](https://github.com/niach/cancerstudio/actions/workflows/ci.yml/badge.svg)](https://github.com/niach/cancerstudio/actions/workflows/ci.yml)
-[![Image](https://img.shields.io/badge/ghcr.io-cancerstudio-2496ed?logo=docker&logoColor=white)](https://github.com/niach/cancerstudio/pkgs/container/cancerstudio)
+[![Release](https://img.shields.io/github/v/release/niach/mutavax?color=22c55e&label=release)](https://github.com/niach/mutavax/releases)
+[![CI](https://github.com/niach/mutavax/actions/workflows/ci.yml/badge.svg)](https://github.com/niach/mutavax/actions/workflows/ci.yml)
+[![Image](https://img.shields.io/badge/ghcr.io-mutavax-2496ed?logo=docker&logoColor=white)](https://github.com/niach/mutavax/pkgs/container/mutavax)
 
-**Site:** <https://cancerstudio.org>
+**Site:** <https://mutavax.straehhuber.com>
 
 | Pick a species | Stage the samples | Run alignment | Find the mutations | Read what they mean |
 | --- | --- | --- | --- | --- |
@@ -24,7 +24,7 @@ cancerstudio is an open studio for designing personalized mRNA cancer vaccines �
 
 **Sample.** Sequence a tumor and a matched healthy sample at any standard lab. Two sequencing files — that's the whole input.
 
-**Compute.** Run cancerstudio on *your* machine. Eight guided stages compare tumor vs. healthy, find the cancer-specific *mutations*, and design the vaccine. ≈12 hours on a workstation.
+**Compute.** Run mutavax on *your* machine. Eight guided stages compare tumor vs. healthy, find the cancer-specific *mutations*, and design the vaccine. ≈12 hours on a workstation.
 
 **Design.** Send the finished design to a GMP manufacturer. A vial arrives roughly ten days later.
 
@@ -79,11 +79,11 @@ macOS / Windows: install [Docker Desktop](https://www.docker.com/products/docker
 ### 2. Create the compose file
 
 ```bash
-mkdir ~/cancerstudio && cd ~/cancerstudio
-curl -fsSL https://raw.githubusercontent.com/niach/cancerstudio/main/docker-compose.yml -o docker-compose.yml
+mkdir ~/mutavax && cd ~/mutavax
+curl -fsSL https://raw.githubusercontent.com/niach/mutavax/main/docker-compose.yml -o docker-compose.yml
 ```
 
-The file pulls the pre-built image from GHCR (`ghcr.io/niach/cancerstudio`) — no build step on your machine.
+The file pulls the pre-built image from GHCR (`ghcr.io/niach/mutavax`) — no build step on your machine.
 
 ### 3. Create a `.env` (optional)
 
@@ -92,13 +92,13 @@ Most users don't need one. Add it if you want to customize anything:
 ```bash
 cat > .env <<'EOF'
 # Where workspace artifacts, references, and the SQLite DB live. Default: ./data
-# CANCERSTUDIO_DATA_ROOT=./data
+# MUTAVAX_DATA_ROOT=./data
 
 # Stage 9 AI review — only needed if you want the LLM review feature.
 # ANTHROPIC_API_KEY=
 
 # Switch the class-I predictor back to DTU NetMHCpan (default is MHCflurry).
-# CANCERSTUDIO_CLASS_I_PREDICTOR=NetMHCpan
+# MUTAVAX_CLASS_I_PREDICTOR=NetMHCpan
 EOF
 ```
 
@@ -145,7 +145,7 @@ Open <http://localhost:3000>. Create a workspace, pick a species, follow the sta
 **GPU-accelerated stage 3 (opt-in):**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/niach/cancerstudio/main/docker-compose.gpu.yml -o docker-compose.gpu.yml
+curl -fsSL https://raw.githubusercontent.com/niach/mutavax/main/docker-compose.gpu.yml -o docker-compose.gpu.yml
 docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
 ```
 
@@ -157,7 +157,7 @@ Species reference — GRCh38 (human), UU_Cfam_GSD_1.0 (dog), or Felis_catus_9.0 
 
 ### Panel-of-normals (human only)
 
-Human workspaces apply the Broad's 1000 Genomes panel-of-normals to Mutect2 to filter recurrent artefacts and low-frequency germline variants. The VCF is auto-downloaded, renamed from UCSC to Ensembl contigs, and indexed on first variant-calling run. Lives under `./data/references/pon/grch38/`. Set `CANCERSTUDIO_PON_GRCH38_VCF=""` in `.env` to disable.
+Human workspaces apply the Broad's 1000 Genomes panel-of-normals to Mutect2 to filter recurrent artefacts and low-frequency germline variants. The VCF is auto-downloaded, renamed from UCSC to Ensembl contigs, and indexed on first variant-calling run. Lives under `./data/references/pon/grch38/`. Set `MUTAVAX_PON_GRCH38_VCF=""` in `.env` to disable.
 
 Dog and cat workspaces skip the PON (no curated canine / feline panel exists yet).
 
@@ -165,7 +165,7 @@ Dog and cat workspaces skip the PON (no curated canine / feline panel exists yet
 
 **Alignment refuses to start with "insufficient memory."** Indexing the human reference peaks around 31 GB of RAM. Either free some up, or drop a prebuilt index into `./data/references/` (see the contributors section below).
 
-**Stage 5 preflight says a NetMHC binary is missing.** You set `CANCERSTUDIO_CLASS_I_PREDICTOR=NetMHCpan` but didn't drop the tarballs in. Check `ls ./data/netmhc/` — should contain `netMHCpan-4.2/` and `netMHCIIpan-4.3/` as directories, not tarballs.
+**Stage 5 preflight says a NetMHC binary is missing.** You set `MUTAVAX_CLASS_I_PREDICTOR=NetMHCpan` but didn't drop the tarballs in. Check `ls ./data/netmhc/` — should contain `netMHCpan-4.2/` and `netMHCIIpan-4.3/` as directories, not tarballs.
 
 **Stage 5 finishes with zero peptides.** Your patient alleles weren't recognized by pvacseq. The Patient MHC panel marks these with a strikethrough + `SKIPPED` pill. For dog, pvacseq only recognizes a handful of DLA-88 alleles and zero class II alleles.
 
@@ -176,8 +176,8 @@ Dog and cat workspaces skip the PON (no curated canine / feline panel exists yet
 Clone the repo for source-level work:
 
 ```bash
-git clone https://github.com/niach/cancerstudio.git
-cd cancerstudio
+git clone https://github.com/niach/mutavax.git
+cd mutavax
 npm install
 ```
 
@@ -226,8 +226,8 @@ node scripts/take-screenshots.mjs <workspace-id>
 
 # Stages 6–8 can be captured from a synthetic demo workspace that skips the heavy
 # bioinformatics (inserts minimum DB stubs only — not suitable for any real run).
-docker cp scripts/seed_demo_workspace.py cancerstudio:/tmp/seed.py
-WORKSPACE_ID=$(docker exec cancerstudio python /tmp/seed.py)
+docker cp scripts/seed_demo_workspace.py mutavax:/tmp/seed.py
+WORKSPACE_ID=$(docker exec mutavax python /tmp/seed.py)
 node scripts/take-screenshots.mjs --stages=6,7,8 "$WORKSPACE_ID"
 ```
 
@@ -237,7 +237,7 @@ Full list of env overrides lives in [.env.example](.env.example).
 
 ## Credits
 
-cancerstudio is inspired by [Paul Conyngham's 2025 personalized mRNA vaccine for his dog Rosie](https://www.unsw.edu.au/newsroom/news/2025/) (mast cell cancer, 75% tumor shrinkage). His pipeline — BWA-MEM2 → Mutect2 → VEP → pVACseq with NetMHCpan — proved the approach works on a single-patient, single-desktop scale. cancerstudio is an attempt to make that pipeline accessible as a guided workspace, species-flexible by default.
+mutavax is inspired by [Paul Conyngham's 2025 personalized mRNA vaccine for his dog Rosie](https://www.unsw.edu.au/newsroom/news/2025/) (mast cell cancer, 75% tumor shrinkage). His pipeline — BWA-MEM2 → Mutect2 → VEP → pVACseq with NetMHCpan — proved the approach works on a single-patient, single-desktop scale. mutavax is an attempt to make that pipeline accessible as a guided workspace, species-flexible by default.
 
 Built on the shoulders of:
 

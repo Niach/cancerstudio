@@ -7,7 +7,7 @@ overrides; that decision is stamped into the stage-8 audit trail via the
 shared workspace config.
 
 Provider-agnostic by design — we pass whatever model string is in
-``CANCERSTUDIO_REVIEW_MODEL`` (default ``anthropic/claude-opus-4-7``) to
+``MUTAVAX_REVIEW_MODEL`` (default ``anthropic/claude-opus-4-7``) to
 LiteLLM and let it resolve the provider key from env (``ANTHROPIC_API_KEY``,
 ``OPENAI_API_KEY``, etc.) per LiteLLM convention.
 """
@@ -151,7 +151,7 @@ class _Blocked:
 
 
 def _configured_model() -> str:
-    return os.environ.get("CANCERSTUDIO_REVIEW_MODEL", DEFAULT_MODEL)
+    return os.environ.get("MUTAVAX_REVIEW_MODEL", DEFAULT_MODEL)
 
 
 def _expected_provider_key(model: str) -> Optional[str]:

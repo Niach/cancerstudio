@@ -51,7 +51,7 @@ export default function DownloadDialog({
           </div>
           <div className="code">
             <span className="c"># Direct download via CLI</span>{"\n"}
-            <span className="k">cancerstudio</span> genome get <span className="n">{genome.id}</span> --format=<span className="s">{fmtChoice}</span> -o ./refs/
+            <span className="k">mutavax</span> genome get <span className="n">{genome.id}</span> --format=<span className="s">{fmtChoice}</span> -o ./refs/
           </div>
         </div>
         <div className="f">

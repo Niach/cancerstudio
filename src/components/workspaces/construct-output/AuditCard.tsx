@@ -26,7 +26,7 @@ export default function AuditCard({ trail, onExport }: AuditCardProps) {
         >
           Decision trail
         </h3>
-        <p className="cs-tiny" style={{ margin: "4px 0 0", fontSize: 12 }}>
+        <p className="mvx-tiny" style={{ margin: "4px 0 0", fontSize: 12 }}>
           Every call made, by whom, and when. Export-ready for USDA APHIS review.
         </p>
       </div>

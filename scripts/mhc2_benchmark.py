@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluate an MHC-II prediction CSV/TSV with cancerstudio metrics."""
+"""Evaluate an MHC-II prediction CSV/TSV with mutavax metrics."""
 
 from __future__ import annotations
 

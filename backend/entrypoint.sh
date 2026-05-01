@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Entrypoint for the combined cancerstudio image.
+# Entrypoint for the combined mutavax image.
 #
 # Starts the FastAPI backend on loopback (127.0.0.1:8000) and the Next.js
 # standalone server on 0.0.0.0:3000. Next.js proxies /backend/* to the loopback

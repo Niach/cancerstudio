@@ -8,7 +8,7 @@
  * Requires the frontend (:3000) and backend (:8000) to be running. For
  * stages 1–5 the target workspace must have completed those runs for real.
  * For stages 6–8 alone, you can seed a synthetic workspace via:
- *     docker exec cancerstudio-backend python /tmp/seed.py
+ *     docker exec mutavax-backend python /tmp/seed.py
  * (copy `scripts/seed_demo_workspace.py` into the container first).
  * Pass `--stages=7,8` to only capture specific stages.
  */

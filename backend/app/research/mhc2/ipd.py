@@ -22,7 +22,7 @@ DEFAULT_REPO_DATA_DIR = Path(__file__).resolve().parents[4] / "data" / "mhc2"
 
 def _candidate_paths() -> list[Path]:
     paths: list[Path] = []
-    env = os.environ.get("CANCERSTUDIO_IPD_ALLELELIST")
+    env = os.environ.get("MUTAVAX_IPD_ALLELELIST")
     if env:
         paths.append(Path(env))
     paths.append(DEFAULT_REPO_DATA_DIR / "ipd_imgt_hla" / "Allelelist.txt")

@@ -132,10 +132,10 @@ export default function AiReviewStagePanel({
   const decision = summary.decision;
 
   return (
-    <div className="cs-view cs-fade-in">
-      <div className="cs-view-head">
+    <div className="mvx-view mvx-fade-in">
+      <div className="mvx-view-head">
         <div>
-          <div className="cs-crumb">Workspace / 09 Reviewer sign-off</div>
+          <div className="mvx-crumb">Workspace / 09 Reviewer sign-off</div>
           <h1>A second set of eyes.</h1>
         </div>
         <div style={{ textAlign: "right" }}>
@@ -289,13 +289,13 @@ function CaseAtGlance({ brief }: { brief: AiReviewCaseBrief }) {
     <div
       style={{
         position: "relative",
-        borderRadius: "var(--radius-cs-lg)",
+        borderRadius: "var(--radius-mvx-lg)",
         padding: "22px 22px 26px",
         background: "var(--surface-sunk)",
         border: "1px solid var(--line)",
       }}
     >
-      <div className="cs-mono-label" style={{ marginBottom: 12 }}>
+      <div className="mvx-mono-label" style={{ marginBottom: 12 }}>
         The case · {brief.patientName}
       </div>
       <div style={{ marginBottom: 18 }}>
@@ -422,7 +422,7 @@ function StatPill({
         border: "1px solid var(--line)",
       }}
     >
-      <div className="cs-mono-label" style={{ fontSize: 9.5 }}>
+      <div className="mvx-mono-label" style={{ fontSize: 9.5 }}>
         {label}
       </div>
       <div
@@ -470,7 +470,7 @@ function GatheringView({
     <Card>
       <div style={{ padding: "22px 28px 28px" }}>
         <div style={{ textAlign: "center", marginBottom: 20 }}>
-          <div className="cs-mono-label" style={{ letterSpacing: "0.16em" }}>
+          <div className="mvx-mono-label" style={{ letterSpacing: "0.16em" }}>
             {phase === "gathering" ? "Assembling case brief" : "Claude · reviewing"}
           </div>
         </div>
@@ -719,7 +719,7 @@ function ReviewReport({
 }) {
   const V = REVIEW_VERDICTS[result.verdict];
   return (
-    <div className="cs-review-grid">
+    <div className="mvx-review-grid">
       <div>
         {error && (
           <div
@@ -749,7 +749,7 @@ function ReviewReport({
               alignItems: "center",
             }}
           >
-            <span className="cs-mono-label" style={{ fontSize: 10.5 }}>
+            <span className="mvx-mono-label" style={{ fontSize: 10.5 }}>
               Reviewer&apos;s letter
             </span>
             <span
@@ -1040,7 +1040,7 @@ function CategoryCard({ category: c }: { category: AiReviewCategory }) {
     <div
       style={{
         padding: "18px 20px",
-        borderRadius: "var(--radius-cs-lg)",
+        borderRadius: "var(--radius-mvx-lg)",
         background: "var(--surface-strong)",
         border: "1px solid var(--line)",
         display: "flex",
@@ -1048,7 +1048,7 @@ function CategoryCard({ category: c }: { category: AiReviewCategory }) {
         gap: 14,
       }}
     >
-      <div className="cs-spread" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+      <div className="mvx-spread" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
         <div>
           <MonoLabel>{meta.label}</MonoLabel>
           <div
@@ -1177,7 +1177,7 @@ function DecisionRail({
 
   return (
     <div
-      className="cs-review-rail"
+      className="mvx-review-rail"
       style={{ position: "sticky", top: 20, alignSelf: "flex-start" }}
     >
       <Card>
@@ -1277,7 +1277,7 @@ function DecisionRail({
                 }}
               >
                 <div
-                  className="cs-mono-label"
+                  className="mvx-mono-label"
                   style={{
                     color:
                       decision.kind === "accept" ? "var(--accent-ink)" : "var(--warm)",

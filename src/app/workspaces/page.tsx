@@ -13,11 +13,11 @@ export default async function Home() {
   const workspaces = await api.listWorkspaces().catch(() => []);
 
   return (
-    <div className="cs-theme">
-      <div className="cs-view cs-fade-in">
-        <div className="cs-view-head">
+    <div className="mvx-theme">
+      <div className="mvx-view mvx-fade-in">
+        <div className="mvx-view-head">
           <div>
-            <div className="cs-crumb">Workspaces</div>
+            <div className="mvx-crumb">Workspaces</div>
             <h1>Your cases.</h1>
             <p
               style={{
@@ -34,7 +34,7 @@ export default async function Home() {
           </div>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <Helix size={110} rungs={14} hue={152} speed={30} />
-            <Link href="/workspaces/new" className="cs-btn cs-btn-primary">
+            <Link href="/workspaces/new" className="mvx-btn mvx-btn-primary">
               + New case
             </Link>
           </div>
@@ -55,7 +55,7 @@ export default async function Home() {
                 textAlign: "left",
                 padding: "22px 26px",
                 border: "1px solid var(--line)",
-                borderRadius: "var(--radius-cs-lg)",
+                borderRadius: "var(--radius-mvx-lg)",
                 background: "var(--surface-strong)",
                 fontFamily: "inherit",
                 color: "var(--ink)",
@@ -140,7 +140,7 @@ export default async function Home() {
                   alignItems: "center",
                 }}
               >
-                <span className="cs-tiny">
+                <span className="mvx-tiny">
                   Updated {formatDateTime(workspace.updatedAt)}
                 </span>
                 <span
@@ -162,7 +162,7 @@ export default async function Home() {
               textAlign: "left",
               padding: "22px 26px",
               border: "1.5px dashed var(--line-strong)",
-              borderRadius: "var(--radius-cs-lg)",
+              borderRadius: "var(--radius-mvx-lg)",
               background: "transparent",
               fontFamily: "inherit",
               color: "var(--muted)",

@@ -142,7 +142,7 @@ PON_BY_PRESET: dict[ReferencePreset, Optional[PonSource]] = {
 }
 
 PON_ENV_VARS = {
-    ReferencePreset.GRCH38: "CANCERSTUDIO_PON_GRCH38_VCF",
+    ReferencePreset.GRCH38: "MUTAVAX_PON_GRCH38_VCF",
 }
 
 
@@ -163,7 +163,7 @@ def resolve_pon_config(preset: ReferencePreset) -> Optional[PonConfig]:
     Returns ``None`` when:
       * no PON is packaged for this preset (dog/cat today), or
       * the VCF / tabix index is not on disk, or
-      * ``CANCERSTUDIO_PON_<PRESET>_VCF`` is set to the empty string
+      * ``MUTAVAX_PON_<PRESET>_VCF`` is set to the empty string
         (explicit opt-out for debugging / offline use).
 
     Env vars mirror the ``REFERENCE_*_FASTA`` pattern in alignment.py and take
@@ -1595,7 +1595,7 @@ def _default_shard_concurrency(total_shards: int) -> int:
     Each Mutect2 shard uses ~2 pair-hmm threads, so budget cores / 2.
     Capped at 8 to avoid saturating I/O and memory on laptops.
     """
-    env_override = os.getenv("CANCERSTUDIO_VC_SHARD_CONCURRENCY")
+    env_override = os.getenv("MUTAVAX_VC_SHARD_CONCURRENCY")
     if env_override:
         try:
             value = int(env_override)
@@ -1608,7 +1608,7 @@ def _default_shard_concurrency(total_shards: int) -> int:
 
 
 def _shard_pair_hmm_threads() -> int:
-    env_override = os.getenv("CANCERSTUDIO_VC_PAIR_HMM_THREADS")
+    env_override = os.getenv("MUTAVAX_VC_PAIR_HMM_THREADS")
     if env_override:
         try:
             value = int(env_override)

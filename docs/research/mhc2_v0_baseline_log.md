@@ -110,4 +110,4 @@ held-out sets and a documented overfitting trajectory.
 
 It isn't: SOTA, publication-quality, or safe to wire into production. The
 existing pVACseq + NetMHCIIpan path remains the canonical neoantigen
-pipeline in cancerstudio.
+pipeline in mutavax.

@@ -42,7 +42,7 @@ def main() -> None:
     parser.add_argument("--out-dir", type=Path, required=True)
     parser.add_argument("--train-fraction", type=float, default=0.8)
     parser.add_argument("--valid-fraction", type=float, default=0.1)
-    parser.add_argument("--seed", default="cancerstudio-mhc2-v1")
+    parser.add_argument("--seed", default="mutavax-mhc2-v1")
     parser.add_argument("--keep-original-splits", action="store_true",
                         help="Keep input record.split field instead of overwriting it.")
     args = parser.parse_args()

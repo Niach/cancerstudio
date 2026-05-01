@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Normalize MHC-II ligand CSV/TSV files into cancerstudio JSONL."""
+"""Normalize MHC-II ligand CSV/TSV files into mutavax JSONL."""
 
 from __future__ import annotations
 

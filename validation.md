@@ -1,8 +1,8 @@
 # Validation
 
-> How we prove cancerstudio is doing the right thing, stage by stage.
+> How we prove mutavax is doing the right thing, stage by stage.
 
-cancerstudio produces a molecule a manufacturer will synthesize and a vet will
+mutavax produces a molecule a manufacturer will synthesize and a vet will
 inject into a pet. That bar demands more than "the pipeline didn't crash."
 This document records what we verified against public ground truth, what we
 *cannot* verify without clinical data, and what the observed numbers are.
@@ -88,7 +88,7 @@ and community truth.
 **Harness:** `backend/tests/validation/stage2/`. Runs overnight on
 `npm run test:validation:slow`.
 
-**Datasets to stage under `${CANCERSTUDIO_DATA_ROOT}/validation/`:**
+**Datasets to stage under `${MUTAVAX_DATA_ROOT}/validation/`:**
 
 - `giab/HG001/` — ~130 GB, from <https://ftp.ncbi.nlm.nih.gov/ReferenceSamples/giab/>
 - `colo829/` — already present as smoke + full
@@ -200,7 +200,7 @@ threshold.
 
 ### MHCflurry wired as runtime predictor — 2026-04-22
 
-Operator toggle via ``CANCERSTUDIO_CLASS_I_PREDICTOR``:
+Operator toggle via ``MUTAVAX_CLASS_I_PREDICTOR``:
 
 * unset or ``NetMHCpan``  → class-I binding via NetMHCpan 4.2 (default)
 * ``MHCflurry``          → pvacseq's MHCflurry affinity predictor
@@ -297,7 +297,7 @@ Replaces the fixture-only flags with a **pure-Python substring +
 single-mismatch regex scan** against UniProt Swiss-Prot, keyed to the
 workspace's species (human / dog / cat). The proteome is
 auto-bootstrapped on first real-data stage-6 load and cached under
-`${CANCERSTUDIO_DATA_ROOT}/references/proteome/{species}/`.
+`${MUTAVAX_DATA_ROOT}/references/proteome/{species}/`.
 
 **Dispatch by peptide length.** An earlier DIAMOND-only implementation
 was silently non-functional for class-I neoantigen peptides (8-11 aa):
@@ -490,7 +490,7 @@ backend/tests/validation/
 
 ### Dataset staging
 
-All validation datasets live under `${CANCERSTUDIO_DATA_ROOT}/validation/`
+All validation datasets live under `${MUTAVAX_DATA_ROOT}/validation/`
 mirroring the production reference layout. A `scripts/fetch_validation_data.py`
 script bootstraps each one idempotently (same pattern as `ensure_pon_ready`).
 
@@ -499,7 +499,7 @@ script bootstraps each one idempotently (same pattern as `ensure_pon_ready`).
 Each validation run emits:
 
 ```
-${CANCERSTUDIO_DATA_ROOT}/validation-runs/{iso-timestamp}/
+${MUTAVAX_DATA_ROOT}/validation-runs/{iso-timestamp}/
 ├── report.json           # every metric + threshold + pass/fail
 ├── report.md             # human-readable summary
 └── artifacts/            # per-stage VCFs, peptide CSVs, etc. for forensics
@@ -526,7 +526,7 @@ Ordered by leverage-per-effort. Each item is one PR-sized unit of work.
    **Done 2026-04-22.** First real pipeline-wide metric: **F1 = 0.866**
    on the SMaHT v1.0 truth set, above the 0.85 floor. Harness at
    `backend/tests/validation/stage3/test_colo829_f1.py` runs against
-   pre-staged VCFs under `${CANCERSTUDIO_DATA_ROOT}/benchmarks/colo829/`
+   pre-staged VCFs under `${MUTAVAX_DATA_ROOT}/benchmarks/colo829/`
    (skips politely when unstaged). Stratum recall: Easy 94.3%,
    Difficult 86.2%, Extreme 44.6% — the Extreme shortfall is expected
    and tracked as a tuning gap for a future PR.
@@ -553,7 +553,7 @@ Ordered by leverage-per-effort. Each item is one PR-sized unit of work.
    publishable.
 10. **Rosie re-derivation (E3) contingent on data access.**
 
-Items 1–3 are the **first milestone** — the "cancerstudio is minimally
+Items 1–3 are the **first milestone** — the "mutavax is minimally
 self-validating" release.
 
 ---
@@ -576,7 +576,7 @@ self-validating" release.
 ## How to contribute a validation
 
 1. Pick an unchecked `[ ]` item above.
-2. Check if the dataset is stageable under `${CANCERSTUDIO_DATA_ROOT}/validation/`;
+2. Check if the dataset is stageable under `${MUTAVAX_DATA_ROOT}/validation/`;
    if not, add a fetch recipe in `scripts/fetch_validation_data.py`.
 3. Write the test in `backend/tests/validation/stage{N}/`.
 4. Make it emit one row into `report.json` with the threshold.

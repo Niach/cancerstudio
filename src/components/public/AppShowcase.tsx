@@ -111,52 +111,52 @@ export default function AppShowcase() {
           </p>
         </div>
 
-        <div className="cs-showcase">
-          <div className="cs-window">
-            <div className="cs-chrome">
-              <div className="cs-dots"><span /><span /><span /></div>
-              <div className="cs-url">
-                <span className="cs-url-lock">●</span>
-                localhost:3000 <span className="cs-url-sub">— cancerstudio / {stage.crumb}</span>
+        <div className="mvx-showcase">
+          <div className="mvx-window">
+            <div className="mvx-chrome">
+              <div className="mvx-dots"><span /><span /><span /></div>
+              <div className="mvx-url">
+                <span className="mvx-url-lock">●</span>
+                localhost:3000 <span className="mvx-url-sub">— mutavax / {stage.crumb}</span>
               </div>
-              <div className="cs-chrome-meta">v0.6</div>
+              <div className="mvx-chrome-meta">v0.6</div>
             </div>
 
             <div
-              className="cs-viewport"
+              className="mvx-viewport"
               onMouseEnter={() => setInteracting(true)}
               onMouseLeave={() => setInteracting(false)}
             >
-              <div className="cs-showcase-layout">
-                <nav className="cs-showcase-rail">
+              <div className="mvx-showcase-layout">
+                <nav className="mvx-showcase-rail">
                   {STAGES.map((s, i) => (
                     <button
                       key={s.id}
                       type="button"
-                      className={"cs-showcase-pill" + (i === active ? " on" : "")}
+                      className={"mvx-showcase-pill" + (i === active ? " on" : "")}
                       onClick={() => pick(i)}
                     >
-                      <span className="cs-showcase-n">{s.n}</span>
+                      <span className="mvx-showcase-n">{s.n}</span>
                       <span>
-                        <span className="cs-showcase-lbl">{s.label}</span>
-                        <span className="cs-showcase-sub">{s.sub}</span>
+                        <span className="mvx-showcase-lbl">{s.label}</span>
+                        <span className="mvx-showcase-sub">{s.sub}</span>
                       </span>
                     </button>
                   ))}
                 </nav>
-                <div className="cs-showcase-main" key={stage.id}>
-                  <div className="cs-theme cs-showcase-scope">
+                <div className="mvx-showcase-main" key={stage.id}>
+                  <div className="mvx-theme mvx-showcase-scope">
                     <StageContent stageId={stage.id} />
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="cs-footbar">
-              <div className="cs-foot-left">
-                <span className="cs-foot-dot" /> Demo fixture · stage {stage.n} · {stage.label}
+            <div className="mvx-footbar">
+              <div className="mvx-foot-left">
+                <span className="mvx-foot-dot" /> Demo fixture · stage {stage.n} · {stage.label}
               </div>
-              <div className="cs-foot-right">Click a stage in the sidebar to jump ↗</div>
+              <div className="mvx-foot-right">Click a stage in the sidebar to jump ↗</div>
             </div>
           </div>
         </div>

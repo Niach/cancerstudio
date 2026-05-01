@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 
-APP_NAME = "cancerstudio"
+APP_NAME = "mutavax"
 
 _settings_lock = threading.Lock()
 
@@ -16,7 +16,7 @@ def _load_local_env_file() -> None:
 
     Without this hook the desktop app (``npm run desktop:dev``) launches
     uvicorn in a fresh subshell that doesn't inherit the user's shell
-    overrides — in particular ``CANCERSTUDIO_APP_DATA_DIR`` — so the UI
+    overrides — in particular ``MUTAVAX_APP_DATA_DIR`` — so the UI
     ends up pointing at the default data root and the user's real
     workspaces don't show up.
 
@@ -70,7 +70,7 @@ def _default_app_data_root() -> Path:
 
 def get_app_data_root() -> Path:
     configured = (
-        os.getenv("CANCERSTUDIO_APP_DATA_DIR")
+        os.getenv("MUTAVAX_APP_DATA_DIR")
         or os.getenv("APP_DATA_ROOT")
         or os.getenv("LOCAL_APP_DATA_DIR")
     )
@@ -127,7 +127,7 @@ def get_vep_cache_root() -> Path:
     Each species/assembly/release triple lives under a child directory so
     the lookup ``{root}/{species_slug}/{release}/{cache_dir}`` is unique.
     """
-    configured = os.getenv("CANCERSTUDIO_VEP_CACHE_DIR")
+    configured = os.getenv("MUTAVAX_VEP_CACHE_DIR")
     root = Path(configured).expanduser() if configured else get_app_data_root() / "vep-cache"
     root.mkdir(parents=True, exist_ok=True)
     return root.resolve()
@@ -144,9 +144,9 @@ def get_inbox_root() -> Path:
     """Return the inbox directory users drop FASTQ/BAM/CRAM files into.
 
     Bind-mounted at ``/inbox`` inside the container; configurable via
-    ``CANCERSTUDIO_INBOX_DIR`` for dev setups that run the backend natively.
+    ``MUTAVAX_INBOX_DIR`` for dev setups that run the backend natively.
     """
-    configured = os.getenv("CANCERSTUDIO_INBOX_DIR")
+    configured = os.getenv("MUTAVAX_INBOX_DIR")
     root = Path(configured).expanduser() if configured else get_app_data_root() / "inbox"
     root.mkdir(parents=True, exist_ok=True)
     return root.resolve()
@@ -181,7 +181,7 @@ def resolve_app_data_path(stored: str | Path) -> Path:
 
     Catches the bind-mount/native-install path mismatch: a SQLite row created
     when the backend ran natively (paths like
-    ``/media/.../cancerstudio/workspaces/.../tumor.bam``) is now read inside
+    ``/media/.../mutavax/workspaces/.../tumor.bam``) is now read inside
     the container, where the same data lives under ``/app-data/workspaces/...``.
 
     If the stored path already exists on disk, it is returned untouched.

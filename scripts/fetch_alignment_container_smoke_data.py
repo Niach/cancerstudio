@@ -56,7 +56,7 @@ def resolve_output_dir(args: argparse.Namespace) -> Path:
 
 
 def open_remote(url: str, timeout: int):
-    request = Request(url, headers={"User-Agent": "cancerstudio-sample-data/1.0"})
+    request = Request(url, headers={"User-Agent": "mutavax-sample-data/1.0"})
     return urlopen(request, timeout=timeout)
 
 
@@ -133,7 +133,7 @@ def main() -> int:
     samtools_command = resolve_samtools_command()
 
     with tempfile.TemporaryDirectory(
-        prefix="cancerstudio-alignment-smoke-",
+        prefix="mutavax-alignment-smoke-",
         dir=repo_root,
     ) as temp_dir_name:
         temp_dir = Path(temp_dir_name)

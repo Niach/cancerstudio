@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Standalone reference indexer for cancerstudio.
+# Standalone reference indexer for mutavax.
 #
 # Run this once in a clean terminal (dev servers + Electron + browser closed)
 # when the backend's in-process "Preparing reference" step doesn't have enough
@@ -14,7 +14,7 @@
 # the existing index and skip the bootstrap step entirely.
 set -euo pipefail
 
-DEFAULT_FASTA="${HOME}/.local/share/cancerstudio/references/grch38/genome.fa"
+DEFAULT_FASTA="${HOME}/.local/share/mutavax/references/grch38/genome.fa"
 FASTA="${1:-${DEFAULT_FASTA}}"
 
 REQUIRED_GB=35

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch a canine DLBCL tumor/normal WGS pair for cancerstudio smoke tests.
+"""Fetch a canine DLBCL tumor/normal WGS pair for mutavax smoke tests.
 
 Dataset: PRJNA805123 — Canine diffuse large B-cell lymphoma (cDLBCL) WGS
 The study pairs a DLBCL tumor biopsy with a matched skin-punch "normal" from
@@ -12,7 +12,7 @@ cohort, chosen so smoke subsets start fast:
     normal = SRR15540951  (cf_punch1, ~52 Gbp paired)
 
 Smoke mode streams a slice from each ENA-hosted FASTQ and rewrites them with
-cancerstudio's expected R1/R2 suffixes. Full mode downloads every base (expect
+mutavax's expected R1/R2 suffixes. Full mode downloads every base (expect
 ~45 GB compressed for DLBCL1). Override ``--tumor-run`` / ``--normal-run`` to
 use a different pair from the same cohort (or any other ENA read-pair pair).
 """
@@ -63,7 +63,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Download a canine DLBCL tumor/normal WGS pair (PRJNA805123) "
-            "renamed for cancerstudio."
+            "renamed for mutavax."
         )
     )
     parser.add_argument(
@@ -178,7 +178,7 @@ def metadata_text(args: argparse.Namespace, line_limit: int | None) -> str:
         "Species: Canis lupus familiaris (NCBI taxid 9615)",
         (
             "Default reference: UU_Cfam_GSD_1.0 (German Shepherd assembly) — "
-            "cancerstudio's canine preset."
+            "mutavax's canine preset."
         ),
         (
             "Sample pairing: tumor DLBCL biopsy and matched skin-punch normal "
@@ -192,10 +192,10 @@ def metadata_text(args: argparse.Namespace, line_limit: int | None) -> str:
         ),
         (
             "Relevance: canine B-cell lymphomas frequently hit TP53, TRAF3, "
-            "POT1, SETD2, FBXW7 — all in cancerstudio's bundled cancer gene "
+            "POT1, SETD2, FBXW7 — all in mutavax's bundled cancer gene "
             "list, so stage 4 should light up on a full-coverage run."
         ),
-        "Naming note: the ENA _1/_2 files are renamed to R1/R2 for cancerstudio.",
+        "Naming note: the ENA _1/_2 files are renamed to R1/R2 for mutavax.",
         f"Mode: {args.mode}",
     ]
     if line_limit is not None:
@@ -211,7 +211,7 @@ def metadata_text(args: argparse.Namespace, line_limit: int | None) -> str:
 
 
 def open_remote(url: str, timeout: int):
-    request = Request(url, headers={"User-Agent": "cancerstudio-sample-data/1.0"})
+    request = Request(url, headers={"User-Agent": "mutavax-sample-data/1.0"})
     return urlopen(request, timeout=timeout)
 
 

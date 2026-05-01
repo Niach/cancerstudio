@@ -82,7 +82,7 @@ export default function FastaHero({
               &gt; {constructId} | mRNA | {totalNt.toLocaleString()} nt | {species}
             </h3>
             <p
-              className="cs-tiny"
+              className="mvx-tiny"
               style={{
                 margin: "6px 0 0",
                 fontSize: 12,
@@ -95,7 +95,7 @@ export default function FastaHero({
               {releasedBy ? ` · by ${releasedBy}` : ""}
             </p>
           </div>
-          <div className="cs-hero-actions">
+          <div className="mvx-hero-actions">
             <DownloadBtn label="FASTA" onClick={() => onDownload("fasta")} />
             <DownloadBtn label="GenBank" onClick={() => onDownload("genbank")} />
             <DownloadBtn label="JSON" onClick={() => onDownload("json")} />

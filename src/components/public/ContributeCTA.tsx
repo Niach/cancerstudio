@@ -18,7 +18,7 @@ export default function ContributeCTA({ stats }: { stats: CatalogStats }) {
               archive. Drop us a line and we&apos;ll set you up.
             </p>
             <div className="c-cta">
-              <a className="btn-primary dark" href="mailto:dennis@straehhuber.com?subject=cancerstudio%20sequencing%20partner">
+              <a className="btn-primary dark" href="mailto:dennis@straehhuber.com?subject=mutavax%20sequencing%20partner">
                 Contact to partner
                 <span className="arrow">→</span>
               </a>

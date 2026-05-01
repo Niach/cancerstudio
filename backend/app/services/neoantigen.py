@@ -84,7 +84,7 @@ NEOANTIGEN_STAGE_ID = PipelineStageId.NEOANTIGEN_PREDICTION.value
 def _detect_tumor_sample_name(vcf_path: Path) -> str:
     """Return the tumor sample name from a VCF's ``#CHROM`` header line.
 
-    cancerstudio's variant-calling stage writes the tumor column with a
+    mutavax's variant-calling stage writes the tumor column with a
     ``.tumor`` suffix. Prefer an exact suffix match; fall back to a
     case-insensitive substring; and finally error with the observed samples
     so the user can diagnose a hand-edited VCF.
@@ -102,7 +102,7 @@ def _detect_tumor_sample_name(vcf_path: Path) -> str:
                         return name
                 raise RuntimeError(
                     "Could not identify a tumor sample in the VCF #CHROM header. "
-                    f"Samples found: {samples!r}. cancerstudio expects a sample "
+                    f"Samples found: {samples!r}. mutavax expects a sample "
                     "name ending in '.tumor' or '_tumor'."
                 )
             if not line.startswith("#"):
@@ -1098,12 +1098,12 @@ def _class_i_predictor(species: str) -> str:
     feline (FLA) workspaces we fall back to NetMHCpan regardless of
     the env override — the operator cannot swap a predictor that
     doesn't know the species' alleles."""
-    override = (os.getenv("CANCERSTUDIO_CLASS_I_PREDICTOR") or "").strip()
+    override = (os.getenv("MUTAVAX_CLASS_I_PREDICTOR") or "").strip()
     if not override:
         return "NetMHCpan"
     if override not in _ALLOWED_CLASS_I_PREDICTORS:
         logger.warning(
-            "CANCERSTUDIO_CLASS_I_PREDICTOR=%r not recognised "
+            "MUTAVAX_CLASS_I_PREDICTOR=%r not recognised "
             "(expected one of %s); falling back to NetMHCpan",
             override, sorted(_ALLOWED_CLASS_I_PREDICTORS),
         )
@@ -1124,9 +1124,9 @@ def _pvacseq_threads() -> int:
     Each NetMHCpan instance loads the model (~100–300 MB) then scores a
     200-peptide chunk. On a typical desktop 4–8 in parallel is the sweet
     spot; beyond that disk I/O for model files starts to dominate. Override
-    with ``CANCERSTUDIO_PVACSEQ_THREADS``.
+    with ``MUTAVAX_PVACSEQ_THREADS``.
     """
-    override = os.getenv("CANCERSTUDIO_PVACSEQ_THREADS")
+    override = os.getenv("MUTAVAX_PVACSEQ_THREADS")
     if override:
         try:
             return max(1, int(override))
@@ -1231,11 +1231,11 @@ def _normalize_alleles_for_pvacseq(
 
 
 def _netmhcpan_version() -> str:
-    return os.getenv("CANCERSTUDIO_NETMHCPAN_VERSION", "NetMHCpan 4.2")
+    return os.getenv("MUTAVAX_NETMHCPAN_VERSION", "NetMHCpan 4.2")
 
 
 def _netmhciipan_version() -> str:
-    return os.getenv("CANCERSTUDIO_NETMHCIIPAN_VERSION", "NetMHCIIpan 4.3")
+    return os.getenv("MUTAVAX_NETMHCIIPAN_VERSION", "NetMHCIIpan 4.3")
 
 
 def _pvacseq_version(run_id: Optional[str] = None) -> Optional[str]:

@@ -75,7 +75,7 @@ export default function Hero() {
           hand the design to a manufacturer — for dogs, cats, and humans.
         </p>
         <div className="hero-cta-row">
-          <a className="btn-primary" href="https://github.com/Niach/cancerstudio" target="_blank" rel="noreferrer">
+          <a className="btn-primary" href="https://github.com/niach/mutavax" target="_blank" rel="noreferrer">
             Get started on GitHub
             <span className="arrow">→</span>
           </a>

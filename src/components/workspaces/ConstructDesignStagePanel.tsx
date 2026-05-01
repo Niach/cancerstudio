@@ -105,9 +105,9 @@ export default function ConstructDesignStagePanel({
   }, [router, workspace.id]);
 
   const header = (
-    <div className="cs-view-head">
+    <div className="mvx-view-head">
       <div>
-        <div className="cs-crumb">
+        <div className="mvx-crumb">
           {workspace.displayName} / 07 mRNA construct design
         </div>
         <h1 style={{ textWrap: "pretty", margin: "4px 0 0" }}>

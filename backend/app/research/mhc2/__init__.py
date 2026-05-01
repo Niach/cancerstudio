@@ -1,7 +1,7 @@
 """Open MHC-II predictor research toolkit.
 
 This package is intentionally separate from the production neoantigen service.
-It gives cancerstudio a reproducible place to curate public MHC-II ligand data,
+It gives mutavax a reproducible place to curate public MHC-II ligand data,
 train an in-house model, and benchmark it against external tools without
 changing the shipped pVACseq/NetMHCIIpan path.
 """

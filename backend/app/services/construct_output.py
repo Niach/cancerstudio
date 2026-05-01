@@ -255,7 +255,7 @@ def _fmt_when(dt) -> str:
 def _build_audit_trail(
     workspace_id: str, construct_summary, output_config: dict
 ) -> list[AuditEntry]:
-    operator = "operator@cancerstudio.org"
+    operator = "operator@mutavax.straehhuber.com"
     trail: list[AuditEntry] = []
 
     with session_scope() as session:
@@ -498,7 +498,7 @@ def update_construct_output(
             existing["selected_cmo"] = cmo_id
             existing["released"] = True
             existing["released_at"] = utc_now().strftime("%Y-%m-%d %H:%M UTC")
-            existing["released_by"] = "operator@cancerstudio.org"
+            existing["released_by"] = "operator@mutavax.straehhuber.com"
             existing["released_checksum"] = summary.checksum
             existing["released_construct_id"] = summary.construct_id
             existing["released_total_nt"] = summary.total_nt

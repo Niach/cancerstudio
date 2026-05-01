@@ -1,4 +1,4 @@
-"""Static metadata for the cancerstudio MHC-II research track."""
+"""Static metadata for the mutavax MHC-II research track."""
 
 from __future__ import annotations
 

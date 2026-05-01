@@ -5,7 +5,7 @@ pipeline runs marked completed) so stages 6–8 render the live UI without
 re-running the real 12 h bioinformatics pipeline. Run inside the backend
 container:
 
-    docker exec cancerstudio-backend python scripts/seed_demo_workspace.py
+    docker exec mutavax-backend python scripts/seed_demo_workspace.py
 
 The resulting workspace ID is written to stdout so `take-screenshots.mjs`
 can consume it.

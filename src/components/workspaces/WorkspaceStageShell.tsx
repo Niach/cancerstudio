@@ -157,19 +157,19 @@ export default function WorkspaceStageShell({
   }
 
   return (
-    <div className="cs-theme">
-      <div className="cs-app">
-        <aside className="cs-sidebar">
+    <div className="mvx-theme">
+      <div className="mvx-app">
+        <aside className="mvx-sidebar">
           <Link
             href="/"
-            className="cs-brand"
+            className="mvx-brand"
             style={{ textDecoration: "none", color: "inherit" }}
           >
-            <div className="cs-brand-mark" />
+            <div className="mvx-brand-mark" />
             <div style={{ display: "flex", flexDirection: "column" }}>
-              <span className="cs-brand-name">cancerstudio</span>
+              <span className="mvx-brand-name">mutavax</span>
               <span
-                className="cs-mono-label"
+                className="mvx-mono-label"
                 style={{ fontSize: 9, letterSpacing: "0.18em" }}
               >
                 v0.6
@@ -178,28 +178,28 @@ export default function WorkspaceStageShell({
           </Link>
 
           <div>
-            <div className="cs-nav-sec-label">Workspace</div>
+            <div className="mvx-nav-sec-label">Workspace</div>
             <Link
               href="/"
-              className={`cs-nav-item`}
+              className={`mvx-nav-item`}
               style={{ textDecoration: "none" }}
             >
-              <span className="cs-step">↖</span>
+              <span className="mvx-step">↖</span>
               <span>All workspaces</span>
             </Link>
             <Link
               href="/workspaces/new"
-              className="cs-nav-item"
+              className="mvx-nav-item"
               style={{ textDecoration: "none" }}
             >
-              <span className="cs-step">+</span>
+              <span className="mvx-step">+</span>
               <span>New workspace</span>
             </Link>
           </div>
 
           <div>
             <div
-              className="cs-nav-sec-label"
+              className="mvx-nav-sec-label"
               style={{
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -220,11 +220,11 @@ export default function WorkspaceStageShell({
                 return (
                   <div
                     key={stage.id}
-                    className={`cs-nav-item is-disabled`}
+                    className={`mvx-nav-item is-disabled`}
                     aria-disabled
                     title={policy.blockedReason ?? "Planned stage"}
                   >
-                    <span className="cs-step">{step}</span>
+                    <span className="mvx-step">{step}</span>
                     <span style={{ flex: 1 }}>{stage.name}</span>
                     <span
                       style={{
@@ -244,9 +244,9 @@ export default function WorkspaceStageShell({
                 <Link
                   key={stage.id}
                   href={`/workspaces/${workspace.id}/${stage.id}`}
-                  className={`cs-nav-item ${isActive ? "is-active" : ""}`}
+                  className={`mvx-nav-item ${isActive ? "is-active" : ""}`}
                 >
-                  <span className="cs-step">{step}</span>
+                  <span className="mvx-step">{step}</span>
                   <span style={{ flex: 1 }}>{stage.name}</span>
                 </Link>
               );
@@ -255,15 +255,15 @@ export default function WorkspaceStageShell({
 
           {researchStages.length > 0 ? (
             <div>
-              <div className="cs-nav-sec-label">Later research</div>
+              <div className="mvx-nav-sec-label">Later research</div>
               {researchStages.map((stage, index) => (
                 <div
                   key={stage.id}
-                  className="cs-nav-item is-disabled"
+                  className="mvx-nav-item is-disabled"
                   aria-disabled
                   title="Research-only — not available yet"
                 >
-                  <span className="cs-step">R{index + 1}</span>
+                  <span className="mvx-step">R{index + 1}</span>
                   <span style={{ flex: 1 }}>{stage.name}</span>
                   <span
                     style={{
@@ -283,13 +283,13 @@ export default function WorkspaceStageShell({
         </aside>
 
         <main>
-          <div className="cs-view cs-fade-in" key={`${workspace.id}-${currentStageId}`}>
+          <div className="mvx-view mvx-fade-in" key={`${workspace.id}-${currentStageId}`}>
             {redirectNoticeStage ? (
               <div
-                className="cs-callout cs-callout-warm"
+                className="mvx-callout mvx-callout-warm"
                 style={{ marginBottom: 22 }}
               >
-                <div className="cs-dot" style={{ color: "var(--warm)" }} />
+                <div className="mvx-dot" style={{ color: "var(--warm)" }} />
                 <div style={{ flex: 1 }}>
                   <div
                     style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)" }}
@@ -298,7 +298,7 @@ export default function WorkspaceStageShell({
                     usable yet.
                   </div>
                   <p
-                    className="cs-tiny"
+                    className="mvx-tiny"
                     style={{ margin: "4px 0 0", fontSize: 13.5 }}
                   >
                     We brought you back to the current working step so the

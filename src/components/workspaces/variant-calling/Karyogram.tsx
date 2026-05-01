@@ -45,7 +45,7 @@ export default function Karyogram({
   } chromosomes`.replace(/\s+/g, " ").trim();
 
   return (
-    <div className="cs-karyo">
+    <div className="mvx-karyo">
       <div
         style={{
           fontFamily: "var(--font-mono)",

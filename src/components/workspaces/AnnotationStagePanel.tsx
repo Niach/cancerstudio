@@ -246,9 +246,9 @@ export default function AnnotationStagePanel({
   );
 
   const header = (
-    <div className="cs-view-head">
+    <div className="mvx-view-head">
       <div>
-        <div className="cs-crumb">{workspace.displayName} / 04 Annotation</div>
+        <div className="mvx-crumb">{workspace.displayName} / 04 Annotation</div>
         <h1 style={{ textWrap: "pretty" }}>Read what the mutations mean.</h1>
         <p
           style={{
@@ -294,7 +294,7 @@ export default function AnnotationStagePanel({
             <div style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)" }}>
               {summary.blockingReason ?? "Finish variant calling first."}
             </div>
-            <p className="cs-tiny" style={{ margin: "4px 0 0" }}>
+            <p className="mvx-tiny" style={{ margin: "4px 0 0" }}>
               Annotation unlocks once the mutation search is done.
             </p>
           </div>
@@ -353,7 +353,7 @@ export default function AnnotationStagePanel({
                 </Btn>
               </div>
               {actionError ? (
-                <p className="cs-tiny" style={{ marginTop: 10, color: "var(--danger)" }}>
+                <p className="mvx-tiny" style={{ marginTop: 10, color: "var(--danger)" }}>
                   {actionError}
                 </p>
               ) : null}
@@ -375,7 +375,7 @@ export default function AnnotationStagePanel({
             <div style={{ marginTop: 20 }}>
               {latestRun.cachePending ? (
                 <div
-                  className="cs-tiny"
+                  className="mvx-tiny"
                   style={{ marginBottom: 10, color: "var(--ink-2)" }}
                 >
                   Downloading the gene-knowledge database
@@ -386,17 +386,17 @@ export default function AnnotationStagePanel({
                 </div>
               ) : null}
               <div
-                className="cs-progress"
+                className="mvx-progress"
                 style={{ maxWidth: 420, margin: "0 auto", height: 10 }}
               >
                 <div
-                  className="cs-progress-fill"
+                  className="mvx-progress-fill"
                   style={{
                     width: `${Math.max(3, Math.round(latestRun.progress * 100))}%`,
                   }}
                 />
               </div>
-              <p className="cs-tiny" style={{ marginTop: 14 }}>
+              <p className="mvx-tiny" style={{ marginTop: 14 }}>
                 Matching mutations to genes · {Math.round(latestRun.progress * 100)}%
               </p>
             </div>
@@ -414,7 +414,7 @@ export default function AnnotationStagePanel({
           <Dot style={{ color: "var(--accent)" }} />
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 15, fontWeight: 500 }}>Paused.</div>
-            <p className="cs-tiny" style={{ margin: "4px 0 0" }}>
+            <p className="mvx-tiny" style={{ margin: "4px 0 0" }}>
               Resume to pick it back up from annotating.
             </p>
           </div>
@@ -441,7 +441,7 @@ export default function AnnotationStagePanel({
             <div style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)" }}>
               Annotation failed.
             </div>
-            <p className="cs-tiny" style={{ margin: "4px 0 0" }}>
+            <p className="mvx-tiny" style={{ margin: "4px 0 0" }}>
               {latestRun?.error ?? "Try again, or check the command log in expert mode."}
             </p>
           </div>
@@ -476,7 +476,7 @@ export default function AnnotationStagePanel({
 
       {/* Completion headline */}
       <div
-        className="cs-callout"
+        className="mvx-callout"
         style={{
           marginBottom: 22,
           alignItems: "flex-start",
@@ -631,8 +631,8 @@ export default function AnnotationStagePanel({
               lineHeight: 1.7,
               color: "var(--muted)",
               background: "var(--surface-sunk)",
-              borderBottomLeftRadius: "var(--radius-cs-lg)",
-              borderBottomRightRadius: "var(--radius-cs-lg)",
+              borderBottomLeftRadius: "var(--radius-mvx-lg)",
+              borderBottomRightRadius: "var(--radius-mvx-lg)",
               overflow: "auto",
               maxHeight: 320,
             }}
@@ -646,7 +646,7 @@ export default function AnnotationStagePanel({
         style={{
           marginTop: 22,
           padding: "18px 22px",
-          borderRadius: "var(--radius-cs-lg)",
+          borderRadius: "var(--radius-mvx-lg)",
           border: "1px dashed var(--line-strong)",
           background: "var(--surface-sunk)",
           display: "flex",
@@ -670,7 +670,7 @@ export default function AnnotationStagePanel({
         </div>
         <Link
           href={`/workspaces/${workspace.id}/neoantigen-prediction`}
-          className="cs-btn cs-btn-primary"
+          className="mvx-btn mvx-btn-primary"
         >
           Open stage 05 →
         </Link>

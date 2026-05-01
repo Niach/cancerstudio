@@ -41,7 +41,7 @@ export default function Helix({
   const offsetY = -((rungs - 1) * spacing) / 2;
 
   if (!mounted) {
-    return <div className="cs-helix-wrap" style={{ width, height }} />;
+    return <div className="mvx-helix-wrap" style={{ width, height }} />;
   }
 
   const rungsArr = Array.from({ length: rungs }, (_, i) => {
@@ -56,9 +56,9 @@ export default function Helix({
   const barColor = `oklch(0.55 0.04 ${hue})`;
 
   return (
-    <div className="cs-helix-wrap" style={{ width, height }}>
+    <div className="mvx-helix-wrap" style={{ width, height }}>
       <div
-        className={`cs-helix-scene ${reverse ? "cs-helix-reverse" : ""}`}
+        className={`mvx-helix-scene ${reverse ? "mvx-helix-reverse" : ""}`}
         style={{ width, height, position: "relative", animationDuration: `${speed}s` }}
       >
         {rungsArr.map((r) => {

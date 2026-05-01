@@ -94,9 +94,9 @@ export default function EpitopeSelectionStagePanel({
   }, []);
 
   const header = (
-    <div className="cs-view-head">
+    <div className="mvx-view-head">
       <div>
-        <div className="cs-crumb">
+        <div className="mvx-crumb">
           {workspace.displayName} / 06 Epitope selection
         </div>
         <h1 style={{ textWrap: "pretty", margin: "4px 0 0" }}>
@@ -145,7 +145,7 @@ export default function EpitopeSelectionStagePanel({
               {summary.blockingReason ??
                 "Finish neoantigen prediction before curating the cassette."}
             </div>
-            <p className="cs-tiny" style={{ margin: "4px 0 0" }}>
+            <p className="mvx-tiny" style={{ margin: "4px 0 0" }}>
               Epitope selection unlocks once neoantigen prediction is done.
             </p>
           </div>
@@ -225,8 +225,8 @@ export default function EpitopeSelectionStagePanel({
               lineHeight: 1.7,
               color: "var(--muted)",
               background: "var(--surface-sunk)",
-              borderBottomLeftRadius: "var(--radius-cs-lg)",
-              borderBottomRightRadius: "var(--radius-cs-lg)",
+              borderBottomLeftRadius: "var(--radius-mvx-lg)",
+              borderBottomRightRadius: "var(--radius-mvx-lg)",
               overflow: "auto",
             }}
           >
@@ -248,7 +248,7 @@ export default function EpitopeSelectionStagePanel({
         style={{
           marginTop: 22,
           padding: "18px 22px",
-          borderRadius: "var(--radius-cs-lg)",
+          borderRadius: "var(--radius-mvx-lg)",
           border: "1px dashed var(--line-strong)",
           background: "var(--surface-sunk)",
           display: "flex",
@@ -274,7 +274,7 @@ export default function EpitopeSelectionStagePanel({
         </div>
         <Link
           href={`/workspaces/${workspace.id}/construct-design`}
-          className="cs-btn cs-btn-primary"
+          className="mvx-btn mvx-btn-primary"
         >
           Open stage 07 →
         </Link>

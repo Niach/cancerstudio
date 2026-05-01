@@ -138,7 +138,7 @@ class VepSpeciesConfig:
     extra_flags: tuple[str, ...] = ()
 
 
-VEP_RELEASE = os.getenv("CANCERSTUDIO_VEP_RELEASE", "111")
+VEP_RELEASE = os.getenv("MUTAVAX_VEP_RELEASE", "111")
 
 
 VEP_SPECIES_CONFIG: dict[WorkspaceSpecies, VepSpeciesConfig] = {
@@ -1218,7 +1218,7 @@ def _vep_install_command() -> list[str]:
 
 
 def _vep_plugins_dir() -> Path:
-    configured = os.getenv("CANCERSTUDIO_VEP_PLUGINS_DIR")
+    configured = os.getenv("MUTAVAX_VEP_PLUGINS_DIR")
     if configured:
         return Path(configured)
     return Path("/opt/vep-plugins")
@@ -1362,7 +1362,7 @@ def run_vep(
 
 
 def _vep_fork_count() -> int:
-    override = os.getenv("CANCERSTUDIO_VEP_FORKS")
+    override = os.getenv("MUTAVAX_VEP_FORKS")
     if override:
         try:
             value = int(override)

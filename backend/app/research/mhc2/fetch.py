@@ -74,7 +74,7 @@ def _urls_for(source: DataSource) -> dict[str, str]:
 
 def _download(url: str, target: Path) -> str:
     hasher = hashlib.sha256()
-    request = urllib.request.Request(url, headers={"User-Agent": "cancerstudio-mhc2/0.1"})
+    request = urllib.request.Request(url, headers={"User-Agent": "mutavax-mhc2/0.1"})
     with urllib.request.urlopen(request, timeout=600) as response:
         with target.open("wb") as handle:
             while True:

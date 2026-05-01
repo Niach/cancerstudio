@@ -337,7 +337,7 @@ function AlleleBlock({
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {items.length === 0 ? (
           <p
-            className="cs-tiny"
+            className="mvx-tiny"
             style={{ margin: 0, color: "var(--muted-2)", fontStyle: "italic" }}
           >
             No alleles configured.

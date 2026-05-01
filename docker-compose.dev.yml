@@ -12,11 +12,11 @@
 # containerized Next.js server is disabled in this overlay.
 
 services:
-  cancerstudio:
+  mutavax:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    image: cancerstudio:dev
+    image: mutavax:dev
     entrypoint:
       - uvicorn
       - app.main:app

@@ -66,9 +66,9 @@ export default function ConstructOutputStagePanel({
   );
 
   const header = (
-    <div className="cs-view-head">
+    <div className="mvx-view-head">
       <div>
-        <div className="cs-crumb">
+        <div className="mvx-crumb">
           {workspace.displayName} / 08 Construct output
         </div>
         <h1 style={{ textWrap: "pretty", margin: "4px 0 0" }}>
@@ -147,7 +147,7 @@ export default function ConstructOutputStagePanel({
         released={summary.status === "released"}
       />
 
-      <div className="cs-stage8-stack">
+      <div className="mvx-stage8-stack">
         <CmoCard
           order={summary.order ?? null}
           released={summary.status === "released"}

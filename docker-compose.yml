@@ -1,49 +1,49 @@
-# cancerstudio — paste-ready self-hosted compose file.
+# mutavax — paste-ready self-hosted compose file.
 #
 # Quick start (no clone, no build):
-#   1. mkdir ~/cancerstudio && cd ~/cancerstudio
-#   2. curl -fsSL https://raw.githubusercontent.com/niach/cancerstudio/main/docker-compose.yml -o docker-compose.yml
+#   1. mkdir ~/mutavax && cd ~/mutavax
+#   2. curl -fsSL https://raw.githubusercontent.com/niach/mutavax/main/docker-compose.yml -o docker-compose.yml
 #   3. docker compose up -d
 #   4. open http://localhost:3000
 #
 # One image. FastAPI backend + Next.js frontend run inside the same container;
 # only port 3000 is exposed. Data and the SQLite DB live under ./data
-# (override with CANCERSTUDIO_DATA_ROOT in .env). Drop tumor/normal
+# (override with MUTAVAX_DATA_ROOT in .env). Drop tumor/normal
 # FASTQ/BAM/CRAM files into ./data/inbox/.
 #
 # Defaults to MHCflurry as the class-I binding predictor so a fresh install
 # works on human samples without any DTU license download. For dog/cat or for
 # class-II scoring, place netMHCpan-4.2/ and netMHCIIpan-4.3/ under
-# ./data/netmhc/ and set CANCERSTUDIO_CLASS_I_PREDICTOR=NetMHCpan in .env.
+# ./data/netmhc/ and set MUTAVAX_CLASS_I_PREDICTOR=NetMHCpan in .env.
 #
 # GPU-accelerated variant calling (NVIDIA Parabricks) is opt-in:
 #   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
 
 services:
-  cancerstudio:
-    image: ghcr.io/niach/cancerstudio:latest
-    container_name: cancerstudio
+  mutavax:
+    image: ghcr.io/niach/mutavax:latest
+    container_name: mutavax
     restart: unless-stopped
     environment:
-      CANCERSTUDIO_CLASS_I_PREDICTOR: ${CANCERSTUDIO_CLASS_I_PREDICTOR:-MHCflurry}
-      CANCERSTUDIO_REVIEW_MODEL: ${CANCERSTUDIO_REVIEW_MODEL:-anthropic/claude-opus-4-7}
-      # Hard-set the in-container data root. A host-native CANCERSTUDIO_APP_DATA_DIR
+      MUTAVAX_CLASS_I_PREDICTOR: ${MUTAVAX_CLASS_I_PREDICTOR:-MHCflurry}
+      MUTAVAX_REVIEW_MODEL: ${MUTAVAX_REVIEW_MODEL:-anthropic/claude-opus-4-7}
+      # Hard-set the in-container data root. A host-native MUTAVAX_APP_DATA_DIR
       # in .env (for bare-metal uvicorn) would otherwise leak in via env_file and
       # point the backend at a path that doesn't exist inside the container.
-      CANCERSTUDIO_APP_DATA_DIR: /app-data
+      MUTAVAX_APP_DATA_DIR: /app-data
     env_file:
       - path: .env
         required: false
     ports:
       - "3000:3000"
     volumes:
-      - ${CANCERSTUDIO_DATA_ROOT:-./data}:/app-data
+      - ${MUTAVAX_DATA_ROOT:-./data}:/app-data
       # NetMHCpan / NetMHCIIpan are externally licensed (DTU). The host dir
       # lands at /tools/src inside the container so DTU's stock wrapper
       # scripts (which hardcode NMHOME=/tools/src/netMHCpan-4.2 etc.) work
       # with zero edits. Empty on a fresh install — stage 5 preflight refuses
       # to start and tells you which file is missing if you opt into NetMHCpan.
-      - ${CANCERSTUDIO_NETMHC_DIR:-${CANCERSTUDIO_DATA_ROOT:-./data}/netmhc}:/tools/src:ro
+      - ${MUTAVAX_NETMHC_DIR:-${MUTAVAX_DATA_ROOT:-./data}/netmhc}:/tools/src:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:3000 >/dev/null"]
       interval: 30s

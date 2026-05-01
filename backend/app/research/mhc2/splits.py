@@ -51,7 +51,7 @@ def assign_cluster_splits(
     records: list[MHC2Record],
     train_fraction: float = 0.8,
     valid_fraction: float = 0.1,
-    seed: str = "cancerstudio-mhc2-v1",
+    seed: str = "mutavax-mhc2-v1",
 ) -> list[MHC2Record]:
     """Assign splits by connected components of shared 9-mers.
 

@@ -135,9 +135,9 @@ export default function NeoantigenPredictionStagePanel({
   );
 
   const header = (
-    <div className="cs-view-head">
+    <div className="mvx-view-head">
       <div>
-        <div className="cs-crumb">
+        <div className="mvx-crumb">
           {workspace.displayName} / 05 Neoantigen prediction
         </div>
         <h1 style={{ textWrap: "pretty", margin: "4px 0 0" }}>
@@ -186,13 +186,13 @@ export default function NeoantigenPredictionStagePanel({
             <div style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)" }}>
               Install the MHC binding predictors to run neoantigen prediction.
             </div>
-            <p className="cs-tiny" style={{ margin: "4px 0 0" }}>
+            <p className="mvx-tiny" style={{ margin: "4px 0 0" }}>
               Missing: {missingTools.tools.join(", ")}
             </p>
             {missingTools.hints.map((hint, i) => (
               <p
                 key={i}
-                className="cs-tiny"
+                className="mvx-tiny"
                 style={{ margin: "6px 0 0", fontFamily: "var(--font-mono)" }}
               >
                 {hint}
@@ -217,7 +217,7 @@ export default function NeoantigenPredictionStagePanel({
             <div style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)" }}>
               {summary.blockingReason ?? "Finish annotation first."}
             </div>
-            <p className="cs-tiny" style={{ margin: "4px 0 0" }}>
+            <p className="mvx-tiny" style={{ margin: "4px 0 0" }}>
               Neoantigen prediction unlocks once annotation is done.
             </p>
           </div>
@@ -283,7 +283,7 @@ export default function NeoantigenPredictionStagePanel({
               </div>
               {summary.alleles.length === 0 ? (
                 <p
-                  className="cs-tiny"
+                  className="mvx-tiny"
                   style={{ marginTop: 10, color: "var(--warm)" }}
                 >
                   Add at least one MHC allele before running.
@@ -291,7 +291,7 @@ export default function NeoantigenPredictionStagePanel({
               ) : null}
               {actionError ? (
                 <p
-                  className="cs-tiny"
+                  className="mvx-tiny"
                   style={{ marginTop: 10, color: "var(--danger)" }}
                 >
                   {actionError}
@@ -317,17 +317,17 @@ export default function NeoantigenPredictionStagePanel({
             <Helix size={220} rungs={20} hue={tweaks.accentHue} speed={18} />
             <div style={{ marginTop: 20 }}>
               <div
-                className="cs-progress"
+                className="mvx-progress"
                 style={{ maxWidth: 420, margin: "0 auto", height: 10 }}
               >
                 <div
-                  className="cs-progress-fill"
+                  className="mvx-progress-fill"
                   style={{
                     width: `${Math.max(3, Math.round(latestRun.progress * 100))}%`,
                   }}
                 />
               </div>
-              <p className="cs-tiny" style={{ marginTop: 14 }}>
+              <p className="mvx-tiny" style={{ marginTop: 14 }}>
                 {phaseCopy} · {Math.round(latestRun.progress * 100)}%
               </p>
             </div>
@@ -345,7 +345,7 @@ export default function NeoantigenPredictionStagePanel({
           <Dot style={{ color: "var(--accent)" }} />
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 15, fontWeight: 500 }}>Paused.</div>
-            <p className="cs-tiny" style={{ margin: "4px 0 0" }}>
+            <p className="mvx-tiny" style={{ margin: "4px 0 0" }}>
               Resume to pick up from {latestRun.runtimePhase ?? "the last phase"}.
             </p>
           </div>
@@ -372,7 +372,7 @@ export default function NeoantigenPredictionStagePanel({
             <div style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)" }}>
               Neoantigen prediction failed.
             </div>
-            <p className="cs-tiny" style={{ margin: "4px 0 0" }}>
+            <p className="mvx-tiny" style={{ margin: "4px 0 0" }}>
               {latestRun?.error ??
                 "Try again, or check the pVACseq log in expert mode."}
             </p>
@@ -534,7 +534,7 @@ export default function NeoantigenPredictionStagePanel({
         </div>
         <Link
           href={`/workspaces/${workspace.id}/epitope-selection`}
-          className="cs-btn cs-btn-primary"
+          className="mvx-btn mvx-btn-primary"
         >
           Open stage 06 →
         </Link>

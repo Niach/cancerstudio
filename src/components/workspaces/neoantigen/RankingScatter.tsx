@@ -64,7 +64,7 @@ export default function RankingScatter({ peptides }: { peptides: TopCandidate[] 
       <div style={{ padding: "6px 12px 14px" }}>
         {plotted.length === 0 ? (
           <p
-            className="cs-tiny"
+            className="mvx-tiny"
             style={{ margin: 18, color: "var(--muted)", fontStyle: "italic" }}
           >
             Gene-expression data (TPM) isn&apos;t available for these candidates yet. Add

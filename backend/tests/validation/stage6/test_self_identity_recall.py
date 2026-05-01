@@ -1,6 +1,6 @@
 """Stage 6 validation — DIAMOND self-identity recall + specificity.
 
-The safety claim cancerstudio makes is: *if a candidate peptide is
+The safety claim mutavax makes is: *if a candidate peptide is
 identical (or near-identical) to a human self-protein, the stage-6
 UI will flag it and block release*. This test validates the sensitive
 end of that claim — peptides that ARE self-proteins must be flagged —
@@ -18,7 +18,7 @@ or our wrapper is not invoking it correctly.
 
 Network-dependent on first run (proteome bootstrap downloads ~11 MB
 of Swiss-Prot from UniProt). Subsequent runs are offline — cached
-under ``$CANCERSTUDIO_DATA_ROOT/references/proteome/human/``.
+under ``$MUTAVAX_DATA_ROOT/references/proteome/human/``.
 
 Skipped on the host (DIAMOND is container-only). Runs in-container
 via `npm run test:validation` or `docker exec ... pytest`.

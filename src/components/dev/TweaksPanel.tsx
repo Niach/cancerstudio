@@ -10,7 +10,7 @@ export default function TweaksPanel() {
   if (!panelVisible) return null;
 
   return (
-    <div className="cs-tweaks-panel" role="dialog" aria-label="Design tweaks">
+    <div className="mvx-tweaks-panel" role="dialog" aria-label="Design tweaks">
       <div
         style={{
           display: "flex",
@@ -37,9 +37,9 @@ export default function TweaksPanel() {
         </button>
       </div>
 
-      <div className="cs-tweak-row">
+      <div className="mvx-tweak-row">
         <label>Visual direction</label>
-        <div className="cs-tweak-seg">
+        <div className="mvx-tweak-seg">
           {DIRECTIONS.map((v) => (
             <button
               key={v}
@@ -53,33 +53,33 @@ export default function TweaksPanel() {
         </div>
       </div>
 
-      <div className="cs-tweak-row">
+      <div className="mvx-tweak-row">
         <label>Accent hue · {tweaks.accentHue}°</label>
         <input
           type="range"
           min={0}
           max={359}
           step={1}
-          className="cs-tweak-range"
+          className="mvx-tweak-range"
           value={tweaks.accentHue}
           onChange={(e) => setTweaks({ accentHue: parseInt(e.target.value, 10) })}
         />
       </div>
 
-      <div className="cs-tweak-row">
+      <div className="mvx-tweak-row">
         <label>Helix density · {tweaks.helixDensity} rungs</label>
         <input
           type="range"
           min={10}
           max={40}
           step={1}
-          className="cs-tweak-range"
+          className="mvx-tweak-range"
           value={tweaks.helixDensity}
           onChange={(e) => setTweaks({ helixDensity: parseInt(e.target.value, 10) })}
         />
       </div>
 
-      <label className="cs-tweak-toggle" style={{ marginTop: 4 }}>
+      <label className="mvx-tweak-toggle" style={{ marginTop: 4 }}>
         <input
           type="checkbox"
           checked={tweaks.expertMode}
@@ -89,7 +89,7 @@ export default function TweaksPanel() {
       </label>
 
       <div
-        className="cs-tiny"
+        className="mvx-tiny"
         style={{ marginTop: 10, fontSize: 11, color: "var(--muted-2)" }}
       >
         Toggle with <kbd>⌃⇧D</kbd>

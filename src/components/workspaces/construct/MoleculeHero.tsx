@@ -40,7 +40,7 @@ export default function MoleculeHero({
     <section aria-label="Complete mRNA molecule">
       <Card style={{ overflow: "visible" }}>
         <div
-          className="cs-card-head"
+          className="mvx-card-head"
           style={{ flexDirection: "column", alignItems: "stretch", gap: 6, paddingBottom: 10 }}
         >
           <div
@@ -451,7 +451,7 @@ function HoverReadout({ info }: { info: HoverInfo | null }) {
           <MonoLabel style={{ fontSize: 10.5 }}>{info.nt}</MonoLabel>
         </div>
         <div
-          className="cs-tiny"
+          className="mvx-tiny"
           style={{ color: "var(--ink-2)", fontSize: 13.5, lineHeight: 1.5 }}
         >
           {info.why}
