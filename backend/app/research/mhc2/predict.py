@@ -303,6 +303,31 @@ class MHC2Predictor:
         peptide_feat_cache: dict[str, "torch.Tensor"] = {}
         pseudoseq_feat_cache: dict[str, "torch.Tensor"] = {}
 
+        # Pre-batch live-embed: scoring N novel peptides was O(N) ESM forwards
+        # because the per-pair ``_lookup_peptide_features`` always invoked
+        # ``embed_sequences`` with batch_size=1. For mining and benchmarking
+        # against fresh proteome windows that's pathologically slow. Collect
+        # every unique cache-miss peptide once up front and embed them in one
+        # batched pass.
+        if self.model_kind != "scratch":
+            unique_peptides = list({pair[0] for pair in pairs})
+            to_embed = [
+                p for p in unique_peptides
+                if self.peptide_features.get(p) is None
+            ]
+            if to_embed:
+                from app.research.mhc2.esm import embed_sequences, load_esm2_35m
+                if self._esm_model is None:
+                    self._esm_model, self._esm_tokenizer = load_esm2_35m(
+                        device=str(self.device)
+                    )
+                embedded = embed_sequences(
+                    self._esm_model, self._esm_tokenizer, to_embed,
+                    device=str(self.device), batch_size=batch_size,
+                )
+                for p, feat in zip(to_embed, embedded):
+                    peptide_feat_cache[p] = feat
+
         for chunk_start in range(0, len(pairs), batch_size):
             chunk_end = min(chunk_start + batch_size, len(pairs))
             chunk_indices = range(chunk_start, chunk_end)
